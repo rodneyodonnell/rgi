@@ -1,4 +1,5 @@
 import tensorflow as tf
+import getpass
 
 def print_gpu_status():
     gpus = tf.config.list_physical_devices('GPU')  # List all physical GPUs
@@ -14,5 +15,6 @@ def print_gpu_status():
             print(f"  Compute Capability: {details.get('compute_capability', 'Unknown')}")
 
 if __name__ == "__main__":
+    print(f"Hello, {getpass.getuser()}!")
     print("Checking GPU status...")
     print_gpu_status()

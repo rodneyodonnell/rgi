@@ -1,11 +1,11 @@
 # Build & run
 ```
-docker build -t tensorflow-gpu-test .  && \
-docker run -it --gpus all -v $(pwd)/logs:/app/logs tensorflow-gpu-test
+docker build -t rgi-gpu .  && \
+docker run -it --gpus all -v $(pwd)/logs:/app/logs rgi-gpu
 ```
 
 # Run using existing image, but updated /src
-docker run -it --gpus all -v $(pwd)/src:/app/src -v $(pwd)/logs:/app/logs tensorflow-gpu-test
+docker run -it --gpus all -v $(pwd)/src:/app/src -v $(pwd)/logs:/app/logs rgi-gpu
 
 
 # Launch tensorboard to https://localhost:6006

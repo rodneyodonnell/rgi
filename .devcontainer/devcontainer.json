@@ -1,0 +1,26 @@
+{
+    "name": "RGI Dev Container",
+    "build": {
+        "context": "..",
+        "dockerfile": "../Dockerfile",
+        "args": {
+            "USERNAME": "vscode"
+        }
+    },
+    "runArgs": [
+        "--gpus", "all",
+        "-v", "${localWorkspaceFolder}/logs:/app/logs"
+    ],
+    "remoteUser": "vscode",
+    "updateRemoteUserUID": true,
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "GitHub.copilot",
+                "ms-python.python",
+                "ms-vscode.git",
+                "ms-azuretools.vscode-docker"
+            ]
+        }
+    }
+}
