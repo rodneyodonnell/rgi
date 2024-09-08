@@ -1,4 +1,4 @@
-FROM tensorflow/tensorflow:2.17.0-gpu
+FROM tensorflow/tensorflow:2.17.0-gpu-jupyter
 
 # Create a non-root user with sudo privileges
 ARG USERNAME=dockeruser
@@ -17,6 +17,8 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY src src
+COPY scripts scripts
+COPY notebooks notebooks
 
 # Change ownership of the /app directory
 RUN chown -R $USERNAME:$USERNAME /app
@@ -27,4 +29,6 @@ RUN ldconfig
 # Switch to the non-root user
 USER $USERNAME
 
-CMD ["python", "src/main.py"]
+ENV PYTHONPATH="/app/src"
+
+CMD ["bash"]

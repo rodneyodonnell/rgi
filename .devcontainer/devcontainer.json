@@ -7,19 +7,29 @@
             "USERNAME": "vscode"
         }
     },
+    // Launch jupyter on localhost:8888 during dev.
+    "postCreateCommand": "jupyter notebook --ip 0.0.0.0 --port 8888 --no-browser --allow-root --NotebookApp.token='' --NotebookApp.password=''",
+    "forwardPorts": [8888],
     "runArgs": [
-        "--gpus", "all",
-        "-v", "${localWorkspaceFolder}/logs:/app/logs"
+        "--gpus", "all"
+    ],
+    "mounts": [
+        "source=${localWorkspaceFolder}/logs,target=/app/logs,type=bind",
+        "source=${localWorkspaceFolder}/src,target=/app/src,type=bind",
+        "source=${localWorkspaceFolder}/scripts,target=/app/scripts,type=bind",
+        "source=${localWorkspaceFolder}/notebooks,target=/app/notebooks,type=bind"
     ],
     "remoteUser": "vscode",
     "updateRemoteUserUID": true,
+
     "customizations": {
         "vscode": {
             "extensions": [
                 "GitHub.copilot",
                 "ms-python.python",
                 "ms-vscode.git",
-                "ms-azuretools.vscode-docker"
+                "ms-azuretools.vscode-docker",
+                "ms-toolsai.jupyter"
             ]
         }
     }
