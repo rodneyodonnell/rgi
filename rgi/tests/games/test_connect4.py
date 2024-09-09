@@ -1,80 +1,123 @@
 import unittest
-from rgi.games.connect4 import Connect4
+from rgi.games.connect4 import Connect4Game, Connect4State
 
-
-class TestConnect4(unittest.TestCase):
+class TestConnect4Game(unittest.TestCase):
     def setUp(self):
-        self.game = Connect4()
+        self.game = Connect4Game()
 
     def test_initial_state(self):
         state = self.game.initial_state()
-        self.assertEqual(len(state), 6)
-        self.assertEqual(len(state[0]), 7)
-        self.assertTrue(all(cell == 0 for row in state for cell in row))
-
-    def test_current_player(self):
-        state = self.game.initial_state()
-        self.assertEqual(self.game.current_player(state), 1)
-        state[5][0] = 1
-        self.assertEqual(self.game.current_player(state), 2)
+        self.assertEqual(state.current_player, 1)
+        self.assertTrue(all(state.board.get((row, col)) == 0 
+                            for row in range(6) for col in range(7)))
 
     def test_legal_actions(self):
         state = self.game.initial_state()
         self.assertEqual(self.game.legal_actions(state), list(range(7)))
-        
-        # Fill a column
-        for i in range(6):
-            state[i][0] = 1
+
+        # Fill up a column
+        for _ in range(6):
+            state = self.game.next_state(state, 0)
         self.assertEqual(self.game.legal_actions(state), list(range(1, 7)))
 
     def test_next_state(self):
         state = self.game.initial_state()
-        new_state = self.game.next_state(state, 3)
-        self.assertEqual(new_state[5][3], 1)
-        self.assertEqual(self.game.current_player(new_state), 2)
+        next_state = self.game.next_state(state, 3)
+        self.assertEqual(next_state.current_player, 2)
+        self.assertEqual(next_state.board.get((5, 3)), 1)
 
     def test_is_terminal(self):
         state = self.game.initial_state()
         self.assertFalse(self.game.is_terminal(state))
-        
-        # Horizontal win
+
+        # Create a winning state
         for i in range(4):
-            state[5][i] = 1
+            state = self.game.next_state(state, i)
+            state = self.game.next_state(state, i)
         self.assertTrue(self.game.is_terminal(state))
 
     def test_reward(self):
         state = self.game.initial_state()
-        self.assertEqual(self.game.reward(state, 1), 0.0)
-        
-        # Player 1 wins
+        self.assertEqual(self.game.reward(state, 1), 0)
+        self.assertEqual(self.game.reward(state, 2), 0)
+
+        # Create a winning state for player 1
         for i in range(4):
-            state[5][i] = 1
-        self.assertEqual(self.game.reward(state, 1), 1.0)
-        self.assertEqual(self.game.reward(state, 2), -1.0)
+            state = self.game.next_state(state, i)
+            if i < 3:
+                state = self.game.next_state(state, i)
+        self.assertEqual(self.game.reward(state, 1), 1)
+        self.assertEqual(self.game.reward(state, 2), -1)
+
+    def test_vertical_win(self):
+        state = self.game.initial_state()
+        for _ in range(3):
+            state = self.game.next_state(state, 0)
+            state = self.game.next_state(state, 1)
+        state = self.game.next_state(state, 0)
+        self.assertTrue(self.game.is_terminal(state))
+        self.assertEqual(self.game.reward(state, 1), 1)
 
     def test_horizontal_win(self):
         state = self.game.initial_state()
         for i in range(4):
-            state[0][i] = 1
-        self.assertTrue(self.game._check_win(state, 1))
-
-    def test_vertical_win(self):
-        state = self.game.initial_state()
-        for i in range(4):
-            state[i][0] = 2
-        self.assertTrue(self.game._check_win(state, 2))
+            state = self.game.next_state(state, i)
+            if i < 3:
+                state = self.game.next_state(state, 0)
+        self.assertTrue(self.game.is_terminal(state))
+        self.assertEqual(self.game.reward(state, 1), 1)
 
     def test_diagonal_win(self):
         state = self.game.initial_state()
-        for i in range(4):
-            state[i][i] = 1
-        self.assertTrue(self.game._check_win(state, 1))
+        moves = [0, 1, 1, 2, 2, 3, 2, 3, 3, 0, 3]
+        for move in moves:
+            state = self.game.next_state(state, move)
+        self.assertTrue(self.game.is_terminal(state))
+        self.assertEqual(self.game.reward(state, 1), 1)
 
-    def test_reverse_diagonal_win(self):
+    def test_invalid_move(self):
         state = self.game.initial_state()
-        for i in range(4):
-            state[i][3-i] = 2
-        self.assertTrue(self.game._check_win(state, 2))
+        with self.assertRaises(ValueError):
+            self.game.next_state(state, 7)
+
+    def test_custom_board_size(self):
+        game = Connect4Game(width=8, height=7, connect=5)
+        state = game.initial_state()
+        self.assertEqual(len(game.legal_actions(state)), 8)
+        for _ in range(7):
+            state = game.next_state(state, 0)
+        self.assertEqual(len(game.legal_actions(state)), 7)
+
+
+
+    def test_draw(self, verbose=True):
+        # Create a full board with no winner
+        state = self.game.initial_state()
+        moves = [
+            0, 1, 2, 3, 4, 5,
+            0, 1, 2, 3, 4, 5,
+            0, 1, 2, 3, 4, 5, 6,
+            0, 1, 2, 3, 4, 5,
+            0, 1, 2, 3, 4, 5,
+            0, 1, 2, 3, 4, 5, 6,
+            6, 6, 6
+        ]
+        for i, move in enumerate(moves):
+            state = self.game.next_state(state, move)
+            self.assertFalse(self.game.is_terminal(state))
+            self.assertEqual(self.game.reward(state, 1), 0)
+            self.assertEqual(self.game.reward(state, 2), 0)
+            self.assertEqual(self.game._check_winner(state), None)
+            if verbose:
+                print(f"Debug - Move {i+1}: {move}")
+                print(self.game.display(state))
+                print(f"Is terminal: {self.game.is_terminal(state)}\n")
+
+        state = self.game.next_state(state, 6)
+        self.assertTrue(self.game.is_terminal(state))
+        self.assertEqual(self.game.reward(state, 1), 0)
+        self.assertEqual(self.game.reward(state, 2), 0)
+        self.assertEqual(self.game._check_winner(state), None)
 
 if __name__ == '__main__':
     unittest.main()

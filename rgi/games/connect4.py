@@ -1,70 +1,79 @@
-from rgi.core.game import Game
+from typing import Literal
+from typing_extensions import override
+from immutables import Map
+from rgi.core.base import Game, TPlayerId, TAction
 
-class Connect4(Game[list[list[int]], int, int]):
-    def __init__(self, rows: int = 6, cols: int = 7):
-        self.rows = rows
-        self.cols = cols
+class Connect4State:
+    def __init__(self, board: Map[tuple[int, int], int], current_player: Literal[1, 2]):
+        self.board = board
+        self.current_player = current_player
 
-    def initial_state(self) -> list[list[int]]:
-        return [[0 for _ in range(self.cols)] for _ in range(self.rows)]
+    def __repr__(self):
+        return f"Connect4State(board={self.board}, current_player={self.current_player})"
 
-    def current_player(self, state: list[list[int]]) -> int:
-        return 1 if sum(sum(row) for row in state) % 2 == 0 else 2
+class Connect4Game(Game[Connect4State, Literal[1, 2], int]):
+    def __init__(self, width: int = 7, height: int = 6, connect: int = 4):
+        self.width = width
+        self.height = height
+        self.connect = connect
 
-    def legal_actions(self, state: list[list[int]]) -> list[int]:
-        return [col for col in range(self.cols) if state[0][col] == 0]
+    @override
+    def initial_state(self) -> Connect4State:
+        return Connect4State(Map({(row, col): 0 for row in range(self.height) for col in range(self.width)}), current_player=1)
 
-    def next_state(self, state: list[list[int]], action: int) -> list[list[int]]:
-        new_state = [row.copy() for row in state]
-        for row in range(self.rows - 1, -1, -1):
-            if new_state[row][action] == 0:
-                new_state[row][action] = self.current_player(state)
+    @override
+    def get_current_player(self, state: Connect4State) -> Literal[1, 2]:
+        return state.current_player
+
+    @override
+    def legal_actions(self, state: Connect4State) -> list[int]:
+        return [col for col in range(self.width) if state.board.get((0, col)) == 0]
+
+    @override
+    def next_state(self, state: Connect4State, action: int) -> Connect4State:
+        if action not in self.legal_actions(state):
+            raise ValueError("Illegal action")
+
+        new_board = state.board
+        for row in range(self.height - 1, -1, -1):
+            if new_board.get((row, action)) == 0:
+                new_board = new_board.set((row, action), state.current_player)
                 break
-        return new_state
 
-    def is_terminal(self, state: list[list[int]]) -> bool:
-        return self._check_win(state, 1) or self._check_win(state, 2) or len(self.legal_actions(state)) == 0
+        return Connect4State(
+            board=new_board,
+            current_player=3 - state.current_player  # Switch player (1 -> 2, 2 -> 1)
+        )
 
-    def reward(self, state: list[list[int]], player: int) -> float:
-        if self._check_win(state, player):
-            return 1.0
-        elif self._check_win(state, 3 - player):  # 3 - player gives the opponent
-            return -1.0
-        else:
-            return 0.0
+    @override
+    def is_terminal(self, state: Connect4State) -> bool:
+        return self._check_winner(state) is not None or all(state.board.get((0, col)) != 0 for col in range(self.width))
 
-    def action_to_string(self, action: int) -> str:
-        return str(action)
+    @override
+    def reward(self, state: Connect4State, player_id: Literal[1, 2]) -> float:
+        winner = self._check_winner(state)
+        if winner is None:
+            return 0
+        return 1 if winner == player_id else -1
 
-    def state_to_string(self, state: list[list[int]]) -> str:
-        return "\n".join(" ".join(str(cell) for cell in row) for row in state)
+    def _check_winner(self, state: Connect4State) -> Literal[1, 2] | None:
+        directions = [(0, 1), (1, 0), (1, 1), (1, -1)]  # Horizontal, Vertical, Diagonal down, Diagonal up
+        for row in range(self.height):
+            for col in range(self.width):
+                if state.board.get((row, col)) == 0:
+                    continue
+                for dx, dy in directions:
+                    if all(0 <= row + i*dy < self.height and 0 <= col + i*dx < self.width and 
+                           state.board.get((row, col)) == state.board.get((row + i*dy, col + i*dx)) 
+                           for i in range(self.connect)):
+                        return state.board.get((row, col))
+        return None
 
-    def string_to_action(self, string: str) -> int:
-        return int(string)
+    def __str__(self) -> str:
+        return f"Connect4Game(width={self.width}, height={self.height}, connect={self.connect})"
 
-    def _check_win(self, state: list[list[int]], player: int) -> bool:
-        # Check horizontal
-        for row in range(self.rows):
-            for col in range(self.cols - 3):
-                if all(state[row][col+i] == player for i in range(4)):
-                    return True
-
-        # Check vertical
-        for row in range(self.rows - 3):
-            for col in range(self.cols):
-                if all(state[row+i][col] == player for i in range(4)):
-                    return True
-
-        # Check diagonal (top-left to bottom-right)
-        for row in range(self.rows - 3):
-            for col in range(self.cols - 3):
-                if all(state[row+i][col+i] == player for i in range(4)):
-                    return True
-
-        # Check diagonal (top-right to bottom-left)
-        for row in range(self.rows - 3):
-            for col in range(3, self.cols):
-                if all(state[row+i][col-i] == player for i in range(4)):
-                    return True
-
-        return False
+    def display(self, state: Connect4State) -> str:
+        return "\n".join(
+            "|" + "|".join(" ●○"[state.board.get((row, col), 0)] for col in range(self.width)) + "|"
+            for row in range(self.height)
+        ) + "\n+" + "-+" * self.width
