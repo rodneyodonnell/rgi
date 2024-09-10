@@ -1,6 +1,7 @@
 import unittest
 from rgi.games.connect4 import Connect4Game, Connect4State
 
+
 class TestConnect4Game(unittest.TestCase):
     def setUp(self):
         self.game = Connect4Game()
@@ -8,8 +9,7 @@ class TestConnect4Game(unittest.TestCase):
     def test_initial_state(self):
         state = self.game.initial_state()
         self.assertEqual(state.current_player, 1)
-        self.assertTrue(all(state.board.get((row, col)) == 0 
-                            for row in range(6) for col in range(7)))
+        self.assertTrue(all(state.board.get((row, col)) == 0 for row in range(6) for col in range(7)))
 
     def test_legal_actions(self):
         state = self.game.initial_state()
@@ -88,20 +88,20 @@ class TestConnect4Game(unittest.TestCase):
             state = game.next_state(state, 0)
         self.assertEqual(len(game.legal_actions(state)), 7)
 
-
-
     def test_draw(self, verbose=True):
         # Create a full board with no winner
         state = self.game.initial_state()
+        # fmt: off
         moves = [
             0, 1, 2, 3, 4, 5,
             0, 1, 2, 3, 4, 5,
             0, 1, 2, 3, 4, 5, 6,
             0, 1, 2, 3, 4, 5,
             0, 1, 2, 3, 4, 5,
-            0, 1, 2, 3, 4, 5, 6,
-            6, 6, 6
+            0, 1, 2, 3, 4, 5,
+            6, 6, 6, 6,
         ]
+        # fmt: on
         for i, move in enumerate(moves):
             state = self.game.next_state(state, move)
             self.assertFalse(self.game.is_terminal(state))
@@ -119,5 +119,6 @@ class TestConnect4Game(unittest.TestCase):
         self.assertEqual(self.game.reward(state, 2), 0)
         self.assertEqual(self.game._check_winner(state), None)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()

@@ -1,11 +1,12 @@
 from abc import ABC, abstractmethod
 from typing import Generic, TypeVar
 
-TGameState = TypeVar('TGameState')
-TPlayerState = TypeVar('TPlayerState')
-TPlayerId = TypeVar('TPlayerId')
-TAction = TypeVar('TAction')
-TEmbedding = TypeVar('TEmbedding')
+TGameState = TypeVar("TGameState")
+TPlayerState = TypeVar("TPlayerState")
+TPlayerId = TypeVar("TPlayerId")
+TAction = TypeVar("TAction")
+TEmbedding = TypeVar("TEmbedding")
+
 
 class Game(ABC, Generic[TGameState, TPlayerId, TAction]):
     @abstractmethod
@@ -36,15 +37,16 @@ class Game(ABC, Generic[TGameState, TPlayerId, TAction]):
     @abstractmethod
     def reward(self, state: TGameState, player_id: TPlayerId) -> float:
         """Return the reward for the given player in the given state.
-        
+
         This is typically 0 for non-terminal states, and -1, 0, or 1 for terminal states,
         depending on whether the player lost, drew, or won respectively."""
         pass
-   
+
     @abstractmethod
     def pretty_str(self, state: TGameState) -> str:
         """Return a human-readable string representation of the game state."""
         pass
+
 
 class StateEmbedder(ABC, Generic[TGameState, TEmbedding]):
     @abstractmethod
@@ -55,6 +57,7 @@ class StateEmbedder(ABC, Generic[TGameState, TEmbedding]):
     def get_embedding_dim(self) -> int:
         pass
 
+
 class ActionEmbedder(ABC, Generic[TAction, TEmbedding]):
     @abstractmethod
     def embed_action(self, action: TAction) -> TEmbedding:
@@ -64,6 +67,7 @@ class ActionEmbedder(ABC, Generic[TAction, TEmbedding]):
     def get_embedding_dim(self) -> int:
         pass
 
+
 class Player(ABC, Generic[TGameState, TPlayerState, TAction]):
     @abstractmethod
     def select_action(self, game_state: TGameState, legal_actions: list[TAction]) -> TAction:
@@ -72,10 +76,11 @@ class Player(ABC, Generic[TGameState, TPlayerState, TAction]):
     @abstractmethod
     def update_state(self, game_state: TGameState, action: TAction):
         """Update the player's internal state based on the game state and action.
-        
+
         This method is called after each action, allowing the player to update any
         internal state or learning parameters based on the game progression."""
         pass
+
 
 class GameObserver(ABC, Generic[TGameState, TPlayerId]):
     @abstractmethod

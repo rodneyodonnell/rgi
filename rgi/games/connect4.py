@@ -3,6 +3,7 @@ from typing_extensions import override
 from immutables import Map
 from rgi.core.base import Game, TPlayerId, TAction
 
+
 class Connect4State:
     def __init__(self, board: Map[tuple[int, int], int], current_player: Literal[1, 2]):
         self.board = board
@@ -10,6 +11,7 @@ class Connect4State:
 
     def __repr__(self):
         return f"Connect4State(board={self.board}, current_player={self.current_player})"
+
 
 class Connect4Game(Game[Connect4State, Literal[1, 2], int]):
     def __init__(self, width: int = 7, height: int = 6, connect: int = 4):
@@ -19,7 +21,10 @@ class Connect4Game(Game[Connect4State, Literal[1, 2], int]):
 
     @override
     def initial_state(self) -> Connect4State:
-        return Connect4State(Map({(row, col): 0 for row in range(self.height) for col in range(self.width)}), current_player=1)
+        return Connect4State(
+            Map({(row, col): 0 for row in range(self.height) for col in range(self.width)}),
+            current_player=1,
+        )
 
     @override
     def current_player_id(self, state: Connect4State) -> Literal[1, 2]:
@@ -46,7 +51,7 @@ class Connect4Game(Game[Connect4State, Literal[1, 2], int]):
 
         return Connect4State(
             board=new_board,
-            current_player=3 - state.current_player  # Switch player (1 -> 2, 2 -> 1)
+            current_player=3 - state.current_player,  # Switch player (1 -> 2, 2 -> 1)
         )
 
     @override
@@ -61,15 +66,23 @@ class Connect4Game(Game[Connect4State, Literal[1, 2], int]):
         return 1 if winner == player_id else -1
 
     def _check_winner(self, state: Connect4State) -> Literal[1, 2] | None:
-        directions = [(0, 1), (1, 0), (1, 1), (1, -1)]  # Horizontal, Vertical, Diagonal down, Diagonal up
+        directions = [
+            (0, 1),
+            (1, 0),
+            (1, 1),
+            (1, -1),
+        ]  # Horizontal, Vertical, Diagonal down, Diagonal up
         for row in range(self.height):
             for col in range(self.width):
                 if state.board.get((row, col)) == 0:
                     continue
                 for dx, dy in directions:
-                    if all(0 <= row + i*dy < self.height and 0 <= col + i*dx < self.width and 
-                           state.board.get((row, col)) == state.board.get((row + i*dy, col + i*dx)) 
-                           for i in range(self.connect)):
+                    if all(
+                        0 <= row + i * dy < self.height
+                        and 0 <= col + i * dx < self.width
+                        and state.board.get((row, col)) == state.board.get((row + i * dy, col + i * dx))
+                        for i in range(self.connect)
+                    ):
                         return state.board.get((row, col))
         return None
 
@@ -78,7 +91,11 @@ class Connect4Game(Game[Connect4State, Literal[1, 2], int]):
 
     @override
     def pretty_str(self, state: Connect4State) -> str:
-        return "\n".join(
-            "|" + "|".join(" ●○"[state.board.get((row, col), 0)] for col in range(self.width)) + "|"
-            for row in range(self.height)
-        ) + "\n+" + "-+" * self.width
+        return (
+            "\n".join(
+                "|" + "|".join(" ●○"[state.board.get((row, col), 0)] for col in range(self.width)) + "|"
+                for row in range(self.height)
+            )
+            + "\n+"
+            + "-+" * self.width
+        )

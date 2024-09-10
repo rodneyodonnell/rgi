@@ -17,3 +17,8 @@ docker run -it --gpus all -v $(pwd)/rgi:/app/rgi -v $(pwd)/logs:/app/logs rgi-gp
 ```
 pytest
 ```
+
+# Reformat code:
+```
+black . --line-length 120
+```

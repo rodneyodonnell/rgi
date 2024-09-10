@@ -38,7 +38,10 @@ For now, we are running all experiments on a RTX 2070 GPU, but may consider upgr
 
 # Project Status:
 - We are currently in the design/prototype phase.
-- We plan to start with a small game (connect4?)
+- We have implemented:
+  - A basic connect_4 game
+  - A random player
+  - A guman player
 - For modeling:
   - We play to use an embedding as a bottleneck between the game state and the model. This should aid generalization to new games.
   - Modeling game state can be done with transformers, CNNs or other approaches to convert from stats -> embedding.

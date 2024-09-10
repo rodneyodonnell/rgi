@@ -2,6 +2,7 @@ from rgi.core.base import Player, TGameState, TAction
 from typing_extensions import override
 import random
 
+
 class RandomPlayer(Player[TGameState, None, TAction]):
     @override
     def select_action(self, game_state: TGameState, legal_actions: list[TAction]) -> TAction:
