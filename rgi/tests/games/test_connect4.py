@@ -110,7 +110,7 @@ class TestConnect4Game(unittest.TestCase):
             self.assertEqual(self.game._check_winner(state), None)
             if verbose:
                 print(f"Debug - Move {i+1}: {move}")
-                print(self.game.display(state))
+                print(self.game.pretty_str(state))
                 print(f"Is terminal: {self.game.is_terminal(state)}\n")
 
         state = self.game.next_state(state, 6)

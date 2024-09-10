@@ -18,11 +18,13 @@ TEmbedding = TypeVar('TEmbedding')
 
 class Game(ABC, Generic[TGameState, TPlayerId, TAction]):
     def initial_state(self) -> TGameState:
-    def get_current_player(self, state: TGameState) -> TPlayerId:
+    def current_player_id(self, state: TGameState) -> TPlayerId:
+    def all_player_ids(self, state: TGameState) -> list[TPlayerId]:
     def legal_actions(self, state: TGameState) -> list[TAction]:
     def next_state(self, state: TGameState, action: TAction) -> TGameState:
     def is_terminal(self, state: TGameState) -> bool:
     def reward(self, state: TGameState, player_id: TPlayerId) -> float:
+    def pretty_str(self, state: TGameState) -> str:
 
 class StateEmbedder(ABC, Generic[TGameState, TEmbedding]):
     def embed_state(self, state: TGameState) -> TEmbedding:

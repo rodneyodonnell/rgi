@@ -22,8 +22,12 @@ class Connect4Game(Game[Connect4State, Literal[1, 2], int]):
         return Connect4State(Map({(row, col): 0 for row in range(self.height) for col in range(self.width)}), current_player=1)
 
     @override
-    def get_current_player(self, state: Connect4State) -> Literal[1, 2]:
+    def current_player_id(self, state: Connect4State) -> Literal[1, 2]:
         return state.current_player
+
+    @override
+    def all_player_ids(self, state: Connect4State) -> list[Literal[1, 2]]:
+        return [1, 2]
 
     @override
     def legal_actions(self, state: Connect4State) -> list[int]:
@@ -72,7 +76,8 @@ class Connect4Game(Game[Connect4State, Literal[1, 2], int]):
     def __str__(self) -> str:
         return f"Connect4Game(width={self.width}, height={self.height}, connect={self.connect})"
 
-    def display(self, state: Connect4State) -> str:
+    @override
+    def pretty_str(self, state: Connect4State) -> str:
         return "\n".join(
             "|" + "|".join(" ●○"[state.board.get((row, col), 0)] for col in range(self.width)) + "|"
             for row in range(self.height)

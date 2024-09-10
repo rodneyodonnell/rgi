@@ -1,17 +1,13 @@
+from rgi.core.base import Player, TGameState, TAction
+from typing_extensions import override
 import random
-from typing import Any
-from rgi.core.player import Player
-from rgi.core.game import Game, TState, TAction, TPlayer
 
-class RandomPlayer(Player[TState, TAction, None]):
-    def select_action(self, game: Game[TState, TAction, TPlayer], state: TState) -> TAction:
-        return random.choice(game.legal_actions(state))
+class RandomPlayer(Player[TGameState, None, TAction]):
+    @override
+    def select_action(self, game_state: TGameState, legal_actions: list[TAction]) -> TAction:
+        return random.choice(legal_actions)
 
-    def update(self, state: TState, action: TAction, new_state: TState) -> None:
-        pass  # RandomPlayer doesn't need to update internal state
-
-    def get_state(self) -> None:
-        return None  # RandomPlayer has no internal state
-
-    def set_state(self, state: None) -> None:
-        pass  # RandomPlayer has no internal state to set
+    @override
+    def update_state(self, game_state: TGameState, action: TAction):
+        # Random player doesn't need to maintain any state
+        pass

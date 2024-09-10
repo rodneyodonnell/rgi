@@ -13,7 +13,12 @@ class Game(ABC, Generic[TGameState, TPlayerId, TAction]):
         pass
 
     @abstractmethod
-    def get_current_player(self, state: TGameState) -> TPlayerId:
+    def current_player_id(self, state: TGameState) -> TPlayerId:
+        pass
+
+    @abstractmethod
+    def all_player_ids(self, state: TGameState) -> list[TPlayerId]:
+        """Return a sequence of all player IDs in the game."""
         pass
 
     @abstractmethod
@@ -34,6 +39,11 @@ class Game(ABC, Generic[TGameState, TPlayerId, TAction]):
         
         This is typically 0 for non-terminal states, and -1, 0, or 1 for terminal states,
         depending on whether the player lost, drew, or won respectively."""
+        pass
+   
+    @abstractmethod
+    def pretty_str(self, state: TGameState) -> str:
+        """Return a human-readable string representation of the game state."""
         pass
 
 class StateEmbedder(ABC, Generic[TGameState, TEmbedding]):

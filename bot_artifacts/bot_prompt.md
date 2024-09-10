@@ -23,6 +23,7 @@ For now, we are running all experiments on a RTX 2070 GPU, but may consider upgr
 - Include types in python code where appropriate.
 - Never import `List` or `Tuple` from `typing`. Always use the more modern `list` and `tuple` (lowercase) instead.
 - When creating a TypeVar, prefix the name with T. E.g. `TState = TypeVar('TState')`
+- Use `@override` decorator when overriding methods (`from typing_extensions import override`).
 
 
 # Project Vision:

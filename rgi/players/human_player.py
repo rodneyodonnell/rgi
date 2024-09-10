@@ -1,31 +1,24 @@
-from rgi.core.player import Player
-from rgi.core.game import Game, TState, TAction, TPlayer
+from rgi.core.base import Player, Game, TGameState, TAction
+from typing import Callable, Generic, TypeVar
+from typing_extensions import override
 
-class HumanPlayer(Player[TState, TAction, None]):
-    def select_action(self, game: Game[TState, TAction, TPlayer], state: TState) -> TAction:
-        print("\nCurrent game state:")
-        print(game.state_to_string(state))
-        
-        legal_actions = game.legal_actions(state)
-        print("\nLegal actions:")
+TGame = TypeVar('TGame', bound=Game)
+
+class HumanPlayer(Player[TGameState, None, TAction], Generic[TGame, TGameState, TAction]):
+    def __init__(self, game: TGame, action_input_func: Callable[[list[TAction]], TAction]):
+        self.game = game
+        self.action_input_func = action_input_func
+
+    @override
+    def select_action(self, game_state: TGameState, legal_actions: list[TAction]) -> TAction:
+        print("Current game state:")
+        print(self.game.pretty_str(game_state))
+        print("Legal actions:")
         for i, action in enumerate(legal_actions):
-            print(f"{i}: {game.action_to_string(action)}")
+            print(f"{i}: {action}")
         
-        while True:
-            try:
-                choice = int(input("\nEnter the number of your chosen action: "))
-                if 0 <= choice < len(legal_actions):
-                    return legal_actions[choice]
-                else:
-                    print("Invalid choice. Please try again.")
-            except ValueError:
-                print("Invalid input. Please enter a number.")
-
-    def update(self, state: TState, action: TAction, new_state: TState) -> None:
-        pass  # HumanPlayer doesn't need to update internal state
-
-    def get_state(self) -> None:
-        return None  # HumanPlayer has no internal state
-
-    def set_state(self, state: None) -> None:
-        pass  # HumanPlayer has no internal state to set
+        return self.action_input_func(legal_actions)
+    @override
+    def update_state(self, game_state: TGameState, action: TAction):
+        # Human player doesn't need to maintain any state
+        pass
