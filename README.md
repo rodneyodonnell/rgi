@@ -22,3 +22,8 @@ pytest
 ```
 black . --line-length 120
 ```
+
+# Run 100 games.
+```
+python main.py --player1 minimax --player2 random --num_games 100
+```
