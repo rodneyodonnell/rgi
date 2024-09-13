@@ -50,3 +50,27 @@ time python -m cProfile -s cumtime rgi/main.py --player1 minimax --player2 rando
 find . \( -name "*.py" -o -name "*.sh" -o -name "Dockerfile" -o -name "requirements.txt" -o -path "./bot_artifacts/" \) \
     -not -path "*/.ipynb_checkpoints/*" -not -name "." -type f -print0 | \
 xargs -0 -I {} sh -c 'echo -e "\n===== {} =====\n"; cat "{}"' | xclip -selection clipboard
+
+
+
+# Web UI
+```
+pip install fastapi uvicorn[standard]
+```
+your_project/
+├── rgi/                     # Your existing game logic
+├── web_app/
+│   ├── main.py              # FastAPI application
+│   ├── routers/
+│   │   ├── __init__.py
+│   │   ├── connect4.py
+│   │   └── othello.py
+│   ├── templates/           # HTML templates
+│   │   ├── index.html
+│   │   ├── connect4.html
+│   │   └── othello.html
+│   └── static/              # CSS and JavaScript files
+│       ├── styles.css
+│       ├── connect4.js
+│       └── othello.js
+└── ...
