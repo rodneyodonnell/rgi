@@ -4,11 +4,15 @@ from collections import defaultdict
 from rgi.core.base import Game
 from rgi.core.game_runner import GameRunner
 from rgi.games.connect4 import Connect4Game
+from rgi.games.othello import OthelloGame
 from rgi.players.random_player import RandomPlayer
 from rgi.players.minimax_player import MinimaxPlayer
 from rgi.players.human_player import HumanPlayer
 
-GAMES = {"connect4": Connect4Game}
+GAMES = {
+    "connect4": Connect4Game,
+    "othello": OthelloGame,
+}
 
 
 def parse_args():

@@ -24,6 +24,7 @@ For now, we are running all experiments on a RTX 2070 GPU, but may consider upgr
 - Never import `List` or `Tuple` from `typing`. Always use the more modern `list` and `tuple` (lowercase) instead.
 - When creating a TypeVar, prefix the name with T. E.g. `TState = TypeVar('TState')`
 - Use `@override` decorator when overriding methods (`from typing_extensions import override`).
+- I'm using black to autoformat the code, so use `# fmt: off` and `# fmt: on` to disable formatting where needed.
 
 
 # Project Vision:
@@ -45,3 +46,9 @@ For now, we are running all experiments on a RTX 2070 GPU, but may consider upgr
 - For modeling:
   - We play to use an embedding as a bottleneck between the game state and the model. This should aid generalization to new games.
   - Modeling game state can be done with transformers, CNNs or other approaches to convert from stats -> embedding.
+
+# TODO:
+- Consider how to add a general heuristic for use by MinMax player, etc.
+- Add more games.
+- Add a game UI
+- Consider adding "relevance tests" to ensure models work as expected on various games.
