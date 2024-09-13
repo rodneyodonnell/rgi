@@ -27,3 +27,10 @@ black . --line-length 120
 ```
 python main.py --player1 minimax --player2 random --num_games 100
 ```
+
+
+# Profile code
+```
+pip install line_profiler
+time python -m cProfile -s cumtime rgi/main.py --player1 minimax --player2 random --num_games 5
+```
