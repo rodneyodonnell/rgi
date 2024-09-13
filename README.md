@@ -41,7 +41,5 @@ time python -m cProfile -s cumtime rgi/main.py --player1 minimax --player2 rando
 
 # Create a tarball to upload to LLMs
 ```
-find . \( -name "*.py" -o -name "Dockerfile" -o -name "requirements.txt" -o -path "./bot_artifacts/*" \) \
-    -not -path "*/.ipynb_checkpoints/*" -not -name ".*" | tar -czvf rgi_source.tar.gz -T -
-
+./scripts/create_bot_tarball.sh
 ```
