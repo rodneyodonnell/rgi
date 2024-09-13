@@ -1,4 +1,5 @@
 import unittest
+import textwrap
 from rgi.games.connect4 import Connect4Game, Connect4State
 
 
@@ -120,6 +121,54 @@ class TestConnect4Game(unittest.TestCase):
         self.assertTrue(self.game.is_terminal(state))
         self.assertEqual(self.game.reward(state, 1), 0)
         self.assertEqual(self.game.reward(state, 2), 0)
+
+    def test_connect4_parse_and_pretty_print(self):
+        game = Connect4Game()
+
+        test_cases = [
+            # empty board
+            textwrap.dedent(
+                """
+                | | | | | | | |
+                | | | | | | | |
+                | | | | | | | |
+                | | | | | | | |
+                | | | | | | | |
+                | | | | | | | |
+                +-+-+-+-+-+-+-+
+                """
+            ),
+            # simple board
+            textwrap.dedent(
+                """
+                | | | | | | | |
+                | | | | | | | |
+                | | | | | | | |
+                | | | | | | |●|
+                |○| | | | | |●|
+                |○|○| | | | |●|
+                +-+-+-+-+-+-+-+
+                """
+            ),
+            # Complex Board
+            textwrap.dedent(
+                """
+                |○| | | | | | |
+                |○| | |●| | | |
+                |●| | |○| | | |
+                |○|○| |●| | | |
+                |○|○|●|●| |●| |
+                |○|●|○|●|●|●|○|
+                +-+-+-+-+-+-+-+
+                """
+            ),
+        ]
+
+        for board_str in test_cases:
+            state = game.parse_board(board_str, current_player=2)
+            pretty_printed = game.pretty_str(state)
+
+            self.assertEqual(pretty_printed.strip(), board_str.strip())
 
 
 if __name__ == "__main__":

@@ -127,3 +127,16 @@ class Connect4Game(Game[Connect4State, TPlayerId, TAction]):
             + "\n+"
             + "-+" * self.width
         )
+
+    def parse_board(self, board_str: str, current_player: int) -> Connect4State:
+        """Parses the output of pretty_str into a Connect4State."""
+        rows = board_str.strip().split("\n")[:-1]  # Skip the bottom border row
+        board = Map()
+        for r, row in enumerate(reversed(rows), start=1):
+            row_cells = row.strip().split("|")[1:-1]  # Extract cells between borders
+            for c, cell in enumerate(row_cells, start=1):
+                if cell == "●":
+                    board = board.set((r, c), 1)  # Player 1
+                elif cell == "○":
+                    board = board.set((r, c), 2)  # Player 2
+        return Connect4State(board=board, current_player=current_player)
