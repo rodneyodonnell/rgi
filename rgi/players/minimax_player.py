@@ -18,7 +18,7 @@ class MinimaxPlayer(Player[TGameState, Any, TAction]):
         """Evaluate terminal state. If the game is terminal, return the reward."""
         if self.game.is_terminal(state):
             reward = self.game.reward(state, self.player_id)
-            return reward if reward != 0 else -1  # Returning -1 for a loss, 1 for a win, and 0 for draws
+            return reward
         return self.heuristic(state)  # Use heuristic evaluation for non-terminal states
 
     def heuristic(self, state: TGameState) -> float:
@@ -26,38 +26,44 @@ class MinimaxPlayer(Player[TGameState, Any, TAction]):
         # return state  # Replace with actual heuristic logic suitable for your game
         return 0
 
-    def minimax(self, state: TGameState, depth: int, maximizing_player: bool) -> tuple[int, Optional[TAction]]:
-        """Minimax algorithm with depth limiting."""
+    def minimax(self, state: TGameState, depth: int, alpha: float, beta: float) -> tuple[float, Optional[TAction]]:
         if self.game.is_terminal(state) or depth == 0:
             return self.evaluate(state), None
 
-        legal_actions = self.game.legal_actions(state)
+        current_player = self.game.current_player_id(state)
+        is_maximizing_player = current_player == self.player_id
 
-        if maximizing_player:
+        legal_actions = self.game.legal_actions(state)
+        best_action = None
+
+        if is_maximizing_player:
             max_eval = -float("inf")
-            best_action = None
             for action in legal_actions:
                 next_state = self.game.next_state(state, action)
-                eval_score, _ = self.minimax(next_state, depth - 1, False)
+                eval_score, _ = self.minimax(next_state, depth - 1, alpha, beta)
                 if eval_score > max_eval:
                     max_eval = eval_score
                     best_action = action
+                alpha = max(alpha, eval_score)
+                if beta <= alpha:
+                    break  # Beta cut-off
             return max_eval, best_action
         else:
             min_eval = float("inf")
-            best_action = None
             for action in legal_actions:
                 next_state = self.game.next_state(state, action)
-                eval_score, _ = self.minimax(next_state, depth - 1, True)
+                eval_score, _ = self.minimax(next_state, depth - 1, alpha, beta)
                 if eval_score < min_eval:
                     min_eval = eval_score
                     best_action = action
+                beta = min(beta, eval_score)
+                if beta <= alpha:
+                    break  # Alpha cut-off
             return min_eval, best_action
 
     @override
     def select_action(self, game_state: TGameState, legal_actions: list[TAction]) -> TAction:
-        """Select the best action using the Minimax algorithm."""
-        _, best_action = self.minimax(game_state, self.max_depth, True)
+        _, best_action = self.minimax(game_state, self.max_depth, -float("inf"), float("inf"))
         return best_action
 
     @override

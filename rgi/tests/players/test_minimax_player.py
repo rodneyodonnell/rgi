@@ -42,7 +42,7 @@ class TestMinimaxPlayerLookahead(unittest.TestCase):
     def test_select_action(self):
         state = 0
         action = self.player1.select_action(state, self.game.legal_actions(state))
-        self.assertEqual(action, 1, "Player 1 should choose action 1")
+        self.assertEqual(action, 2, "Player 1 should choose action 2")
 
     def test_evaluate_terminal_state(self):
         terminal_state = 3

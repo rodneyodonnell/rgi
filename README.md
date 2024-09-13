@@ -43,3 +43,9 @@ time python -m cProfile -s cumtime rgi/main.py --player1 minimax --player2 rando
 ```
 ./scripts/create_bot_tarball.sh
 ```
+
+# Create tarball of source code to make interacting with LLM bots easier.
+# Should run from rgi root directory.
+find . \( -name "*.py" -o -name "*.sh" -o -name "Dockerfile" -o -name "requirements.txt" -o -path "./bot_artifacts/" \) \
+    -not -path "*/.ipynb_checkpoints/*" -not -name "." -type f -print0 | \
+xargs -0 -I {} sh -c 'echo -e "\n===== {} =====\n"; cat "{}"' | xclip -selection clipboard
