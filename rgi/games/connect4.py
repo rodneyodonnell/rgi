@@ -8,6 +8,7 @@ class Connect4State:
     def __init__(
         self, board: Map[tuple[int, int], int], current_player: Literal[1, 2], winner: Optional[Literal[1, 2]] = None
     ):
+        # Immutable map of board. Indexed by (row,column). board[(1,1)] is bottom left corner.
         self.board = board
         self.current_player = current_player
         self.winner = winner
@@ -17,10 +18,17 @@ class Connect4State:
 
 
 class Connect4Game(Game[Connect4State, TPlayerId, TAction]):
+    """Connect 4 game implementation.
+
+    Actions are column numbers (1-7) where the player can drop a piece.
+    """
+
     def __init__(self, width: int = 7, height: int = 6, connect: int = 4):
         self.width = width
         self.height = height
         self.connect = connect
+        self._all_column_ids = list(range(1, width + 1))
+        self._all_row_ids = list(range(1, height + 1))
 
     @override
     def initial_state(self) -> Connect4State:
@@ -37,14 +45,17 @@ class Connect4Game(Game[Connect4State, TPlayerId, TAction]):
 
     @override
     def legal_actions(self, state: Connect4State) -> list[int]:
-        return [col for col in range(self.width) if (col, self.height - 1) not in state.board]
+        return [col for col in self._all_column_ids if (self.height, col) not in state.board]
 
     @override
     def next_state(self, state: Connect4State, action: int) -> Connect4State:
         """Find the lowest empty row in the selected column and return the updated game state."""
-        for row in range(self.height):
-            if (action, row) not in state.board:
-                new_board = state.board.set((action, row), state.current_player)
+        if action not in self.legal_actions(state):
+            raise ValueError(f"Invalid move: Invalid column '{action}' no in {self._all_column_ids}")
+
+        for row in range(1, self.height + 1):
+            if (row, action) not in state.board:
+                new_board = state.board.set((row, action), state.current_player)
                 winner = self._calculate_winner(new_board, action, row, state.current_player)
                 next_player = 2 if state.current_player == 1 else 1
                 return Connect4State(board=new_board, current_player=next_player, winner=winner)
@@ -52,34 +63,43 @@ class Connect4Game(Game[Connect4State, TPlayerId, TAction]):
         raise ValueError("Invalid move: column is full")
 
     def _calculate_winner(self, board: Map[tuple[int, int], int], col: int, row: int, player: int) -> Optional[int]:
-        """Check if the last move made at (col, row) by 'player' wins the game."""
+        """Check if the last move made at (row, col) by 'player' wins the game."""
+        # fmt: off
         directions = [
-            [(1, 0), (-1, 0)],  # Horizontal
-            [(0, 1), (0, -1)],  # Vertical
-            [(1, 1), (-1, -1)],  # Diagonal /
-            [(1, -1), (-1, 1)],  # Diagonal \
+            (1, 0), (-1, 0),  # Vertical
+            (0, 1), (0, -1),  # Horizontal
+            (1, 1), (-1, -1),  # Diagonal /
+            (1, -1), (-1, 1),  # Diagonal \
         ]
+        # fmt: on
 
-        def count_in_direction(delta_col: int, delta_row: int) -> int:
+        def count_in_direction(delta_row: int, delta_col: int) -> int:
             """Count consecutive pieces in one direction."""
             count = 0
-            current_col, current_row = col + delta_col, row + delta_row
-            while 0 <= current_col < self.width and 0 <= current_row < self.height:
-                if board.get((current_col, current_row)) == player:
+            current_row, current_col = row + delta_row, col + delta_col
+            while 1 <= current_row <= self.height and 1 <= current_col <= self.width:
+                if board.get((current_row, current_col)) == player:
                     count += 1
-                    current_col += delta_col
                     current_row += delta_row
+                    current_col += delta_col
                 else:
                     break
             return count
 
         # Check all directions from the last move
-        for direction in directions:
-            consecutive_count = 1  # Include the last move itself
-            for delta_col, delta_row in direction:
-                consecutive_count += count_in_direction(delta_col, delta_row)
+        for delta_row, delta_col in directions:
+            # +1 to include the current square.
+            consecutive_count = count_in_direction(delta_row, delta_col) + 1
             if consecutive_count >= self.connect:
-                return player  # Current player wins
+                return player
+
+        # Check all directions from the last move
+        # for direction in directions:
+        #     consecutive_count = 1  # Include the last move itself
+        #     for delta_col, delta_row in direction:
+        #         consecutive_count = count_in_direction(delta_col, delta_row)
+        #     if consecutive_count >= self.connect:
+        #         return player  # Current player wins
 
         return None  # No winner yet
 
@@ -87,7 +107,7 @@ class Connect4Game(Game[Connect4State, TPlayerId, TAction]):
     def is_terminal(self, state: Connect4State) -> bool:
         if state.winner is not None:
             return True
-        return all((col, self.height - 1) in state.board for col in range(self.width))
+        return all((self.height, col) in state.board for col in self._all_column_ids)
 
     @override
     def reward(self, state: Connect4State, player_id: int) -> float:
@@ -101,8 +121,8 @@ class Connect4Game(Game[Connect4State, TPlayerId, TAction]):
     def pretty_str(self, state: Connect4State) -> str:
         return (
             "\n".join(
-                "|" + "|".join(" ●○"[state.board.get((col, row), 0)] for col in range(self.width)) + "|"
-                for row in reversed(range(self.height))  # Start from the top row and work down
+                "|" + "|".join(" ●○"[state.board.get((row, col), 0)] for col in self._all_column_ids) + "|"
+                for row in reversed(self._all_row_ids)  # Start from the top row and work down
             )
             + "\n+"
             + "-+" * self.width
