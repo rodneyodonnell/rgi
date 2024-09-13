@@ -44,10 +44,7 @@ def create_player(player_type: str, game: Game, player_id: int) -> Type:
     elif player_type == "minimax":
         return MinimaxPlayer(game, player_id)
     elif player_type == "human":
-        return HumanPlayer(
-            game,
-            lambda actions: actions[int(input("Enter the index of your chosen action: "))],
-        )
+        return HumanPlayer(game)
     else:
         raise ValueError(f"Unknown player type: {player_type}")
 

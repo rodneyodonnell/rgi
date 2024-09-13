@@ -28,6 +28,10 @@ black . --line-length 120
 python main.py --player1 minimax --player2 random --num_games 100
 ```
 
+# Play vs computer.
+```
+python rgi/main.py --player1 human --player2 minimax --game connect4
+```
 
 # Profile code
 ```
