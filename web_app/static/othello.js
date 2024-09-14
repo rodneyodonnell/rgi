@@ -23,7 +23,8 @@ function renderBoard(boardData, currentPlayer, legalActions, isTerminal, winner)
     table.classList.add('othello-table');
     const size = boardData.length; // Assuming 8x8
 
-    for (let r = 0; r < size; r++) {
+    // Start rendering from the last row to the first row
+    for (let r = size - 1; r >= 0; r--) {
         const row = document.createElement('tr');
         for (let c = 0; c < size; c++) {
             const cell = document.createElement('td');

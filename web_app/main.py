@@ -131,7 +131,8 @@ async def make_move(game_id: int, action: Dict[str, Any]):
             if isinstance(game, Connect4Game):
                 ai_move = ai_action  # column number
             elif isinstance(game, OthelloGame):
-                ai_move = {"row": ai_action[0], "col": ai_action[1]}
+                # ai_move = {"row": ai_action[0], "col": ai_action[1]}
+                ai_move = ai_action
             state = game.next_state(state, ai_move)
             games[game_id]["state"] = state
 

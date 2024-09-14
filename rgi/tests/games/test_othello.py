@@ -1,6 +1,7 @@
 # rgi/tests/games/test_othello.py
 
 import unittest
+import textwrap
 from rgi.games.othello import OthelloGame, OthelloState
 from immutables import Map
 
@@ -62,44 +63,33 @@ class TestOthelloGame(unittest.TestCase):
         state = self.game.initial_state()
 
         # Manually set up the board
-        board = Map(
-            {
-                (1, 1): 1,
-                (1, 2): 2,
-                (1, 3): 1,
-                (2, 1): 2,
-                (2, 2): 1,
-                (2, 3): 2,
-                (3, 1): 1,
-                (3, 2): 2,
-                (3, 3): 1,
-            }
-        )
-        state = OthelloState(board=board, current_player=1)
+        board_str = """
+        . . . . . . . .
+        . . . . . . . .
+        . . . . . . . .
+        . . . . . . . .
+        . . . . . . . .
+        ● ○ ● . . . . .
+        ○ ○ ○ . . . . .
+        ● ○ ● . . . . .
+        """
+        state = self.game.parse_board(board_str, current_player=1, is_terminal=False)
 
         legal_moves = self.game.legal_actions(state)
         self.assertEqual(len(legal_moves), 0)
 
-        # Next state should keep the same player if the opponent also has no moves
-        next_state = self.game.next_state(state, action=None)
-        self.assertEqual(next_state.current_player, 2)
-
     def test_is_terminal(self):
         # Fill the board completely
-        board = Map(
-            {
-                (row, col): 1 if (row + col) % 2 == 0 else 2
-                for row in range(1, self.board_size + 1)
-                for col in range(1, self.board_size + 1)
-            }
-        )
-        state = OthelloState(board=board, current_player=1)
+        board = Map()
+        state = OthelloState(board=board, current_player=1, is_terminal=True)
         self.assertTrue(self.game.is_terminal(state))
+        state = OthelloState(board=board, current_player=1, is_terminal=False)
+        self.assertFalse(self.game.is_terminal(state))
 
     def test_reward_win(self):
         # Create a winning state for player 1
         board = Map({(row, col): 1 for row in range(1, self.board_size + 1) for col in range(1, self.board_size + 1)})
-        state = OthelloState(board=board, current_player=1)
+        state = OthelloState(board=board, current_player=1, is_terminal=True)
         self.assertEqual(self.game.reward(state, 1), 1.0)
         self.assertEqual(self.game.reward(state, 2), -1.0)
 
@@ -112,7 +102,7 @@ class TestOthelloGame(unittest.TestCase):
                 for col in range(1, self.board_size + 1)
             }
         )
-        state = OthelloState(board=board, current_player=1)
+        state = OthelloState(board=board, current_player=1, is_terminal=True)
         self.assertEqual(self.game.reward(state, 1), 0.0)
         self.assertEqual(self.game.reward(state, 2), 0.0)
 
@@ -124,67 +114,27 @@ class TestOthelloGame(unittest.TestCase):
             (3, 3),  # Player 2
             (3, 4),  # Player 1
             (5, 3),  # Player 2
-            (5, 4),  # Player 1
+            (5, 2),  # Player 1
         ]
         for move in moves:
+            print(self.game.pretty_str(state))
+            print(f"player: {self.game.current_player_id(state)} move: {move} legal: {self.game.legal_actions(state)}")
             state = self.game.next_state(state, move)
 
         # Verify board state after moves
-        expected_board_positions = {
-            (4, 4): 1,
-            (5, 5): 1,
-            (3, 4): 1,
-            (5, 4): 1,
-            (4, 3): 1,
-            (4, 5): 2,
-            (3, 3): 2,
-            (5, 3): 2,
-        }
-        for pos, player in expected_board_positions.items():
-            self.assertEqual(state.board.get(pos), player)
+        expected_board_str = """
+            . . . . . . . .
+            . . . . . . . .
+            . . . . . . . .
+            . ● ○ ○ ○ . . .
+            . . ● ● ● . . .
+            . . ○ ● . . . .
+            . . . . . . . .
+            . . . . . . . .
+            """
+        expected_state = self.game.parse_board(expected_board_str, current_player=1, is_terminal=False)
 
-    def test_no_legal_moves_for_both_players(self):
-        # Create a state where neither player has legal moves
-        board = Map()
-        state = OthelloState(board=board, current_player=1)
-        self.assertTrue(self.game.is_terminal(state))
-
-    def test_pretty_str(self):
-        state = self.game.initial_state()
-        board_str = self.game.pretty_str(state)
-        print("Initial Board:")
-        print(board_str)
-        # Manually verify the output or write assertions based on expected string
-
-    def test_parse_board(self):
-        board_str = """
-        . . . . . . . .
-        . . . . . . . .
-        . . . ● ○ . . .
-        . . ● ○ ● ○ . .
-        . . ○ ● ○ ● . .
-        . . . ○ ● . . .
-        . . . . . . . .
-        . . . . . . . .
-        """
-        state = self.game.parse_board(board_str, current_player=1)
-        # Verify the board is parsed correctly
-        positions = {
-            (3, 4): 1,
-            (3, 5): 2,
-            (4, 3): 1,
-            (4, 4): 2,
-            (4, 5): 1,
-            (4, 6): 2,
-            (5, 3): 2,
-            (5, 4): 1,
-            (5, 5): 2,
-            (5, 6): 1,
-            (6, 4): 2,
-            (6, 5): 1,
-        }
-        for pos, player in positions.items():
-            self.assertEqual(state.board.get(pos), player)
+        self.assertEqual(expected_state.board, state.board)
 
     def test_edge_flipping(self):
         # Test flipping discs on the edge of the board
@@ -200,14 +150,14 @@ class TestOthelloGame(unittest.TestCase):
                 (1, 5): 1,
                 (1, 6): 1,
                 (1, 7): 1,
-                (1, 8): 2,
             }
         )
-        state = OthelloState(board=board, current_player=2)
+        state = OthelloState(board=board, current_player=2, is_terminal=False)
 
         # Player 2 places at (1, 8), which should flip discs from (1,2)-(1,7)
         action = (1, 8)
         next_state = self.game.next_state(state, action)
+
         for col in range(2, 8):
             self.assertEqual(next_state.board.get((1, col)), 2)
 
@@ -227,7 +177,7 @@ class TestOthelloGame(unittest.TestCase):
                 (7, 7): 1,
             }
         )
-        state = OthelloState(board=board, current_player=2)
+        state = OthelloState(board=board, current_player=2, is_terminal=False)
 
         # Player 2 places at (8,8), which should flip discs along the diagonal
         action = (8, 8)
@@ -254,12 +204,8 @@ class TestOthelloGame(unittest.TestCase):
         while not self.game.is_terminal(state):
             current_player_id = self.game.current_player_id(state)
             legal_actions = self.game.legal_actions(state)
-            if legal_actions:
-                action = players[current_player_id].select_action(state, legal_actions)
-                state = self.game.next_state(state, action)
-            else:
-                # No legal moves, pass turn
-                state = OthelloState(state.board, 3 - current_player_id)
+            action = players[current_player_id].select_action(state, legal_actions)
+            state = self.game.next_state(state, action)
 
         # At the end, check that the board is full or no moves are possible
         self.assertTrue(self.game.is_terminal(state))
@@ -268,26 +214,33 @@ class TestOthelloGame(unittest.TestCase):
         # Test a move that flips discs in multiple directions
         state = self.game.initial_state()
 
-        # Manually set up the board
-        board = Map(
-            {
-                (4, 5): 2,
-                (5, 4): 2,
-                (5, 5): 1,
-                (5, 6): 1,
-                (6, 5): 1,
-            }
-        )
-        state = OthelloState(board=board, current_player=1)
+        board_str = """
+        . . . . . . . .
+        . . . . . . . .
+        . . . . . . . .
+        . . . ● ● . . .
+        . . ○ ○ ● ● . .
+        . . . . ○ ● . .
+        . . . . ○ . . .
+        ○ . . . . . . .
+        """
+        state = self.game.parse_board(board_str, current_player=1, is_terminal=False)
 
-        # Player 1 places at (5,5), which should flip discs in multiple directions
-        action = (5, 5)
+        # Player 1 places at (3,4), which should flip discs in multiple directions
+        action = (3, 4)
         next_state = self.game.next_state(state, action)
 
-        # Verify that discs are flipped correctly
-        flipped_positions = [(4, 5), (5, 4), (5, 6), (6, 5)]
-        for pos in flipped_positions:
-            self.assertEqual(next_state.board.get(pos), 1)
+        expected_board_str = (
+            " . . . . . . . .\n"
+            " . . . . . . . .\n"
+            " . . . . . . . .\n"
+            " . . . ● ● . . .\n"
+            " . . ○ ● ● ● . .\n"
+            " . . . ● ● ● . .\n"
+            " . . . . ○ . . .\n"
+            " ○ . . . . . . .\n"
+        )
+        self.assertEqual(self.game.pretty_str(next_state), expected_board_str)
 
     def test_no_legal_moves_for_current_player(self):
         # Create a state where the current player has no legal moves but the game is not over
@@ -302,26 +255,90 @@ class TestOthelloGame(unittest.TestCase):
                 (2, 2): 1,
             }
         )
-        state = OthelloState(board=board, current_player=1)
+        state = OthelloState(board=board, current_player=1, is_terminal=False)
 
         legal_moves = self.game.legal_actions(state)
         self.assertEqual(len(legal_moves), 0)
         self.assertFalse(self.game.is_terminal(state))
 
     def test_game_end_by_no_moves(self):
-        # Create a state where neither player has legal moves
-        state = self.game.initial_state()
-        # Manually set up the board
-        board = Map(
-            {
-                (1, 1): 1,
-                (1, 2): 1,
-                (2, 1): 1,
-                (2, 2): 1,
-            }
+
+        board_str = """
+        . . . . . . . .
+        . . . . . . . .
+        . . . . . . . .
+        . . . . . . . .
+        . . . . . . . .
+        . . . . . . . .
+        . . . . . . . .
+        ● ○ ○ . . . . .
+        """
+        state = self.game.parse_board(board_str, current_player=1, is_terminal=False)
+        new_state = self.game.next_state(state, (1, 4))
+        self.assertTrue(self.game.is_terminal(new_state))
+
+    def test_parse_board_simple(self):
+        board_str = """
+        . . . . . . . .
+        . . . . . . . .
+        . . . . . . . .
+        . . . . . . . .
+        . . . . . . . .
+        . . . . . . . .
+        . . . . . . . .
+        . ○ . . . . . .
+        """
+        state = self.game.parse_board(board_str, current_player=1, is_terminal=False)
+        # Verify the board is parsed correctly
+        positions = {(1, 2): 2}
+        for pos, player in positions.items():
+            self.assertEqual(state.board.get(pos), player)
+
+    def test_parse_board(self):
+        board_str = """
+        . . . . . . . .
+        . . . . . . . .
+        . . . ○ ● . . .
+        . . ○ ● ○ ● . .
+        . . ● ○ ● ○ . .
+        . . . ● ○ . . .
+        . . . . . . . .
+        . . . . . . . .
+        """
+        state = self.game.parse_board(board_str, current_player=1, is_terminal=False)
+        # Verify the board is parsed correctly
+        positions = {
+            (3, 4): 1,
+            (3, 5): 2,
+            (4, 3): 1,
+            (4, 4): 2,
+            (4, 5): 1,
+            (4, 6): 2,
+            (5, 3): 2,
+            (5, 4): 1,
+            (5, 5): 2,
+            (5, 6): 1,
+            (6, 4): 2,
+            (6, 5): 1,
+        }
+        for pos, player in positions.items():
+            self.assertEqual(state.board.get(pos), player)
+
+    def test_pretty_str_bottom_left(self):
+        # Define a state with pieces at (1,1) and (2,1)
+        state = OthelloState(board=Map({(1, 1): 2, (2, 1): 2}), current_player=1, is_terminal=False)
+        expected_output = (
+            " . . . . . . . .\n"
+            " . . . . . . . .\n"
+            " . . . . . . . .\n"
+            " . . . . . . . .\n"
+            " . . . . . . . .\n"
+            " . . . . . . . .\n"
+            " ○ . . . . . . .\n"
+            " ○ . . . . . . .\n"
         )
-        state = OthelloState(board=board, current_player=1)
-        self.assertTrue(self.game.is_terminal(state))
+        actual_output = self.game.pretty_str(state)
+        self.assertEqual(actual_output, expected_output)
 
 
 if __name__ == "__main__":

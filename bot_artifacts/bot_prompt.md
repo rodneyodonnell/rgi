@@ -26,6 +26,10 @@ For now, we are running all experiments on a RTX 2070 GPU, but may consider upgr
 - Use `@override` decorator when overriding methods (`from typing_extensions import override`).
 - I'm using black to autoformat the code, so use `# fmt: off` and `# fmt: on` to disable formatting where needed.
 
+# Project Conventions:
+When working with games, follow the following conentions unless there is a strong convention for the particular game:
+- Always use (row, col) for coordinates, with row before column.
+- In games with boards, use (1, 1) for the bottom-left corner.
 
 # Project Vision:
 - Build a generalized game playing AI extendable to real world AGI.

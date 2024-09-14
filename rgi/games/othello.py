@@ -5,13 +5,14 @@ from rgi.core.base import Game, TPlayerId, TAction
 
 
 class OthelloState:
-    def __init__(self, board: Map[tuple[int, int], int], current_player: int):
+    def __init__(self, board: Map[tuple[int, int], int], current_player: int, is_terminal: bool):
         # Immutable map of board positions to player IDs (1 or 2)
         self.board = board
         self.current_player = current_player
+        self.is_terminal = is_terminal
 
     def __repr__(self) -> str:
-        return f"OthelloState(board={self.board}, current_player={self.current_player})"
+        return f"OthelloState(board={self.board}, current_player={self.current_player}, is_teminal={self.is_terminal})"
 
 
 class OthelloGame(Game[OthelloState, TPlayerId, TAction]):
@@ -44,7 +45,7 @@ class OthelloGame(Game[OthelloState, TPlayerId, TAction]):
         board = board.set((mid + 1, mid + 1), 2)  # White
         board = board.set((mid, mid + 1), 1)  # Black
         board = board.set((mid + 1, mid), 1)  # Black
-        return OthelloState(board=board, current_player=1)  # Black starts
+        return OthelloState(board=board, current_player=1, is_terminal=False)  # Black starts
 
     @override
     def current_player_id(self, state: OthelloState) -> TPlayerId:
@@ -93,8 +94,9 @@ class OthelloGame(Game[OthelloState, TPlayerId, TAction]):
 
     @override
     def next_state(self, state: OthelloState, action: tuple[int, int]) -> OthelloState:
-        if action not in self.legal_actions(state):
-            raise ValueError(f"Invalid move: {action} is not a legal action.")
+        _legal_actions = self.legal_actions(state)
+        if action not in _legal_actions:
+            raise ValueError(f"Invalid move: {action} is not a legal action {_legal_actions}.")
 
         player = state.current_player
         opponent = 3 - player
@@ -112,15 +114,16 @@ class OthelloGame(Game[OthelloState, TPlayerId, TAction]):
         # Determine next player
         next_player = 3 - player  # Switch turns
 
+        is_terminal = False
         # If next player has no legal moves, current player plays again
-        if not self._get_legal_moves(OthelloState(new_board, next_player), next_player):
-            if self._get_legal_moves(OthelloState(new_board, player), player):
+        if not self._get_legal_moves(OthelloState(new_board, next_player, is_terminal=False), next_player):
+            if self._get_legal_moves(OthelloState(new_board, player, is_terminal=False), player):
                 next_player = player
             else:
                 # No moves for either player; the game will end
-                pass
+                is_terminal = True
 
-        return OthelloState(board=new_board, current_player=next_player)
+        return OthelloState(board=new_board, current_player=next_player, is_terminal=is_terminal)
 
     def _get_positions_to_flip(
         self, state: OthelloState, position: tuple[int, int], player: int, opponent: int
@@ -151,13 +154,7 @@ class OthelloGame(Game[OthelloState, TPlayerId, TAction]):
 
     @override
     def is_terminal(self, state: OthelloState) -> bool:
-        if self.legal_actions(state):
-            return False
-        opponent = 3 - state.current_player
-        opponent_state = OthelloState(state.board, opponent)
-        if self.legal_actions(opponent_state):
-            return False
-        return True
+        return state.is_terminal
 
     @override
     def reward(self, state: OthelloState, player_id: int) -> float:
@@ -175,7 +172,7 @@ class OthelloGame(Game[OthelloState, TPlayerId, TAction]):
     @override
     def pretty_str(self, state: OthelloState) -> str:
         board_str = ""
-        for row in range(1, self.board_size + 1):
+        for row in reversed(range(1, self.board_size + 1)):
             row_str = ""
             for col in range(1, self.board_size + 1):
                 pos = (row, col)
@@ -187,10 +184,10 @@ class OthelloGame(Game[OthelloState, TPlayerId, TAction]):
             board_str += row_str + "\n"
         return board_str
 
-    def parse_board(self, board_str: str, current_player: int) -> OthelloState:
+    def parse_board(self, board_str: str, current_player: int, is_terminal: bool) -> OthelloState:
         """Parses a board string into an OthelloState."""
         board = Map()
-        rows = board_str.strip().split("\n")
+        rows = board_str.strip().split("\n")[::-1]
         for r, row in enumerate(rows, start=1):
             cells = row.strip().split()
             for c, cell in enumerate(cells, start=1):
@@ -198,4 +195,4 @@ class OthelloGame(Game[OthelloState, TPlayerId, TAction]):
                     board = board.set((r, c), 1)
                 elif cell == "○":
                     board = board.set((r, c), 2)
-        return OthelloState(board=board, current_player=current_player)
+        return OthelloState(board=board, current_player=current_player, is_terminal=is_terminal)
