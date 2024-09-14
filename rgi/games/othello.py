@@ -1,7 +1,7 @@
-from typing import Optional
+from typing import Optional, Any
 from typing_extensions import override
 from immutables import Map
-from rgi.core.base import Game, TPlayerId, TAction
+from rgi.core.base import Game, GameSerializer, TPlayerId, TAction
 
 
 class OthelloState:
@@ -196,3 +196,26 @@ class OthelloGame(Game[OthelloState, TPlayerId, TAction]):
                 elif cell == "○":
                     board = board.set((r, c), 2)
         return OthelloState(board=board, current_player=current_player, is_terminal=is_terminal)
+
+
+class OthelloSerializer(GameSerializer[OthelloGame, OthelloState, tuple[int, int]]):
+    @override
+    def serialize_state(self, game: OthelloGame, state: OthelloState) -> dict[str, Any]:
+        """Serialize the game state to a dictionary for frontend consumption."""
+        board_size = game.board_size
+        board = [[state.board.get((row + 1, col + 1), 0) for col in range(board_size)] for row in range(board_size)]
+        return {
+            "board": board,
+            "current_player": state.current_player,
+            "legal_actions": game.legal_actions(state),
+            "is_terminal": game.is_terminal(state),
+        }
+
+    @override
+    def parse_action(self, game: OthelloGame, action_data: dict[str, Any]) -> tuple[int, int]:
+        """Parse an action from frontend data."""
+        row = action_data.get("row")
+        col = action_data.get("col")
+        if row is None or col is None:
+            raise ValueError("Action data must include 'row' and 'col'")
+        return (row, col)

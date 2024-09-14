@@ -1,7 +1,7 @@
-from typing import Literal, Optional
+from typing import Literal, Optional, Any
 from typing_extensions import override
 from immutables import Map
-from rgi.core.base import Game, TPlayerId, TAction
+from rgi.core.base import Game, GameSerializer, TPlayerId, TAction
 
 
 class Connect4State:
@@ -93,14 +93,6 @@ class Connect4Game(Game[Connect4State, TPlayerId, TAction]):
             if consecutive_count >= self.connect:
                 return player
 
-        # Check all directions from the last move
-        # for direction in directions:
-        #     consecutive_count = 1  # Include the last move itself
-        #     for delta_col, delta_row in direction:
-        #         consecutive_count = count_in_direction(delta_col, delta_row)
-        #     if consecutive_count >= self.connect:
-        #         return player  # Current player wins
-
         return None  # No winner yet
 
     @override
@@ -140,3 +132,24 @@ class Connect4Game(Game[Connect4State, TPlayerId, TAction]):
                 elif cell == "○":
                     board = board.set((r, c), 2)  # Player 2
         return Connect4State(board=board, current_player=current_player)
+
+
+class Connect4Serializer(GameSerializer[Connect4Game, Connect4State, TAction]):
+    @override
+    def serialize_state(self, game: Connect4Game, state: Connect4State) -> dict[str, Any]:
+        """Serialize the game state to a dictionary for frontend consumption."""
+        board = [[state.board.get((row + 1, col + 1), 0) for col in range(game.width)] for row in range(game.height)]
+        return {
+            "board": board,
+            "current_player": state.current_player,
+            "legal_actions": game.legal_actions(state),
+            "is_terminal": game.is_terminal(state),
+        }
+
+    @override
+    def parse_action(self, game: Connect4Game, action_data: dict[str, Any]) -> TAction:
+        """Parse an action from frontend data."""
+        column = action_data.get("column")
+        if column is None:
+            raise ValueError("Action data must include 'column'")
+        return column

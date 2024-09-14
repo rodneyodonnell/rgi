@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
-from typing import Generic, TypeVar
+from typing import Generic, TypeVar, Any
 
+TGame = TypeVar("TGame")
 TGameState = TypeVar("TGameState")
 TPlayerState = TypeVar("TPlayerState")
 TPlayerId = TypeVar("TPlayerId")
@@ -65,6 +66,20 @@ class ActionEmbedder(ABC, Generic[TAction, TEmbedding]):
 
     @abstractmethod
     def get_embedding_dim(self) -> int:
+        pass
+
+
+class GameSerializer(ABC, Generic[TGame, TGameState, TAction]):
+    """Companion class to Game that serializes game states for frontend consumption."""
+
+    @abstractmethod
+    def serialize_state(self, game: TGame, state: TGameState) -> dict[str, Any]:
+        """Serialize the game state to a dictionary for frontend consumption."""
+        pass
+
+    @abstractmethod
+    def parse_action(self, game: TGame, action_data: dict[str, Any]) -> TAction:
+        """Parse an action from frontend data."""
         pass
 
 

@@ -1,34 +1,18 @@
 // web_app/static/othello.js
 
-// Retrieve the game ID from the URL
-const gameId = window.location.pathname.split("/").pop();
-
-function updateGameState() {
-    fetch(`/games/${gameId}/state`)
-        .then(response => response.json())
-        .then(data => {
-            renderBoard(data.board, data.current_player, data.legal_actions, data.is_terminal, data.winner);
-        })
-        .catch(error => {
-            console.error('Error fetching game state:', error);
-            alert('Failed to fetch game state.');
-        });
-}
-
-function renderBoard(boardData, currentPlayer, legalActions, isTerminal, winner) {
+function renderGame(data) {
     const gameDiv = document.getElementById('game');
     const statusDiv = document.getElementById('status');
     gameDiv.innerHTML = '';
     const table = document.createElement('table');
     table.classList.add('othello-table');
-    const size = boardData.length; // Assuming 8x8
+    const size = data.board.length;
 
-    // Start rendering from the last row to the first row
     for (let r = size - 1; r >= 0; r--) {
         const row = document.createElement('tr');
         for (let c = 0; c < size; c++) {
             const cell = document.createElement('td');
-            const value = boardData[r][c];
+            const value = data.board[r][c];
             if (value === 1) {
                 cell.classList.add('othello-player1');
             } else if (value === 2) {
@@ -37,9 +21,9 @@ function renderBoard(boardData, currentPlayer, legalActions, isTerminal, winner)
                 cell.classList.add('othello-empty');
             }
 
-            // If this cell is a legal action, add onclick
-            if (legalActions.some(action => action[0] === (r + 1) && action[1] === (c + 1))) {
-                cell.onclick = () => makeMove(r + 1, c + 1); // rows and cols are 1-indexed
+            // Add click handler if the move is legal
+            if (data.legal_actions.some(action => action[0] === r + 1 && action[1] === c + 1)) {
+                cell.onclick = () => makeMove({ row: r + 1, col: c + 1 });
             }
 
             row.appendChild(cell);
@@ -49,42 +33,16 @@ function renderBoard(boardData, currentPlayer, legalActions, isTerminal, winner)
 
     gameDiv.appendChild(table);
 
-    if (isTerminal) {
-        if (winner) {
-            statusDiv.textContent = `Player ${winner} wins!`;
+    if (data.is_terminal) {
+        if (data.winner) {
+            statusDiv.textContent = `Player ${data.winner} wins!`;
         } else {
             statusDiv.textContent = 'The game is a draw!';
         }
     } else {
-        statusDiv.textContent = `Current Player: ${currentPlayer}`;
+        statusDiv.textContent = `Current Player: ${data.current_player}`;
     }
 }
 
-function makeMove(row, col) {
-    console.log(`Attempting to make move at row: ${row}, column: ${col}`);
-    fetch(`/games/${gameId}/move`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({row: row, col: col})
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            console.log('Move successful. Updating game state.');
-            updateGameState();
-        } else {
-            console.log('Move failed. Invalid move.');
-            alert('Invalid move');
-        }
-    })
-    .catch(error => {
-        console.error('Error making move:', error);
-        alert('Failed to make move.');
-    });
-}
-
-// Initialize the game by fetching the current state
+// Start the game
 updateGameState();
-
-// Optional: Auto-refresh the game state every few seconds
-// setInterval(updateGameState, 2000);

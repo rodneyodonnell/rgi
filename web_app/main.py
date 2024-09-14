@@ -4,11 +4,10 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from rgi.games.connect4 import Connect4Game
-from rgi.games.othello import OthelloGame
-from typing import Dict, Any
+from rgi.core.game_registry import GAME_REGISTRY
 from rgi.players.minimax_player import MinimaxPlayer
 from rgi.players.random_player import RandomPlayer
+from typing import Dict, Any
 
 app = FastAPI()
 templates = Jinja2Templates(directory="web_app/templates")
@@ -24,64 +23,49 @@ async def index(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 
-# Endpoint to create a new game
 @app.post("/games/new")
 async def create_game(request: Request):
     global game_counter
     data = await request.json()
     game_type = data.get("game_type")
     ai_player = data.get("ai_player", False)
-    game_counter += 1
-    if game_type == "connect4":
-        game = Connect4Game()
-        board_size = (game.height, game.width)  # (rows, columns)
-    elif game_type == "othello":
-        game = OthelloGame()
-        board_size = (game.board_size, game.board_size)  # Assuming square board
-    else:
+    registry_entry = GAME_REGISTRY.get(game_type)
+    if not registry_entry.game_fn or not registry_entry.serializer_fn:
         raise HTTPException(status_code=400, detail="Invalid game type")
+
+    game = registry_entry.game_fn()
+    game_serializer = registry_entry.serializer_fn()
     state = game.initial_state()
-    # Store game, state, AI player info, and board size
-    games[game_counter] = {"game": game, "state": state, "ai_player": ai_player, "board_size": board_size}
-    return {"game_id": game_counter}
+    game_counter += 1
+
+    # Initialize players
+    players = {
+        1: MinimaxPlayer(game, player_id=1) if ai_player else RandomPlayer(),
+        2: RandomPlayer(),
+    }
+
+    # Store game session
+    games[game_counter] = {
+        "game": game,
+        "serializer": game_serializer,
+        "state": state,
+        "players": players,
+        "ai_player": ai_player,
+    }
+    return {"game_id": game_counter, "game_type": game_type}
 
 
-# Endpoint to get the game state
 @app.get("/games/{game_id}/state")
 async def get_game_state(game_id: int):
-    if game_id not in games:
+    game_session = games.get(game_id)
+    if not game_session:
         raise HTTPException(status_code=404, detail="Game not found")
-    game = games[game_id]["game"]
-    state = games[game_id]["state"]
-    board_size = games[game_id]["board_size"]
 
-    # Serialize the board as a 2D list based on game type
-    if isinstance(game, Connect4Game):
-        rows, cols = board_size
-        board_list = []
-        for r in range(1, rows + 1):
-            row = []
-            for c in range(1, cols + 1):
-                row.append(state.board.get((r, c), 0))
-            board_list.append(row)
-    elif isinstance(game, OthelloGame):
-        size = board_size[0]  # Assuming square board
-        board_list = []
-        for r in range(1, size + 1):
-            row = []
-            for c in range(1, size + 1):
-                row.append(state.board.get((r, c), 0))
-            board_list.append(row)
-    else:
-        raise HTTPException(status_code=400, detail="Unknown game type")
+    game = game_session["game"]
+    serializer = game_session["serializer"]
+    state = game_session["state"]
+    game_state = serializer.serialize_state(game, state)
 
-    game_state = {
-        "board": board_list,
-        "current_player": state.current_player,
-        "legal_actions": game.legal_actions(state),
-        "is_terminal": game.is_terminal(state),
-    }
-    # Add winner information if the game is over
     if game_state["is_terminal"]:
         all_players = game.all_player_ids(state)
         rewards = {player_id: game.reward(state, player_id) for player_id in all_players}
@@ -89,63 +73,53 @@ async def get_game_state(game_id: int):
         game_state["winner"] = winner[0] if winner else None
     else:
         game_state["winner"] = None
+
     return game_state
 
 
-# Endpoint to make a move
 @app.post("/games/{game_id}/move")
-async def make_move(game_id: int, action: Dict[str, Any]):
-    if game_id not in games:
+async def make_move(game_id: int, action_data: Dict[str, Any]):
+    game_session = games.get(game_id)
+    if not game_session:
         raise HTTPException(status_code=404, detail="Game not found")
-    game = games[game_id]["game"]
-    state = games[game_id]["state"]
-    ai_player = games[game_id]["ai_player"]
-    board_size = games[game_id]["board_size"]
-    current_player = game.current_player_id(state)
 
-    # Human move
-    if isinstance(game, Connect4Game):
-        column = action.get("column")
-        if column not in game.legal_actions(state):
-            raise HTTPException(status_code=400, detail="Invalid move")
-        state = game.next_state(state, column)
-    elif isinstance(game, OthelloGame):
-        row = action.get("row")
-        col = action.get("col")
-        position = (row, col)
-        if position not in game.legal_actions(state):
-            raise HTTPException(status_code=400, detail="Invalid move")
-        state = game.next_state(state, position)
-    else:
-        raise HTTPException(status_code=400, detail="Invalid game type")
+    game = game_session["game"]
+    serializer = game_session["serializer"]
+    state = game_session["state"]
+    players = game_session["players"]
+    ai_player = game_session["ai_player"]
 
-    games[game_id]["state"] = state
+    try:
+        action = serializer.parse_action(game, action_data)
+        if action not in game.legal_actions(state):
+            raise ValueError("Invalid move")
+        state = game.next_state(state, action)
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
 
-    # Check if AI should make a move
+    # Update game state
+    game_session["state"] = state
+
+    # AI Move
     if ai_player and not game.is_terminal(state):
-        state = games[game_id]["state"]
-        ai_player_id = game.current_player_id(state)
-        ai = MinimaxPlayer(game, ai_player_id)
-        ai_action = ai.select_action(state, game.legal_actions(state))
-        if ai_action is not None:
-            if isinstance(game, Connect4Game):
-                ai_move = ai_action  # column number
-            elif isinstance(game, OthelloGame):
-                # ai_move = {"row": ai_action[0], "col": ai_action[1]}
-                ai_move = ai_action
-            state = game.next_state(state, ai_move)
-            games[game_id]["state"] = state
+        current_player_id = game.current_player_id(state)
+        ai = players.get(current_player_id)
+        if ai:
+            ai_action = ai.select_action(state, game.legal_actions(state))
+            try:
+                state = game.next_state(state, ai_action)
+                game_session["state"] = state
+            except ValueError as ve:
+                raise HTTPException(status_code=400, detail=str(ve))
 
     return {"success": True}
 
 
-# Route to serve Connect Four game page
-@app.get("/connect4/{game_id}", response_class=HTMLResponse)
-async def connect4_game(request: Request, game_id: int):
-    return templates.TemplateResponse("connect4.html", {"request": request, "game_id": game_id})
+@app.get("/{game_type}/{game_id}", response_class=HTMLResponse)
+async def serve_game_page(request: Request, game_type: str, game_id: int):
+    if game_type not in GAME_REGISTRY:
+        raise HTTPException(status_code=404, detail="Game not found")
+    if game_id not in games:
+        raise HTTPException(status_code=404, detail="Game not found")
 
-
-# Route to serve Othello game page
-@app.get("/othello/{game_id}", response_class=HTMLResponse)
-async def othello_game(request: Request, game_id: int):
-    return templates.TemplateResponse("othello.html", {"request": request, "game_id": game_id})
+    return templates.TemplateResponse("game.html", {"request": request, "game_type": game_type, "game_id": game_id})
