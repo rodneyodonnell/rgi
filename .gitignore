@@ -1,5 +1,10 @@
 *~
 __pycache__/
 .ipynb_checkpoints
-.vscode
-rgi_source.tar.gz
+rgi_source.tar
+
+# Ignore most .vscode files, but keep those launch.json, etc, to simplify sharing settings
+.vscode/*
+!.vscode/launch.json
+!.vscode/tasks.json
+!.vscode/extensions.json

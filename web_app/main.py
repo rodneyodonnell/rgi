@@ -123,3 +123,9 @@ async def serve_game_page(request: Request, game_type: str, game_id: int):
         raise HTTPException(status_code=404, detail="Game not found")
 
     return templates.TemplateResponse("game.html", {"request": request, "game_type": game_type, "game_id": game_id})
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(app, host="0.0.0.0", port=8000)
