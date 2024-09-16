@@ -15,6 +15,7 @@ find . \( -path "*/node_modules" -o \
        -o -not -name "TODO.md" \
        -not -name ".*" \
        -not -name "*.tar" \
+       -not -name "*.tar.*" \
        -not -name "package-lock.json" \
        -type f \
        -print | grep -v -E "$EXCLUDE_PATTERN" | tar -cvf rgi_source.tar -T -

@@ -1,146 +1,169 @@
 /* web_app/static/styles.css */
 
-/* General Styles */
-body { 
-    text-align: center; 
-    font-family: Arial, sans-serif; 
-    background-color: #f0f0f0;
-    padding-top: 20px;
+/* Body Styling */
+body {
+    background-color: #f8f9fa;
 }
 
-h1, h2 { 
-    text-align: center; 
+/* Heading Styles */
+h1, h2 {
+    color: #343a40;
 }
 
-.button-container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 20px;
+/* Card Styles (If used) */
+.card {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
-.game-section {
-    background-color: #fff;
-    padding: 20px;
-    border-radius: 10px;
-    box-shadow: 0 0 10px rgba(0,0,0,0.1);
-    width: 300px;
+/* Opponent Type Selection Styling */
+#opponentTypeSelect {
+    width: 200px;
 }
 
-.game-buttons {
-    margin: 10px 0;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
+/* Game Area Styling */
+#game {
+    width: 100%;
+    max-width: 600px;
+    margin: 0 auto;
 }
 
-button {
-    padding: 12px 20px;
-    font-size: 16px;
-    cursor: pointer;
-    border: none;
-    border-radius: 5px;
-    transition: background-color 0.3s, transform 0.2s;
+/* Grid Styles for Connect Four */
+.grid-container {
+    display: grid;
+    grid-template-rows: repeat(6, 100px);
+    grid-template-columns: repeat(7, 100px);
+    gap: 5px;
+    justify-content: center;
+    margin-bottom: 20px;
 }
 
-button:hover {
-    transform: translateY(-2px);
-}
-
-.connect4 { 
-    background-color: #4CAF50; 
-    color: white; 
-}
-
-.othello { 
-    background-color: #008CBA; 
-    color: white; 
-}
-
-.connect4:hover { 
-    background-color: #45a049; 
-}
-
-.othello:hover { 
-    background-color: #007BB5; 
-}
-
-/* Connect Four Styles */
-.connect4-table {
-    border-collapse: collapse; 
-    margin: auto; 
-    cursor: pointer;
-}
-
-.connect4-table td {
-    width: 60px;
-    height: 60px;
-    text-align: center;
-    vertical-align: middle;
-    border: 2px solid #333;
-    font-size: 24px;
-    background-color: #1E90FF; /* Blue background */
-    position: relative;
-}
-
-.connect4-player1::after, .connect4-player2::after {
-    content: '';
-    display: block;
-    width: 50px;
-    height: 50px;
+.grid-cell {
+    width: 100px;
+    height: 100px;
+    background-color: #007bff;
     border-radius: 50%;
-    margin: auto;
+    position: relative;
+    cursor: pointer;
+    transition: background-color 0.3s;
 }
 
-.connect4-player1::after {
+.grid-cell:hover {
+    background-color: #0056b3;
+}
+
+.grid-cell::after {
+    content: '';
+    position: absolute;
+    top: 5px;
+    left: 5px;
+    width: 90px;
+    height: 90px;
+    border-radius: 50%;
+    background-color: white;
+    transition: all 0.3s ease;
+}
+
+.grid-cell.player1::after {
     background-color: red;
 }
 
-.connect4-player2::after {
+.grid-cell.player2::after {
     background-color: yellow;
 }
 
-.connect4-empty:hover {
-    background-color: #87CEFA; /* Lighter blue on hover */
+/* Last Move Highlight */
+.grid-cell.last-move::after {
+    top: 0;
+    left: 0;
+    width: 100px;
+    height: 100px;
+    box-shadow: inset 0 0 0 5px #32CD32, 0 0 10px #32CD32;
 }
 
-/* Othello Styles */
-.othello-table {
-    border-collapse: collapse; 
-    margin: auto; 
-}
-
-.othello-table td {
-    width: 50px;
-    height: 50px;
+/* Status Message Styling */
+#status {
     text-align: center;
-    vertical-align: middle;
-    border: 2px solid #333;
-    font-size: 24px;
-    background-color: green;
-    color: white;
-    cursor: pointer;
-    position: relative;
+    font-size: 1.5em;
+    color: #343a40;
 }
 
-.othello-player1::after, .othello-player2::after {
-    content: '';
+/* Inactive Cells Styling */
+.inactive-cell {
+    pointer-events: none;
+    opacity: 0.6;
+}
+
+/* Toast Styling */
+.toast-container .toast {
+    min-width: 250px;
+}
+
+/* Modal Body Styling */
+.modal-body {
+    font-size: 1.5em;
+    text-align: center;
+}
+
+/* Animation for Modal Appearance */
+.modal-content {
+    animation: fadeInDown 0.5s;
+}
+
+@keyframes fadeInDown {
+    from {
+        opacity: 0;
+        transform: translateY(-50px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Larger Modal Title */
+.modal-title {
+    font-size: 2.5em !important;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .grid-container {
+        grid-template-rows: repeat(6, 60px);
+        grid-template-columns: repeat(7, 60px);
+        gap: 3px;
+    }
+
+    .grid-cell {
+        width: 60px;
+        height: 60px;
+    }
+
+    .grid-cell::after {
+        top: 3px;
+        left: 3px;
+        width: 54px;
+        height: 54px;
+    }
+
+    .grid-cell.last-move::after {
+        top: 0;
+        left: 0;
+        width: 60px;
+        height: 60px;
+        box-shadow: inset 0 0 0 3px #32CD32, 0 0 5px #32CD32;
+    }
+
+    .modal-title {
+        font-size: 2em !important;
+    }
+
+    .modal-body {
+        font-size: 1.2em;
+    }
+}
+
+/* Optional: Style for Reset Button */
+#game .btn-success {
     display: block;
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    margin: auto;
-}
-
-.othello-player1::after {
-    background-color: black;
-}
-
-.othello-player2::after {
-    background-color: white;
-    border: 1px solid #333;
-}
-
-.othello-empty:hover {
-    background-color: #006400; /* Darker green on hover */
+    margin: 0 auto;
 }

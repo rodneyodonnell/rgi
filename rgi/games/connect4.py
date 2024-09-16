@@ -140,9 +140,10 @@ class Connect4Serializer(GameSerializer[Connect4Game, Connect4State, TAction]):
         """Serialize the game state to a dictionary for frontend consumption."""
         board = [[state.board.get((row + 1, col + 1), 0) for col in range(game.width)] for row in range(game.height)]
         return {
-            "board": board,
+            "rows": game.height,
+            "columns": game.width,
+            "state": board,
             "current_player": state.current_player,
-            "legal_actions": game.legal_actions(state),
             "is_terminal": game.is_terminal(state),
         }
 

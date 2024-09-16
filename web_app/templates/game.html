@@ -1,19 +1,22 @@
-<!-- web_app/templates/game.html -->
-<!DOCTYPE html>
-<html>
-<head>
-    <title>{{ game_type.capitalize() }} Game</title>
-    <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}">
-    <script>
-        const GAME_TYPE = "{{ game_type }}";
-        const GAME_ID = "{{ game_id }}";
-    </script>
-</head>
-<body>
-    <h1>{{ game_type.capitalize() }}</h1>
-    <div id="game"></div>
-    <h2 id="status"></h2>
-    <script src="{{ url_for('static', path='game_common.js') }}"></script>
-    <script src="{{ url_for('static', path=game_type + '.js') }}"></script>
-</body>
-</html>
+{% extends "base.html" %}
+
+{% block title %}{{ game_type.capitalize() }} Game{% endblock %}
+
+{% block content %}
+<h1 class="text-center">{{ game_type.capitalize() }}</h1>
+
+<div id="game" class="mt-4">
+    <!-- Game board will be rendered here by connect4.js -->
+</div>
+<h2 id="status" class="mt-3"></h2>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const GAME_TYPE = "{{ game_type }}";
+    const GAME_ID = "{{ game_id }}";
+    const OPPONENT_TYPE = "{{ opponent_type }}"; // 'ai' or 'human'
+</script>
+<script src="{{ url_for('static', path='game_common.js') }}"></script>
+<script src="{{ url_for('static', path=game_type + '.js') }}"></script>
+{% endblock %}

@@ -1,29 +1,33 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Game Portal</title>
-    <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}">
-</head>
-<body>
-    <h1>Welcome to the Game Portal</h1>
-    <div class="button-container">
-        <div class="game-section">
-            <h2>Connect Four</h2>
-            <div class="game-buttons">
-                <button class="connect4" onclick="startGame('connect4', false)">Play Connect Four</button>
-                <button class="connect4" onclick="startGame('connect4', true)">Play Connect Four vs AI</button>
+{% extends "base.html" %}
+
+{% block title %}Home - RGI Game Portal{% endblock %}
+
+{% block content %}
+<h1 class="text-center">Welcome to the RGI Game Portal</h1>
+<div class="row justify-content-center mt-5">
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h2>Connect Four</h2>
+            </div>
+            <div class="card-body">
+                <button class="btn btn-primary me-2" onclick="startGame('connect4', false)">Play Connect Four</button>
+                <button class="btn btn-secondary" onclick="startGame('connect4', true)">Play Connect Four vs AI</button>
             </div>
         </div>
-        <div class="game-section">
-            <h2>Othello</h2>
-            <div class="game-buttons">
-                <button class="othello" onclick="startGame('othello', false)">Play Othello</button>
-                <button class="othello" onclick="startGame('othello', true)">Play Othello vs AI</button>
+        <div class="card">
+            <div class="card-header">
+                <h2>Othello</h2>
+            </div>
+            <div class="card-body">
+                <button class="btn btn-primary me-2" onclick="startGame('othello', false)">Play Othello</button>
+                <button class="btn btn-secondary" onclick="startGame('othello', true)">Play Othello vs AI</button>
             </div>
         </div>
     </div>
-    <div id="game-area"></div>
+</div>
+{% endblock %}
 
-    <script src="{{ url_for('static', path='index.js') }}"></script>
-</body>
-</html>
+{% block scripts %}
+<script src="{{ url_for('static', path='index.js') }}"></script>
+{% endblock %}

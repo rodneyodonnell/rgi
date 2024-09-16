@@ -1,48 +1,68 @@
 // web_app/static/othello.js
 
-function renderGame(data) {
-    const gameDiv = document.getElementById('game');
-    const statusDiv = document.getElementById('status');
-    gameDiv.innerHTML = '';
-    const table = document.createElement('table');
-    table.classList.add('othello-table');
-    const size = data.board.length;
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('othello.js loaded and DOMContentLoaded event fired.');
 
-    for (let r = size - 1; r >= 0; r--) {
-        const row = document.createElement('tr');
-        for (let c = 0; c < size; c++) {
-            const cell = document.createElement('td');
-            const value = data.board[r][c];
-            if (value === 1) {
-                cell.classList.add('othello-player1');
-            } else if (value === 2) {
-                cell.classList.add('othello-player2');
+    // Define renderGame on window to make it globally accessible
+    window.renderGame = (data) => {
+        console.log('Rendering game with data:', data);
+        const gameArea = document.getElementById('game');
+        const status = document.getElementById('status');
+        
+        // Clear previous game board
+        gameArea.innerHTML = '';
+
+        // Check if rows and columns are present
+        if (!data.rows || !data.columns) {
+            console.error('Missing rows or columns in game state data.');
+            gameArea.innerHTML = '<p>Error: Invalid game state data.</p>';
+            return;
+        }
+
+        // Create game board grid
+        const grid = document.createElement('div');
+        grid.classList.add('grid-container');
+
+        for (let row = 0; row < data.rows; row++) {
+            for (let col = 0; col < data.columns; col++) {
+                const cell = document.createElement('div');
+                cell.classList.add('grid-cell');
+                cell.dataset.row = row;
+                cell.dataset.col = col;
+
+                // Set cell color based on state
+                if (data.state[row][col] === 1) {
+                    cell.classList.add('player1');
+                } else if (data.state[row][col] === 2) {
+                    cell.classList.add('player2');
+                }
+
+                cell.addEventListener('click', () => {
+                    console.log('Cell clicked:', { row: row, col: col });
+                    makeMove({ row: row, col: col });
+                });
+
+                grid.appendChild(cell);
+            }
+        }
+
+        gameArea.appendChild(grid);
+
+        // Update game status
+        if (data.is_terminal) {
+            if (data.winner) {
+                status.textContent = `Player ${data.winner} wins!`;
             } else {
-                cell.classList.add('othello-empty');
+                status.textContent = 'Game is a draw.';
             }
-
-            // Add click handler if the move is legal
-            if (data.legal_actions.some(action => action[0] === r + 1 && action[1] === c + 1)) {
-                cell.onclick = () => makeMove({ row: r + 1, col: c + 1 });
-            }
-
-            row.appendChild(cell);
-        }
-        table.appendChild(row);
-    }
-
-    gameDiv.appendChild(table);
-
-    if (data.is_terminal) {
-        if (data.winner) {
-            statusDiv.textContent = `Player ${data.winner} wins!`;
         } else {
-            statusDiv.textContent = 'The game is a draw!';
+            status.textContent = `Current Turn: Player ${data.current_player}`;
         }
-    } else {
-        statusDiv.textContent = `Current Player: ${data.current_player}`;
-    }
-}
+    };
 
-// Start the game
-updateGameState();
+    // Initial game state fetch
+    updateGameState();
+
+    // Optionally, set an interval to periodically update the game state
+    // setInterval(updateGameState, 5000);
+});
