@@ -8,7 +8,7 @@
         }
     },
     // Launch jupyter on localhost:8888 during dev.
-    "postCreateCommand": "jupyter notebook --ip 0.0.0.0 --port 8888 --no-browser --allow-root --NotebookApp.token='' --NotebookApp.password=''",
+    // "postCreateCommand": "jupyter notebook --ip 0.0.0.0 --port 8888 --no-browser --allow-root --NotebookApp.token='' --NotebookApp.password=''",
     "forwardPorts": [8888],
     "runArgs": [
         "--gpus", "all"
@@ -16,6 +16,7 @@
     "mounts": [
         "source=${localWorkspaceFolder}/logs,target=/app/logs,type=bind",
         "source=${localWorkspaceFolder}/rgi,target=/app/rgi,type=bind",
+        "source=${localWorkspaceFolder}/web_app,target=/app/web_app,type=bind",
         "source=${localWorkspaceFolder}/scripts,target=/app/scripts,type=bind",
         "source=${localWorkspaceFolder}/notebooks,target=/app/notebooks,type=bind"
     ],

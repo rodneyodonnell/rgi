@@ -7,3 +7,9 @@ immutables==0.20
 fastapi==0.114.1
 uvicorn[standard]==0.30.6
 Jinja2==3.1.4
+
+# Frontent testing
+playwright==1.47.0
+pytest-playwright==0.5.2
+selenium==4.24.0
+webdriver-manager==4.0.2

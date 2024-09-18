@@ -74,3 +74,13 @@ your_project/
 │       ├── connect4.js
 │       └── othello.js
 └── ...
+
+
+# Run frontend tests
+```
+# Headless
+pytest web_app/tests/test_connect4_frontend.py
+
+# Non-headless
+pytest web_app/tests/test_connect4_frontend.py -v --headed
+```

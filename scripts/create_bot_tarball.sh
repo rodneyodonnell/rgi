@@ -23,6 +23,8 @@ find . \( -path "*/node_modules" -o \
 
 xclip -selection clipboard < rgi_source.tar
 
+# Make a copy with .txt extension so claude UI will allow it.
+cp rgi_source.tar rgi_source.tar.txt
 
 echo
 echo Created source tarball 'rgi_source.tar' and copied to clipboard.

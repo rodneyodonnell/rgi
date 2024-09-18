@@ -13,8 +13,15 @@ RUN groupadd --gid $USER_GID $USERNAME \
 
 WORKDIR /app
 
+# Install playwright for frontend testing
+RUN pip install playwright
+RUN python -m playwright install
+RUN python -m playwright install-deps
+RUN python -m playwright install chromium
+
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+
 
 COPY rgi rgi
 COPY scripts scripts
