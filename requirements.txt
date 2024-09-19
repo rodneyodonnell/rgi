@@ -2,6 +2,7 @@ tensorflow==2.17.0
 numpy==1.26.4
 jupyter==1.1.1
 pytest==8.3.2
+pytest-mock==3.14.0
 immutables==0.20
 
 fastapi==0.114.1

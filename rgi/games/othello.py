@@ -171,18 +171,18 @@ class OthelloGame(Game[OthelloState, TPlayerId, TAction]):
 
     @override
     def pretty_str(self, state: OthelloState) -> str:
-        board_str = ""
-        for row in reversed(range(1, self.board_size + 1)):
-            row_str = ""
-            for col in range(1, self.board_size + 1):
-                pos = (row, col)
-                if pos in state.board:
-                    player = state.board[pos]
-                    row_str += " ●" if player == 1 else " ○"
-                else:
-                    row_str += " ."
-            board_str += row_str + "\n"
-        return board_str
+        def cell_to_str(row, col):
+            pos = (row, col)
+            if pos in state.board:
+                return "●" if state.board[pos] == 1 else "○"
+            return "."
+
+        rows = []
+        for row in range(self.board_size, 0, -1):
+            row_str = " ".join(cell_to_str(row, col) for col in range(1, self.board_size + 1))
+            rows.append(row_str)
+
+        return "\n".join(rows)
 
     def parse_board(self, board_str: str, current_player: int, is_terminal: bool) -> OthelloState:
         """Parses a board string into an OthelloState."""
