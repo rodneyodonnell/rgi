@@ -35,7 +35,7 @@ async def create_game(request: Request):
     data = await request.json()
     game_type = data.get("game_type")
     ai_player = data.get("ai_player", False)
-    logger.debug(f"Creating new game. Type: {game_type}, AI Player: {ai_player}")
+    logger.info(f"Creating new game. Type: {game_type}, AI Player: {ai_player}")
 
     registry_entry = GAME_REGISTRY.get(game_type)
     if not registry_entry:
