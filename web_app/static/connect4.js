@@ -3,23 +3,22 @@
 document.addEventListener('DOMContentLoaded', () => {
     console.log('connect4.js loaded and DOMContentLoaded event fired.');
 
-    let isAI = false;
-    let lastMove = null;
     let gameState = null;
+    let previousBoard = null;
+    let aiMoveInterval = null;
 
     function startNewGame() {
-        console.log('Starting a new Connect 4 game. Current AI setting:', isAI);
-
+        console.log('Starting a new Connect 4 game.');
+    
         fetch('/games/new', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
-                game_type: 'connect4', 
-                ai_player: isAI 
+                game_type: 'connect4',
+                options: gameOptions
             })
         })
         .then(response => {
-            console.log('Response status:', response.status);
             if (!response.ok) {
                 throw new Error(`Failed to create a new game. Status code: ${response.status}`);
             }
@@ -27,17 +26,16 @@ document.addEventListener('DOMContentLoaded', () => {
         })
         .then(data => {
             console.log('New game created with ID:', data.game_id);
-            history.pushState(null, '', `/connect4/${data.game_id}`);
+            // Update the URL with the new game ID
+            window.history.pushState({}, '', `/connect4/${data.game_id}`);
             
             const gameModal = bootstrap.Modal.getInstance(document.getElementById('gameModal'));
             if (gameModal) {
                 gameModal.hide();
             }
             
-            lastMove = null;
-            gameState = null;
-            
             updateGameState();
+            startAIMovePolling();
         })
         .catch(error => {
             console.error('Error creating new game:', error);
@@ -45,8 +43,40 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+
+    function highlightLastMove(row, column) {
+        // Remove the 'last-move' class from all previous moves
+        document.querySelectorAll('.grid-cell.last-move').forEach(cell => {
+            cell.classList.remove('last-move');
+        });
+    
+        // Select the cell based on the row and column directly
+        const lastMove = document.querySelector(`.grid-cell[data-column='${column}'][data-row='${row}']`);
+    
+        // Add the 'last-move' class to the selected cell
+        if (lastMove) {
+            lastMove.classList.add('last-move');
+        }
+    }
+
+    function findLastMove(newBoard) {
+        if (!previousBoard) return;  // No previous board to compare to
+        
+        // Loop through the new board to find the difference
+        for (let row = 0; row < newBoard.length; row++) {
+            for (let col = 0; col < newBoard[row].length; col++) {
+                // Check if there's a new piece (difference between old and new board)
+                if (newBoard[row][col] != 0 && newBoard[row][col] !== previousBoard[row][col]) {
+                    highlightLastMove(row, col);  // Highlight the last move
+                    return;
+                }
+            }
+        }
+    }
+
     window.renderGame = (data) => {
         console.log('Rendering game with data:', data);
+        gameState = data;
         const gameArea = document.getElementById('game');
         const status = document.getElementById('status');
         const modalBody = document.getElementById('modalBody');
@@ -54,121 +84,101 @@ document.addEventListener('DOMContentLoaded', () => {
             keyboard: false
         });
         const newGameButton = document.getElementById('newGameButton');
+        
+        gameOptions = data.options;
+        console.log('Updated gameOptions:', gameOptions);
 
-        isAI = data.ai_player;
-        console.log('Updated AI setting:', isAI);
-
+        // Clear previous game board
         gameArea.innerHTML = '';
 
-        if (!data.rows || !data.columns) {
-            console.error('Missing rows or columns in game state data.');
-            gameArea.innerHTML = '<p>Error: Invalid game state data.</p>';
-            showErrorToast('Invalid game state data received.');
-            return;
-        }
-
+        // Create game board grid
         const grid = document.createElement('div');
         grid.classList.add('grid-container');
 
-        const reversedRows = [...data.state].reverse();
-
-        for (let row = 0; row < reversedRows.length; row++) {
+        for (let row = data.rows - 1; row >= 0; row--) {
             for (let col = 0; col < data.columns; col++) {
                 const cell = document.createElement('div');
                 cell.classList.add('grid-cell');
                 cell.dataset.column = col;
-                cell.dataset.row = reversedRows.length - 1 - row;
+                cell.dataset.row = row;
 
-                if (reversedRows[row][col] === 1) {
+                if (data.state[row][col] === 1) {
                     cell.classList.add('player1');
-                } else if (reversedRows[row][col] === 2) {
+                } else if (data.state[row][col] === 2) {
                     cell.classList.add('player2');
                 }
 
-                if (lastMove && lastMove.row === (reversedRows.length - 1 - row) && lastMove.column === col) {
-                    cell.classList.add('last-move');
-                }
-
-                if (!data.is_terminal) {
+                if (!data.is_terminal && data.options[`player${data.current_player}_type`] === 'human') {
                     cell.addEventListener('click', () => {
-                        console.log(`Cell clicked: Column ${col + 1}`);
+                        console.log(`Cell clicked: Column ${col}`);
                         makeMove({ column: col + 1 });
                     });
-                } else {
-                    cell.classList.add('inactive-cell');
                 }
-
+                
                 grid.appendChild(cell);
             }
         }
 
         gameArea.appendChild(grid);
 
+        // Compare the new board with the previous board to detect the last move
+        if (data.state) {
+            findLastMove(data.state);
+            previousBoard = data.state;  // Update the previous board state
+        }
+
         if (data.is_terminal) {
             console.log('Game is terminal. Winner:', data.winner);
             let message = data.winner 
                 ? `🎉 <strong>Player ${data.winner} Wins!</strong> 🎉`
                 : '🤝 <strong>The game is a draw!</strong> 🤝';
-
+            
             modalBody.innerHTML = message;
-            gameModal.show();
+            gameModal.show();  // Show the Bootstrap modal when game ends
 
-            newGameButton.onclick = startNewGame;
+            newGameButton.onclick = startNewGame;  // Ensure button triggers a new game
+            stopAIMovePolling();
         } else {
             console.log('Game continuing. Current player:', data.current_player);
             status.textContent = `Current Turn: Player ${data.current_player}`;
         }
     };
 
+    function getCurrentGameId() {
+        return window.location.pathname.split('/').pop();
+    }
+
     function makeMove(action) {
-        if (gameState && gameState.is_terminal) {
-            console.log('Game is already over. Cannot make move.');
-            return;
-        }
-
-        const gameId = window.location.pathname.split('/').pop();
+        const gameId = getCurrentGameId();
         console.log(`Making move for game ${gameId}:`, action);
-
         fetch(`/games/${gameId}/move`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(action)
         })
         .then(response => {
-            console.log('Move response status:', response.status);
-            if (!response.ok) {
-                throw new Error('Failed to make move');
-            }
             return response.json();
         })
         .then(data => {
             console.log('Move response:', data);
             if (data.success) {
-                updateGameState(() => {
-                    if (isAI && gameState && !gameState.is_terminal) {
-                        setTimeout(() => {
-                            console.log('Fetching AI move after delay');
-                            updateGameState();
-                        }, 300);
-                    }
-                });
+                updateGameState();
             } else {
-                showErrorToast('Invalid move. Please try again.');
+                showErrorToast(data.error || 'Unknown error occurred');
             }
         })
         .catch(error => {
             console.error('Error making move:', error);
-            showErrorToast('Failed to make move. Please try again.');
+            showErrorToast(error.message || 'Failed to make move.');
         });
     }
 
-    function updateGameState(callback) {
-        const gameId = window.location.pathname.split('/').pop();
+    function updateGameState() {
+        const gameId = getCurrentGameId();
         console.log('Updating game state for game ID:', gameId);
 
         fetch(`/games/${gameId}/state`)
             .then(response => {
-                console.log('Game state response status:', response.status);
                 if (!response.ok) {
                     throw new Error('Failed to fetch game state');
                 }
@@ -176,36 +186,49 @@ document.addEventListener('DOMContentLoaded', () => {
             })
             .then(data => {
                 console.log('Received game state:', data);
-                const newLastMove = findLastMove(data.state);
-                if (newLastMove) {
-                    lastMove = newLastMove;
-                }
-                gameState = data;
                 renderGame(data);
-                if (callback) callback();
             })
             .catch(error => {
                 console.error('Error fetching game state:', error);
-                showErrorToast('Failed to update game state.');
+                showErrorToast('Failed to fetch game state.');
             });
     }
 
-    function findLastMove(currentState) {
-        if (!window.previousState) {
-            window.previousState = currentState;
-            return null;
-        }
+    function makeAIMove() {
+        const gameId = window.location.pathname.split('/').pop();
+        console.log('Attempting AI move for game ID:', gameId);
 
-        for (let row = 0; row < currentState.length; row++) {
-            for (let col = 0; col < currentState[row].length; col++) {
-                if (currentState[row][col] !== window.previousState[row][col]) {
-                    window.previousState = currentState;
-                    return { row, column: col };
-                }
+        fetch(`/games/${gameId}/ai_move`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Failed to make AI move');
             }
-        }
+            return response.json();
+        })
+        .then(data => {
+            console.log('AI move response:', data);
+            if (data.success) {
+                updateGameState();
+            }
+        })
+        .catch(error => {
+            console.error('Error making AI move:', error);
+        });
+    }
 
-        return null;
+    function startAIMovePolling() {
+        stopAIMovePolling();  // Clear any existing interval
+        aiMoveInterval = setInterval(makeAIMove, 100);  // Poll every second
+    }
+
+    function stopAIMovePolling() {
+        if (aiMoveInterval) {
+            clearInterval(aiMoveInterval);
+            aiMoveInterval = null;
+        }
     }
 
     function showErrorToast(message) {
@@ -215,13 +238,13 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         toastBody.textContent = message;
-
+    
         const errorToastElement = document.getElementById('errorToast');
         if (!errorToastElement) {
             console.error('Error toast element not found.');
             return;
         }
-
+    
         const errorToast = new bootstrap.Toast(errorToastElement, {
             delay: 5000
         });
@@ -229,5 +252,9 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log(`Error toast displayed: ${message}`);
     }
 
+    // Start AI move polling when the page loads
+    startAIMovePolling();
+
+    // Initial game state fetch
     updateGameState();
 });

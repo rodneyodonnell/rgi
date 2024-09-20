@@ -8,6 +8,7 @@ from fastapi.templating import Jinja2Templates
 from rgi.core.game_registry import GAME_REGISTRY
 from rgi.players.minimax_player import MinimaxPlayer
 from rgi.players.random_player import RandomPlayer
+from rgi.players.human_player import HumanPlayer
 from typing import Dict, Any
 
 # Set up logging
@@ -34,8 +35,9 @@ async def create_game(request: Request):
     global game_counter
     data = await request.json()
     game_type = data.get("game_type")
-    ai_player = data.get("ai_player", False)
-    logger.info(f"Creating new game. Type: {game_type}, AI Player: {ai_player}")
+    player1_type = data.get("options").get("player1_type")
+    player2_type = data.get("options").get("player2_type")
+    logger.info(f"Creating new game. Type: {game_type}, Player 1: {player1_type}, Player 2: {player2_type}")
 
     registry_entry = GAME_REGISTRY.get(game_type)
     if not registry_entry:
@@ -49,8 +51,8 @@ async def create_game(request: Request):
 
     # Initialize players
     players = {
-        1: RandomPlayer(),
-        2: MinimaxPlayer(game, player_id=2) if ai_player else RandomPlayer(),
+        1: create_player(player1_type, game, player_id=1),
+        2: create_player(player2_type, game, player_id=2),
     }
     logger.debug(f"Players initialized. Player 1: {type(players[1]).__name__}, Player 2: {type(players[2]).__name__}")
 
@@ -60,10 +62,25 @@ async def create_game(request: Request):
         "serializer": game_serializer,
         "state": state,
         "players": players,
-        "ai_player": ai_player,
+        "options": {
+            "player1_type": player1_type,
+            "player2_type": player2_type,
+        },
     }
-    logger.info(f"New game created. ID: {game_counter}, AI Player: {ai_player}")
+    logger.info(f"New game created. ID: {game_counter}, Player 1: {player1_type}, Player 2: {player2_type}")
     return {"game_id": game_counter, "game_type": game_type}
+
+
+def create_player(player_type: str, game, player_id: int):
+    if player_type == "human":
+        return HumanPlayer(game)
+    elif player_type == "random":
+        return RandomPlayer()
+    elif player_type == "minimax":
+        return MinimaxPlayer(game, player_id)
+    else:
+        logger.error(f"Unknown player type: {player_type}")
+        raise ValueError(f"Unknown player type: {player_type}")
 
 
 @app.get("/games/{game_id}/state")
@@ -80,7 +97,7 @@ async def get_game_state(game_id: int):
     game_state = serializer.serialize_state(game, state)
 
     # Add AI player information to the game state
-    game_state["ai_player"] = game_session["ai_player"]
+    game_state["options"] = game_session["options"]
 
     if game.is_terminal(state):
         all_players = game.all_player_ids(state)
@@ -97,48 +114,56 @@ async def get_game_state(game_id: int):
 
 @app.post("/games/{game_id}/move")
 async def make_move(game_id: int, action_data: Dict[str, Any]):
-    logger.debug(f"Making move for game ID: {game_id}. Action data: {action_data}")
+    game_session = games.get(game_id)
+    if not game_session:
+        raise HTTPException(status_code=404, detail="Game not found")
+
+    game = game_session["game"]
+    state = game_session["state"]
+
+    try:
+        action = game_session["serializer"].parse_action(game, action_data)
+        if action not in game.legal_actions(state):
+            return {"success": False, "error": "Invalid move"}
+        new_state = game.next_state(state, action)
+        game_session["state"] = new_state
+        return {"success": True}
+    except ValueError as ve:
+        return {"success": False, "error": str(ve)}
+
+
+@app.post("/games/{game_id}/ai_move")
+async def make_ai_move(game_id: int):
+    logger.debug(f"Attempting AI move for game ID: {game_id}")
     game_session = games.get(game_id)
     if not game_session:
         logger.error(f"Game not found. ID: {game_id}")
         raise HTTPException(status_code=404, detail="Game not found")
 
     game = game_session["game"]
-    serializer = game_session["serializer"]
     state = game_session["state"]
     players = game_session["players"]
-    ai_player = game_session["ai_player"]
+
+    current_player_id = game.current_player_id(state)
+    current_player = players[current_player_id]
+
+    if game.is_terminal(state):
+        logger.info(f"Game {game_id} is already in a terminal state.")
+        return {"success": False, "reason": "Game is already over"}
+
+    if isinstance(current_player, HumanPlayer):
+        logger.info(f"Current player {current_player_id} is human. No AI move made.")
+        return {"success": False, "reason": "Current player is human"}
 
     try:
-        action = serializer.parse_action(game, action_data)
-        if action not in game.legal_actions(state):
-            logger.warning(f"Invalid move attempted. Game ID: {game_id}, Action: {action}")
-            raise ValueError("Invalid move")
-        state = game.next_state(state, action)
-        logger.debug(f"Move made. New state: {state}")
-    except ValueError as ve:
-        logger.error(f"Error making move: {ve}")
-        raise HTTPException(status_code=400, detail=str(ve))
-
-    # Update game state
-    game_session["state"] = state
-
-    # AI Move
-    if ai_player and not game.is_terminal(state):
-        current_player_id = game.current_player_id(state)
-        ai = players.get(current_player_id)
-        if isinstance(ai, MinimaxPlayer):
-            logger.debug(f"AI (MinimaxPlayer) is making a move. Game ID: {game_id}")
-            ai_action = ai.select_action(state, game.legal_actions(state))
-            try:
-                state = game.next_state(state, ai_action)
-                game_session["state"] = state
-                logger.debug(f"AI move made. New state: {state}")
-            except ValueError as ve:
-                logger.error(f"Error making AI move: {ve}")
-                raise HTTPException(status_code=400, detail=str(ve))
-
-    return {"success": True}
+        ai_action = current_player.select_action(state, game.legal_actions(state))
+        new_state = game.next_state(state, ai_action)
+        game_session["state"] = new_state
+        logger.info(f"AI move made for player {current_player_id}. Action: {ai_action}")
+        return {"success": True}
+    except Exception as e:
+        logger.error(f"Error making AI move: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error making AI move")
 
 
 @app.get("/{game_type}/{game_id}", response_class=HTMLResponse)

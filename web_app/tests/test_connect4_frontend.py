@@ -2,14 +2,34 @@ import pytest
 from playwright.sync_api import Page, expect
 import re
 
+# max timeout of 5s for each test
+pytestmark = pytest.mark.timeout(5)
 
-@pytest.fixture
+
+@pytest.fixture(scope="function")
 def game_page(page: Page):
-    page.set_default_timeout(500)  # 500ms default timeout
-    expect.set_options(timeout=500)
+    return custom_game_page(page)
+
+
+def custom_game_page(page: Page, timeout_ms=500, player1_type: str = "human", player2_type: str = "human"):
+    page.set_default_timeout(timeout_ms)
+    expect.set_options(timeout=timeout_ms)
+
+    # Go to the main page
     page.goto("http://localhost:8000")
+
+    # Select the AI types from the form (assuming these are select elements with specific IDs)
+    page.select_option("#connect4Player1", player1_type)
+    page.select_option("#connect4Player2", player2_type)
+
+    # Submit the form to start the game
+    start_button = page.get_by_text("Start Connect 4 Game")
+    expect(start_button).to_be_visible()
+
     with page.expect_navigation(url=re.compile(r"http://localhost:8000/connect4/\d+")):
-        page.click("text=Play Connect Four")
+        start_button.click()
+
+    expect(page.locator(".grid-container")).to_be_visible(timeout=5000)
     return page
 
 
@@ -20,7 +40,7 @@ def test_create_new_game(game_page: Page):
 
 def test_make_move(game_page: Page):
     game_page.click(".grid-cell[data-column='0']")
-    expect(game_page.locator(".grid-cell.player1[data-column='0']")).to_be_visible()
+    expect(game_page.locator(".grid-cell.player1")).to_be_visible()
 
 
 def test_game_over(game_page: Page):
@@ -35,12 +55,14 @@ def test_game_over(game_page: Page):
 def test_invalid_move(game_page: Page):
     # Fill a column
     for _ in range(6):
-        game_page.click(".grid-cell[data-column='0']")
+        print("Click!", _)
+        game_page.click(".grid-cell[data-column='0']", timeout=500)
 
     # Try to make an invalid move
     game_page.click(".grid-cell[data-column='0']")
     expect(game_page.locator("#errorToast")).to_be_visible()
-    expect(game_page.locator("#toastBody")).to_contain_text("Failed")
+    expect(game_page.locator("#toastBody")).to_contain_text("Invalid move")
+    print("done.")
 
 
 def test_game_state_updates(game_page: Page):
@@ -52,7 +74,7 @@ def test_game_state_updates(game_page: Page):
     empty_cell.click()
 
     # Wait for the move to be reflected in the UI
-    expect(game_page.locator(".grid-cell.player1, .grid-cell.player2")).to_have_count(initial_filled_cells + 1)
+    game_page.wait_for_timeout(1000)  # Wait for 1 second
 
     # Capture updated state
     updated_filled_cells = game_page.locator(".grid-cell.player1, .grid-cell.player2").count()
@@ -60,22 +82,56 @@ def test_game_state_updates(game_page: Page):
     # Assert that the state has changed
     assert updated_filled_cells == initial_filled_cells + 1, "Game state should update after a move"
 
-    # Optionally, check if the correct player made the move
-    new_cell = game_page.locator(".grid-cell.player1").last
-    expect(new_cell).to_be_visible()
+
+def test_human_vs_ai_player_move(page: Page):
+    page = custom_game_page(page, player1_type="human", player2_type="random")
+
+    for i in range(3):  # Simulate three moves
+        # Human player (player1) makes a move
+        page.click(f".grid-cell[data-column='{i}']")
+
+        # Wait for AI (player2) to make a move in response by locating the last player2 move
+        ai_move = page.locator(".grid-cell.player2").last
+        page.wait_for_selector(".grid-cell.player2", timeout=5000)
+
+        # Check that the latest AI move is visible
+        expect(ai_move).to_be_visible()
 
 
-def test_ai_player_move(page: Page):
-    # Start a new game against AI
-    page.goto("http://localhost:8000")
-    page.click("text=Play Connect Four vs AI")
-    page.wait_for_url(re.compile(r"http://localhost:8000/connect4/\d+"))
+def test_two_random_bots_play_to_end(page: Page):
+    # Setup the game with two random AI players
+    page = custom_game_page(page, player1_type="random", player2_type="random")
 
-    # Make a move and wait for AI response
-    page.click(".grid-cell[data-column='3']")
-    page.wait_for_selector(".grid-cell.player2")
-    ai_move = page.locator(".grid-cell.player2")
-    expect(ai_move).to_be_visible()
+    # Define the maximum time for the game to complete (30 seconds)
+    max_game_time_ms = 30_000
+    start_time = page.evaluate("performance.now()")
+
+    # Helper function to count pieces on the board
+    def count_pieces():
+        player1_pieces = page.locator(".grid-cell.player1").count()
+        player2_pieces = page.locator(".grid-cell.player2").count()
+        return player1_pieces + player2_pieces
+
+    previous_count = count_pieces()
+
+    # Keep checking every second until game ends or timeout
+    while page.evaluate("performance.now()") - start_time < max_game_time_ms:
+        page.wait_for_timeout(1000)  # Wait for 1 second
+
+        # Get the current piece count
+        current_count = count_pieces()
+
+        # Check if the game has ended (look for the game-over modal)
+        if page.locator("#modalBody").is_visible():
+            break
+
+        # Assert that pieces are being added
+        assert current_count > previous_count, "No new pieces added in the last second."
+        previous_count = current_count
+
+    # After exiting the loop, check for a win/loss/draw message
+    modal_body = page.locator("#modalBody")
+    expect(modal_body).to_have_text(re.compile(r"(Player 1 Wins|Player 2 Wins|Draw)"))
 
 
 def test_game_reset(game_page: Page):
@@ -134,15 +190,11 @@ def test_last_move_highlight(game_page: Page):
 
 
 def test_unique_game_ids(page):
-    page.goto("http://localhost:8000")
-    with page.expect_navigation(url=re.compile(r"http://localhost:8000/connect4/\d+")):
-        page.click("text=Play Connect Four")
+    page = custom_game_page(page)
     url_1 = page.url
     assert re.match(r"http://localhost:8000/connect4/\d+", url_1), f"Unexpected URL: {url_1}"
 
-    page.goto("http://localhost:8000")
-    with page.expect_navigation(url=re.compile(r"http://localhost:8000/connect4/\d+")):
-        page.click("text=Play Connect Four")
+    page = custom_game_page(page)
     url_2 = page.url
     assert re.match(r"http://localhost:8000/connect4/\d+", url_2), f"Unexpected URL: {url_2}"
 

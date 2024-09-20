@@ -1,0 +1,35 @@
+# requirements.in
+#
+# This file lists the direct dependencies of the project.
+# To update dependencies:
+# 1. Edit this file to add, remove, or update dependencies.
+# 2. Run: python3 -m piptools compile requirements.in
+#
+# To upgrade all packages to their latest versions:
+# Run: python3 -m piptools compile --upgrade requirements.in
+
+
+# Core
+tensorflow
+numpy
+jupyter
+immutables
+
+# Frontend
+fastapi==0.114.1
+uvicorn[standard]==0.30.6
+Jinja2==3.1.4
+
+# Testing
+pytest
+pytest-mock
+pytest-timeout
+
+# Frontent testing
+playwright==1.47.0
+pytest-playwright==0.5.2
+selenium==4.24.0
+webdriver-manager==4.0.2
+
+# Tools
+pip-tools
