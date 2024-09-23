@@ -203,9 +203,14 @@ class OthelloSerializer(GameSerializer[OthelloGame, OthelloState, tuple[int, int
     def serialize_state(self, game: OthelloGame, state: OthelloState) -> dict[str, Any]:
         """Serialize the game state to a dictionary for frontend consumption."""
         board_size = game.board_size
-        board = [[state.board.get((row + 1, col + 1), 0) for col in range(board_size)] for row in range(board_size)]
+        # Note: We're not changing the indexing here because the game logic already uses 1-based indexing
+        board = [
+            [state.board.get((row, col), 0) for col in range(1, board_size + 1)] for row in range(1, board_size + 1)
+        ]
         return {
-            "board": board,
+            "rows": board_size,
+            "columns": board_size,
+            "state": board,
             "current_player": state.current_player,
             "legal_actions": game.legal_actions(state),
             "is_terminal": game.is_terminal(state),
@@ -218,4 +223,4 @@ class OthelloSerializer(GameSerializer[OthelloGame, OthelloState, tuple[int, int
         col = action_data.get("col")
         if row is None or col is None:
             raise ValueError("Action data must include 'row' and 'col'")
-        return (row, col)
+        return (int(row), int(col))  # Ensure we're returning integers

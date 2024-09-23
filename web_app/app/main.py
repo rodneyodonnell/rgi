@@ -11,6 +11,11 @@ from rgi.players.random_player import RandomPlayer
 from rgi.players.human_player import HumanPlayer
 from typing import Dict, Any
 
+
+from datetime import datetime
+
+print("Server restarted at", datetime.now())
+
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -176,7 +181,8 @@ async def serve_game_page(request: Request, game_type: str, game_id: int):
         logger.error(f"Game not found. ID: {game_id}")
         raise HTTPException(status_code=404, detail="Game not found")
 
-    return templates.TemplateResponse("game.html", {"request": request, "game_type": game_type, "game_id": game_id})
+    template_name = f"{game_type}.html"
+    return templates.TemplateResponse(template_name, {"request": request, "game_type": game_type, "game_id": game_id})
 
 
 if __name__ == "__main__":
