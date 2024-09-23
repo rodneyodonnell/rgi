@@ -1,4 +1,5 @@
 // web_app/static/game_common.js
+"use strict";
 
 function updateGameState() {
     console.log(`Fetching game state for GAME_ID: ${GAME_ID}`);

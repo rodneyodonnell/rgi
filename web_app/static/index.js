@@ -1,4 +1,5 @@
 // web_app/static/index.js
+"use strict";
 
 document.addEventListener('DOMContentLoaded', () => {
     const connect4Form = document.getElementById('connect4Form');

@@ -1,4 +1,5 @@
 // web_app/static/connect4.js
+"use strict";
 
 document.addEventListener('DOMContentLoaded', () => {
     console.log('connect4.js loaded and DOMContentLoaded event fired.');
@@ -6,6 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let gameState = null;
     let previousBoard = null;
     let aiMoveInterval = null;
+    let gameOptions = null;
 
     function startNewGame() {
         console.log('Starting a new Connect 4 game.');
@@ -221,7 +223,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function startAIMovePolling() {
         stopAIMovePolling();  // Clear any existing interval
-        aiMoveInterval = setInterval(makeAIMove, 100);  // Poll every second
+        aiMoveInterval = setInterval(makeAIMove, 100);  // Poll every 100 ms
     }
 
     function stopAIMovePolling() {

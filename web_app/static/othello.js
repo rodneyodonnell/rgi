@@ -1,4 +1,5 @@
 // web_app/static/othello.js
+"use strict";
 
 document.addEventListener('DOMContentLoaded', () => {
     console.log('othello.js loaded and DOMContentLoaded event fired.');
