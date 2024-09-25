@@ -11,8 +11,6 @@ RUN groupadd --gid $USER_GID $USERNAME \
     && echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME \
     && chmod 0440 /etc/sudoers.d/$USERNAME
 
-WORKDIR /app
-
 # Install Node.js and Yarn
 RUN apt-get update && apt-get install -y curl gnupg2 && \
     curl -sL https://deb.nodesource.com/setup_20.x | bash - && \
@@ -20,6 +18,15 @@ RUN apt-get update && apt-get install -y curl gnupg2 && \
     curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add - && \
     echo "deb https://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.list.d/yarn.list && \
     apt-get update && apt-get install -y yarn
+
+# Install useful tools
+RUN apt-get update && apt-get install -y emacs less
+
+# Switch to the non-root user
+USER $USERNAME
+WORKDIR /app
+RUN chown -R $USERNAME:$USERNAME /app
+ENV PYTHONPATH="/app"
 
 # Check versions
 RUN node -v && yarn -v
@@ -33,8 +40,6 @@ RUN python -m playwright install chromium
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install useful tools
-RUN apt-get update && apt-get install -y emacs less
 
 # Install TypeScript and related tools
 RUN yarn add typescript@5.5 --dev
@@ -49,15 +54,5 @@ COPY rgi rgi
 COPY scripts scripts
 COPY notebooks notebooks
 
-# Change ownership of the /app directory
-RUN chown -R $USERNAME:$USERNAME /app
-
-# Run ldconfig as root
-RUN ldconfig
-
-# Switch to the non-root user
-USER $USERNAME
-
-ENV PYTHONPATH="/app"
 
 CMD ["bash"]
