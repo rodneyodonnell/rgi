@@ -1,15 +1,9 @@
-import { BaseGameData, updateGameState, makeMove, showErrorToast, getCurrentGameId } from './game_common.js';
-
-// No need to redeclare Window interface here, as it's already declared in game_common.ts
+import { BaseGameData, updateGameState, makeMove, showErrorToast, getCurrentGameId, startNewGame, makeAIMove, currentPlayerType } from './game_common.js';
 
 interface Connect4GameData extends BaseGameData {
     rows: number;
     columns: number;
     state: number[][];
-    options: {
-        player1_type: string;
-        player2_type: string;
-    };
 }
 
 let previousBoard: number[][];
@@ -80,7 +74,11 @@ document.addEventListener("DOMContentLoaded", () => {
             modalBody.innerHTML = message;
             gameModal.show();  // Show the Bootstrap modal when game ends
 
-            newGameButton!.onclick = startNewGame;  // Ensure button triggers a new game
+            newGameButton!.onclick = () => {
+                startNewGame("connect4", gameOptions, renderGame)
+                    .then(() => startAIMovePolling())
+                    .catch(error => console.error("Error starting new game:", error));
+            };
             stopAIMovePolling();
         } else {
             console.log("Game continuing. Current player:", data.current_player);
@@ -88,40 +86,19 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     };
 
-    function startNewGame() {
-        console.log("Starting a new Connect 4 game.");
+    function findLastMove(newBoard: number[][]) {
+        if (!previousBoard) return;  // No previous board to compare to
 
-        fetch("/games/new", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                game_type: "connect4",
-                options: gameOptions
-            })
-        })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`Failed to create a new game. Status code: ${response.status}`);
+        // Loop through the new board to find the difference
+        for (let row = 0; row < newBoard.length; row++) {
+            for (let col = 0; col < newBoard[row].length; col++) {
+                // Check if there's a new piece (difference between old and new board)
+                if (newBoard[row][col] != 0 && newBoard[row][col] !== previousBoard[row][col]) {
+                    highlightLastMove(row, col);  // Highlight the last move
+                    return;
                 }
-                return response.json();
-            })
-            .then(data => {
-                console.log("New game created with ID:", data.game_id);
-                // Update the URL with the new game ID
-                window.history.pushState({}, "", `/connect4/${data.game_id}`);
-
-                const gameModal = window.bootstrap.Modal.getInstance(document.getElementById("gameModal")!);
-                if (gameModal) {
-                    gameModal.hide();
-                }
-
-                updateGameState(renderGame);
-                startAIMovePolling();
-            })
-            .catch(error => {
-                console.error("Error creating new game:", error);
-                showErrorToast("Failed to create a new game. Please try again.");
-            });
+            }
+        }
     }
 
     function highlightLastMove(row: number, column: number) {
@@ -139,53 +116,9 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    function findLastMove(newBoard: number[][]) {
-        if (!previousBoard) return;  // No previous board to compare to
-
-        // Loop through the new board to find the difference
-        for (let row = 0; row < newBoard.length; row++) {
-            for (let col = 0; col < newBoard[row].length; col++) {
-                // Check if there's a new piece (difference between old and new board)
-                if (newBoard[row][col] != 0 && newBoard[row][col] !== previousBoard[row][col]) {
-                    highlightLastMove(row, col);  // Highlight the last move
-                    return;
-                }
-            }
-        }
-    }
-
-    function currentPlayerType(data: Connect4GameData): string {
-        return data.current_player === 1 ? data.options.player1_type : data.options.player2_type;
-    }
-
-    function makeAIMove() {
-        const gameId = getCurrentGameId();
-        console.log("Attempting AI move for game ID:", gameId);
-
-        fetch(`/games/${gameId}/ai_move`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-        })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error("Failed to make AI move");
-                }
-                return response.json();
-            })
-            .then(data => {
-                console.log("AI move response:", data);
-                if (data.success) {
-                    updateGameState(renderGame);
-                }
-            })
-            .catch(error => {
-                console.error("Error making AI move:", error);
-            });
-    }
-
     function startAIMovePolling() {
         stopAIMovePolling();  // Clear any existing interval
-        aiMoveInterval = setInterval(makeAIMove, 100);  // Poll every 100 ms
+        aiMoveInterval = setInterval(() => makeAIMove(renderGame), 100);  // Poll every 100 ms
     }
 
     function stopAIMovePolling() {
@@ -195,9 +128,11 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    // Start AI move polling when the page loads
-    startAIMovePolling();
-
     // Initial game state fetch
-    updateGameState(renderGame);
+    updateGameState(renderGame)
+        .then(data => {
+            gameOptions = data.options;
+            startAIMovePolling();
+        })
+        .catch(error => console.error("Error fetching initial game state:", error));
 });

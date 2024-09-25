@@ -1,15 +1,14 @@
-import { BaseGameData, updateGameState, makeMove, showErrorToast } from './game_common.js';
+import { BaseGameData, updateGameState, makeMove, showErrorToast, getCurrentGameId, startNewGame, makeAIMove, currentPlayerType } from './game_common.js';
 
 interface OthelloGameData extends BaseGameData {
     rows: number;
     columns: number;
     state: number[][];
     legal_actions: [number, number][];
-    options: {
-        player1_type: string;
-        player2_type: string;
-    };
 }
+
+let gameOptions: { player1_type: string, player2_type: string };
+let aiMoveInterval: number;
 
 document.addEventListener('DOMContentLoaded', () => {
     console.log('othello.ts loaded and DOMContentLoaded event fired.');
@@ -18,11 +17,19 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log('Rendering game with data:', JSON.stringify(data, null, 2));
         const gameArea = document.getElementById('game');
         const status = document.getElementById('status');
+        const modalBody = document.getElementById("modalBody");
+        const gameModal = new window.bootstrap.Modal(document.getElementById("gameModal")!, {
+            keyboard: false
+        });
+        const newGameButton = document.getElementById("newGameButton");
         
         if (!gameArea || !status) {
             console.error('Required DOM elements not found.');
             return;
         }
+
+        gameOptions = data.options;
+        console.log("Updated gameOptions:", gameOptions);
 
         // Clear previous game board
         gameArea.innerHTML = '';
@@ -57,10 +64,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     console.log(`Legal move at (${row}, ${col})`);
                 }
 
-                cell.addEventListener('click', () => {
-                    console.log('Cell clicked:', { row, col });
-                    makeMove<OthelloGameData>({ row, col }, renderGame);
-                });
+                if (!data.is_terminal && currentPlayerType(data) === "human") {
+                    cell.addEventListener('click', () => {
+                        console.log('Cell clicked:', { row, col });
+                        makeMove<OthelloGameData>({ row, col }, renderGame);
+                    });
+                }
 
                 grid.appendChild(cell);
             }
@@ -70,19 +79,45 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Update game status
         if (data.is_terminal) {
-            if (data.winner) {
-                status.textContent = `Player ${data.winner} wins!`;
-            } else {
-                status.textContent = 'Game is a draw.';
-            }
+            console.log("Game is terminal. Winner:", data.winner);
+            const message = data.winner
+                ? `🎉 <strong>Player ${data.winner} Wins!</strong> 🎉`
+                : "🤝 <strong>The game is a draw!</strong> 🤝";
+
+            modalBody!.innerHTML = message;
+            gameModal.show();  // Show the Bootstrap modal when game ends
+
+            newGameButton!.onclick = () => {
+                startNewGame("othello", gameOptions, renderGame)
+                    .then(() => startAIMovePolling())
+                    .catch(error => console.error("Error starting new game:", error));
+            };
+            stopAIMovePolling();
         } else {
+            console.log("Game continuing. Current player:", data.current_player);
             status.textContent = `Current Turn: Player ${data.current_player}`;
         }
 
         console.log('Finished rendering game');
     };
 
+    function startAIMovePolling() {
+        stopAIMovePolling();  // Clear any existing interval
+        aiMoveInterval = setInterval(() => makeAIMove(renderGame), 100);  // Poll every 100 ms
+    }
+
+    function stopAIMovePolling() {
+        if (aiMoveInterval) {
+            clearInterval(aiMoveInterval);
+            aiMoveInterval = 0;
+        }
+    }
+
     // Initial game state fetch
-    console.log('Fetching initial game state');
-    updateGameState<OthelloGameData>(renderGame);
+    updateGameState(renderGame)
+        .then(data => {
+            gameOptions = data.options;
+            startAIMovePolling();
+        })
+        .catch(error => console.error("Error fetching initial game state:", error));
 });
