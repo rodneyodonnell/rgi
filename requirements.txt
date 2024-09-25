@@ -23,6 +23,8 @@ argon2-cffi-bindings==21.2.0
     # via argon2-cffi
 arrow==1.3.0
     # via isoduration
+astroid==3.3.4
+    # via pylint
 asttokens==2.4.1
     # via stack-data
 astunparse==1.6.3
@@ -67,6 +69,8 @@ decorator==5.1.1
     # via ipython
 defusedxml==0.7.1
     # via nbconvert
+dill==0.3.8
+    # via pylint
 executing==2.1.0
     # via stack-data
 fastapi==0.114.1
@@ -127,6 +131,8 @@ ipywidgets==8.1.5
     # via jupyter
 isoduration==20.11.0
     # via jsonschema
+isort==5.13.2
+    # via pylint
 jedi==0.19.1
     # via ipython
 jinja2==3.1.4
@@ -209,6 +215,8 @@ matplotlib-inline==0.1.7
     # via
     #   ipykernel
     #   ipython
+mccabe==0.7.0
+    # via pylint
 mdurl==0.1.2
     # via markdown-it-py
 mistune==3.0.2
@@ -217,6 +225,10 @@ ml-dtypes==0.4.1
     # via
     #   keras
     #   tensorflow
+mypy==1.11.2
+    # via -r requirements.in
+mypy-extensions==1.0.0
+    # via mypy
 namex==0.0.8
     # via keras
 nbclient==0.10.0
@@ -277,7 +289,9 @@ pexpect==4.9.0
 pip-tools==7.4.1
     # via -r requirements.in
 platformdirs==4.3.6
-    # via jupyter-core
+    # via
+    #   jupyter-core
+    #   pylint
 playwright==1.47.0
     # via
     #   -r requirements.in
@@ -316,6 +330,8 @@ pygments==2.18.0
     #   jupyter-console
     #   nbconvert
     #   rich
+pylint==3.3.1
+    # via -r requirements.in
 pyproject-hooks==1.1.0
     # via
     #   build
@@ -429,6 +445,8 @@ text-unidecode==1.3
     # via python-slugify
 tinycss2==1.3.0
     # via nbconvert
+tomlkit==0.13.2
+    # via pylint
 tornado==6.4.1
     # via
     #   ipykernel
@@ -465,6 +483,7 @@ typing-extensions==4.12.2
     # via
     #   fastapi
     #   ipython
+    #   mypy
     #   optree
     #   pydantic
     #   pydantic-core

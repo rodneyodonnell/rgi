@@ -33,3 +33,5 @@ webdriver-manager==4.0.2
 
 # Tools
 pip-tools
+pylint
+mypy
