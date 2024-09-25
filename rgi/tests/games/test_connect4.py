@@ -185,3 +185,24 @@ def test_connect4_parse_and_pretty_print(game, board_str, expected_player):
     state = game.parse_board(board_str, current_player=expected_player)
     pretty_printed = game.pretty_str(state)
     assert pretty_printed.strip() == board_str.strip()
+
+
+def test_middle_of_row_win():
+    game = Connect4Game()
+
+    board_str = textwrap.dedent(
+        """
+        | | | | | | | |
+        | | | | | | | |
+        | | | | | | | |
+        |○| | | | | |○|
+        |○| | | | | |○|
+        |○|●|○|●|●| |●|
+        +-+-+-+-+-+-+-+
+        """
+    )
+    state = game.parse_board(board_str, current_player=1)
+    assert state.winner == None
+
+    new_state = game.next_state(state, 6)
+    assert new_state.winner == 1, f"Expected Player 1 to win, but got {state.winner}"

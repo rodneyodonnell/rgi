@@ -64,14 +64,12 @@ class Connect4Game(Game[Connect4State, TPlayerId, TAction]):
 
     def _calculate_winner(self, board: Map[tuple[int, int], int], col: int, row: int, player: int) -> Optional[int]:
         """Check if the last move made at (row, col) by 'player' wins the game."""
-        # fmt: off
         directions = [
-            (1, 0), (-1, 0),  # Vertical
-            (0, 1), (0, -1),  # Horizontal
-            (1, 1), (-1, -1),  # Diagonal /
-            (1, -1), (-1, 1),  # Diagonal \
+            ((1, 0), (-1, 0)),  # Vertical
+            ((0, 1), (0, -1)),  # Horizontal
+            ((1, 1), (-1, -1)),  # Diagonal /
+            ((1, -1), (-1, 1)),  # Diagonal \
         ]
-        # fmt: on
 
         def count_in_direction(delta_row: int, delta_col: int) -> int:
             """Count consecutive pieces in one direction."""
@@ -86,10 +84,12 @@ class Connect4Game(Game[Connect4State, TPlayerId, TAction]):
                     break
             return count
 
-        # Check all directions from the last move
-        for delta_row, delta_col in directions:
-            # +1 to include the current square.
-            consecutive_count = count_in_direction(delta_row, delta_col) + 1
+        for (delta_row1, delta_col1), (delta_row2, delta_col2) in directions:
+            consecutive_count = (
+                count_in_direction(delta_row1, delta_col1)
+                + count_in_direction(delta_row2, delta_col2)
+                + 1  # Include the current piece
+            )
             if consecutive_count >= self.connect:
                 return player
 
