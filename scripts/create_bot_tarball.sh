@@ -18,6 +18,8 @@ find . \( -path "*/node_modules" -o \
        -not -name "*.tar.*" \
        -not -name "package-lock.json" \
        -not -name "yarn.lock" \
+       -not -name "*.png" \
+       -not -name "*.ico" \
        -not -regex '.*\/web_app\/static\/.*\.js$' \
        -type f \
        -print | grep -v -E "$EXCLUDE_PATTERN" | tar -cvf rgi_source.tar -T -
