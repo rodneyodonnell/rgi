@@ -39,6 +39,7 @@ RUN apt-get update && apt-get install -y emacs less
 # Install TypeScript and related tools
 RUN yarn add typescript@5.5 --dev
 RUN yarn add eslint @typescript-eslint/parser @typescript-eslint/eslint-plugin --dev
+RUN yarn add prettier --dev
 
 # Install Bootstrap type definitions
 RUN yarn add @types/bootstrap --dev

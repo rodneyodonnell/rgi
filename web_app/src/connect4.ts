@@ -1,138 +1,157 @@
-import { BaseGameData, updateGameState, makeMove, showErrorToast, getCurrentGameId, startNewGame, makeAIMove, currentPlayerType } from './game_common.js';
+import {
+  BaseGameData,
+  updateGameState,
+  makeMove,
+  showErrorToast,
+  getCurrentGameId,
+  startNewGame,
+  makeAIMove,
+  currentPlayerType,
+} from './game_common.js'
 
 interface Connect4GameData extends BaseGameData {
-    rows: number;
-    columns: number;
-    state: number[][];
+  rows: number
+  columns: number
+  state: number[][]
 }
 
-let previousBoard: number[][];
-let aiMoveInterval: number;
-let gameOptions: { player1_type: string, player2_type: string };
+let previousBoard: number[][]
+let aiMoveInterval: number
+let gameOptions: { player1_type: string; player2_type: string }
 
-document.addEventListener("DOMContentLoaded", () => {
-    console.log("connect4.ts loaded and DOMContentLoaded event fired.");
+document.addEventListener('DOMContentLoaded', () => {
+  console.log('connect4.ts loaded and DOMContentLoaded event fired.')
 
-    const renderGame = (data: Connect4GameData) => {
-        console.log("Rendering game with data:", data);
-        const gameArea = document.getElementById("game")!;
-        const status = document.getElementById("status")!;
-        const modalBody = document.getElementById("modalBody")!;
-        const gameModal = new window.bootstrap.Modal(document.getElementById("gameModal")!, {
-            keyboard: false
-        });
-        const newGameButton = document.getElementById("newGameButton");
+  const renderGame = (data: Connect4GameData) => {
+    console.log('Rendering game with data:', data)
+    const gameArea = document.getElementById('game')!
+    const status = document.getElementById('status')!
+    const modalBody = document.getElementById('modalBody')!
+    const gameModal = new window.bootstrap.Modal(
+      document.getElementById('gameModal')!,
+      {
+        keyboard: false,
+      },
+    )
+    const newGameButton = document.getElementById('newGameButton')
 
-        gameOptions = data.options;
-        console.log("Updated gameOptions:", gameOptions);
+    gameOptions = data.options
+    console.log('Updated gameOptions:', gameOptions)
 
-        // Clear previous game board
-        gameArea.innerHTML = "";
+    // Clear previous game board
+    gameArea.innerHTML = ''
 
-        // Create game board grid
-        const grid = document.createElement("div");
-        grid.classList.add("grid-container");
+    // Create game board grid
+    const grid = document.createElement('div')
+    grid.classList.add('grid-container')
 
-        for (let row = data.rows - 1; row >= 0; row--) {
-            for (let col = 0; col < data.columns; col++) {
-                const cell = document.createElement("div");
-                cell.classList.add("grid-cell");
-                cell.dataset.column = col.toString();
-                cell.dataset.row = row.toString();
+    for (let row = data.rows - 1; row >= 0; row--) {
+      for (let col = 0; col < data.columns; col++) {
+        const cell = document.createElement('div')
+        cell.classList.add('grid-cell')
+        cell.dataset.column = col.toString()
+        cell.dataset.row = row.toString()
 
-                if (data.state[row][col] === 1) {
-                    cell.classList.add("player1");
-                } else if (data.state[row][col] === 2) {
-                    cell.classList.add("player2");
-                }
-
-                if (!data.is_terminal && currentPlayerType(data) === "human") {
-                    cell.addEventListener("click", () => {
-                        console.log(`Cell clicked: Column ${col}`);
-                        makeMove<Connect4GameData>({ column: col + 1 }, renderGame);
-                    });
-                }
-
-                grid.appendChild(cell);
-            }
+        if (data.state[row][col] === 1) {
+          cell.classList.add('player1')
+        } else if (data.state[row][col] === 2) {
+          cell.classList.add('player2')
         }
 
-        gameArea.appendChild(grid);
-
-        // Compare the new board with the previous board to detect the last move
-        if (data.state) {
-            findLastMove(data.state);
-            previousBoard = data.state;  // Update the previous board state
+        if (!data.is_terminal && currentPlayerType(data) === 'human') {
+          cell.addEventListener('click', () => {
+            console.log(`Cell clicked: Column ${col}`)
+            makeMove<Connect4GameData>({ column: col + 1 }, renderGame)
+          })
         }
 
-        if (data.is_terminal) {
-            console.log("Game is terminal. Winner:", data.winner);
-            const message = data.winner
-                ? `🎉 <strong>Player ${data.winner} Wins!</strong> 🎉`
-                : "🤝 <strong>The game is a draw!</strong> 🤝";
-
-            modalBody.innerHTML = message;
-            gameModal.show();  // Show the Bootstrap modal when game ends
-
-            newGameButton!.onclick = () => {
-                startNewGame("connect4", gameOptions, renderGame)
-                    .then(() => startAIMovePolling())
-                    .catch(error => console.error("Error starting new game:", error));
-            };
-            stopAIMovePolling();
-        } else {
-            console.log("Game continuing. Current player:", data.current_player);
-            status.textContent = `Current Turn: Player ${data.current_player}`;
-        }
-    };
-
-    function findLastMove(newBoard: number[][]) {
-        if (!previousBoard) return;  // No previous board to compare to
-
-        // Loop through the new board to find the difference
-        for (let row = 0; row < newBoard.length; row++) {
-            for (let col = 0; col < newBoard[row].length; col++) {
-                // Check if there's a new piece (difference between old and new board)
-                if (newBoard[row][col] != 0 && newBoard[row][col] !== previousBoard[row][col]) {
-                    highlightLastMove(row, col);  // Highlight the last move
-                    return;
-                }
-            }
-        }
+        grid.appendChild(cell)
+      }
     }
 
-    function highlightLastMove(row: number, column: number) {
-        // Remove the 'last-move' class from all previous moves
-        document.querySelectorAll(".grid-cell.last-move").forEach(cell => {
-            cell.classList.remove("last-move");
-        });
+    gameArea.appendChild(grid)
 
-        // Select the cell based on the row and column directly
-        const lastMove = document.querySelector(`.grid-cell[data-column='${column}'][data-row='${row}']`);
+    // Compare the new board with the previous board to detect the last move
+    if (data.state) {
+      findLastMove(data.state)
+      previousBoard = data.state // Update the previous board state
+    }
 
-        // Add the 'last-move' class to the selected cell
-        if (lastMove) {
-            lastMove.classList.add("last-move");
+    if (data.is_terminal) {
+      console.log('Game is terminal. Winner:', data.winner)
+      const message = data.winner
+        ? `🎉 <strong>Player ${data.winner} Wins!</strong> 🎉`
+        : '🤝 <strong>The game is a draw!</strong> 🤝'
+
+      modalBody.innerHTML = message
+      gameModal.show() // Show the Bootstrap modal when game ends
+
+      newGameButton!.onclick = () => {
+        startNewGame('connect4', gameOptions, renderGame)
+          .then(() => startAIMovePolling())
+          .catch((error) => console.error('Error starting new game:', error))
+      }
+      stopAIMovePolling()
+    } else {
+      console.log('Game continuing. Current player:', data.current_player)
+      status.textContent = `Current Turn: Player ${data.current_player}`
+    }
+  }
+
+  function findLastMove(newBoard: number[][]) {
+    if (!previousBoard) return // No previous board to compare to
+
+    // Loop through the new board to find the difference
+    for (let row = 0; row < newBoard.length; row++) {
+      for (let col = 0; col < newBoard[row].length; col++) {
+        // Check if there's a new piece (difference between old and new board)
+        if (
+          newBoard[row][col] != 0 &&
+          newBoard[row][col] !== previousBoard[row][col]
+        ) {
+          highlightLastMove(row, col) // Highlight the last move
+          return
         }
+      }
     }
+  }
 
-    function startAIMovePolling() {
-        stopAIMovePolling();  // Clear any existing interval
-        aiMoveInterval = setInterval(() => makeAIMove(renderGame), 100);  // Poll every 100 ms
+  function highlightLastMove(row: number, column: number) {
+    // Remove the 'last-move' class from all previous moves
+    document.querySelectorAll('.grid-cell.last-move').forEach((cell) => {
+      cell.classList.remove('last-move')
+    })
+
+    // Select the cell based on the row and column directly
+    const lastMove = document.querySelector(
+      `.grid-cell[data-column='${column}'][data-row='${row}']`,
+    )
+
+    // Add the 'last-move' class to the selected cell
+    if (lastMove) {
+      lastMove.classList.add('last-move')
     }
+  }
 
-    function stopAIMovePolling() {
-        if (aiMoveInterval) {
-            clearInterval(aiMoveInterval);
-            aiMoveInterval = 0;
-        }
+  function startAIMovePolling() {
+    stopAIMovePolling() // Clear any existing interval
+    aiMoveInterval = setInterval(() => makeAIMove(renderGame), 100) // Poll every 100 ms
+  }
+
+  function stopAIMovePolling() {
+    if (aiMoveInterval) {
+      clearInterval(aiMoveInterval)
+      aiMoveInterval = 0
     }
+  }
 
-    // Initial game state fetch
-    updateGameState(renderGame)
-        .then(data => {
-            gameOptions = data.options;
-            startAIMovePolling();
-        })
-        .catch(error => console.error("Error fetching initial game state:", error));
-});
+  // Initial game state fetch
+  updateGameState(renderGame)
+    .then((data) => {
+      gameOptions = data.options
+      startAIMovePolling()
+    })
+    .catch((error) =>
+      console.error('Error fetching initial game state:', error),
+    )
+})

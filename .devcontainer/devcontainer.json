@@ -31,7 +31,8 @@
                 "ms-vscode.git",
                 "ms-azuretools.vscode-docker",
                 "ms-toolsai.jupyter",
-                "ms-python.black-formatter"
+                "ms-python.black-formatter",
+                "prettier.prettier-vscode"
             ]
         }
     }
