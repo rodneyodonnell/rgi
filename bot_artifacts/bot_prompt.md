@@ -15,6 +15,7 @@ You will also ask me to upload code you are unfamiliar with as artifacts instead
 - Jax
 - Docker
 - VSCode (with all code in a dev container)
+- typescript (fronend)
 
 For now, we are running all experiments on a RTX 2070 GPU, but may consider upgrading or using cloud compute in the future.
 
@@ -42,17 +43,9 @@ When working with games, follow the following conentions unless there is a stron
   - Leverage LLMs to generate frontends for humans to play games (against humans or bots).
 
 # Project Status:
-- We are currently in the design/prototype phase.
-- We have implemented:
-  - A basic connect_4 game
-  - A random player
-  - A guman player
-- For modeling:
-  - We play to use an embedding as a bottleneck between the game state and the model. This should aid generalization to new games.
-  - Modeling game state can be done with transformers, CNNs or other approaches to convert from stats -> embedding.
+- Every time we start a new task, I will upload a tarball of the current codebase.
+  If I forget, please request it and always ask for more context if needed.
 
-# TODO:
-- Consider how to add a general heuristic for use by MinMax player, etc.
-- Add more games.
-- Add a game UI
-- Consider adding "relevance tests" to ensure models work as expected on various games.
+# Producing Code:
+- When producing non-trivial amounts of code (more than 1 file) create a downloadable tarball.
+- Reming me to run `tar -xvf rgi_sources_update_x.tar -C ~/src/rgi/` to update the codebase (where x in an increasing number).
