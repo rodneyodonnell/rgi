@@ -1,5 +1,8 @@
 import { Toast, Modal } from 'bootstrap'
 
+const urlParams = new URLSearchParams(window.location.search)
+const aiIntervalMs = Number(urlParams.get('ai_interval_ms') ?? '100')
+
 declare global {
   interface Window {
     bootstrap: {
@@ -121,7 +124,11 @@ export function startNewGame(
     .then((data) => {
       console.log('New game created with ID:', data.game_id)
       // Update the URL with the new game ID
-      window.history.pushState({}, '', `/${gameType}/${data.game_id}`)
+      window.history.pushState(
+        {},
+        '',
+        `/${gameType}/${data.game_id}${window.location.search}`,
+      )
 
       const gameModal = window.bootstrap.Modal.getInstance(
         document.getElementById('gameModal')!,
@@ -168,4 +175,18 @@ export function currentPlayerType(data: BaseGameData): string {
   return data.current_player === 1
     ? data.options.player1_type
     : data.options.player2_type
+}
+
+let aiMoveInterval: number
+
+export function startAIMovePolling(renderGame: (data: any) => void) {
+  stopAIMovePolling() // Clear any existing interval
+  aiMoveInterval = setInterval(() => makeAIMove(renderGame), aiIntervalMs) // Poll every 100 ms
+}
+
+export function stopAIMovePolling() {
+  if (aiMoveInterval) {
+    clearInterval(aiMoveInterval)
+    aiMoveInterval = 0
+  }
 }

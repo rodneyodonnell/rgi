@@ -16,7 +16,7 @@ def custom_game_page(page: Page, timeout_ms=500, player1_type: str = "human", pl
     expect.set_options(timeout=timeout_ms)
 
     # Go to the main page
-    page.goto("http://localhost:8000")
+    page.goto("http://localhost:8000?ai_interval_ms=1")
 
     # Select the AI types from the form
     page.select_option("#othelloPlayer1", player1_type)
@@ -118,25 +118,7 @@ def test_two_random_bots_play_to_end(page: Page):
 
 def test_legal_moves_highlight(game_page: Page):
     legal_moves = game_page.locator(".grid-cell.legal-move")
-    expect(legal_moves).to_have_count(greater_than=0)
-
-
-def test_game_over_no_legal_moves(page: Page):
-    # This test simulates a game ending when there are no more legal moves
-    # We'll use two random AIs to play until the game ends
-    page = custom_game_page(page, player1_type="random", player2_type="random")
-
-    max_game_time_ms = 60_000  # Allow up to 60 seconds for the game to complete
-    start_time = page.evaluate("performance.now()")
-
-    while page.evaluate("performance.now()") - start_time < max_game_time_ms:
-        page.wait_for_timeout(1000)  # Wait for 1 second
-
-        if page.locator("#modalBody").is_visible():
-            break
-
-    expect(page.locator("#modalBody")).to_be_visible()
-    expect(page.locator("#modalBody")).to_have_text(re.compile(r"(Player 1 Wins|Player 2 Wins|The game is a draw)"))
+    expect(legal_moves).to_have_count(4)
 
 
 def test_unique_game_ids(page):

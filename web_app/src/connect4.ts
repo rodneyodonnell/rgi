@@ -7,6 +7,8 @@ import {
   startNewGame,
   makeAIMove,
   currentPlayerType,
+  startAIMovePolling,
+  stopAIMovePolling,
 } from './game_common.js'
 
 interface Connect4GameData extends BaseGameData {
@@ -88,7 +90,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       newGameButton!.onclick = () => {
         startNewGame('connect4', gameOptions, renderGame)
-          .then(() => startAIMovePolling())
+          .then(() => startAIMovePolling(renderGame))
           .catch((error) => console.error('Error starting new game:', error))
       }
       stopAIMovePolling()
@@ -133,23 +135,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  function startAIMovePolling() {
-    stopAIMovePolling() // Clear any existing interval
-    aiMoveInterval = setInterval(() => makeAIMove(renderGame), 100) // Poll every 100 ms
-  }
-
-  function stopAIMovePolling() {
-    if (aiMoveInterval) {
-      clearInterval(aiMoveInterval)
-      aiMoveInterval = 0
-    }
-  }
-
   // Initial game state fetch
   updateGameState(renderGame)
     .then((data) => {
       gameOptions = data.options
-      startAIMovePolling()
+      startAIMovePolling(renderGame)
     })
     .catch((error) =>
       console.error('Error fetching initial game state:', error),

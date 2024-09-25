@@ -16,7 +16,7 @@ def custom_game_page(page: Page, timeout_ms=500, player1_type: str = "human", pl
     expect.set_options(timeout=timeout_ms)
 
     # Go to the main page
-    page.goto("http://localhost:8000")
+    page.goto("http://localhost:8000?ai_interval_ms=1")
 
     # Select the AI types from the form (assuming these are select elements with specific IDs)
     page.select_option("#connect4Player1", player1_type)

@@ -1,5 +1,4 @@
 // web_app/static/index.js
-'use strict'
 
 document.addEventListener('DOMContentLoaded', () => {
   const connect4Form = document.getElementById('connect4Form')
@@ -53,7 +52,7 @@ function startGame(
     })
     .then((data) => {
       console.log('Game created with ID:', data.game_id)
-      window.location.href = `/${gameType}/${data.game_id}`
+      window.location.href = `/${gameType}/${data.game_id}${window.location.search}`
     })
     .catch((error) => {
       console.error('Error creating game:', error)
