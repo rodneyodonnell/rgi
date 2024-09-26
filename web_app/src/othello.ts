@@ -2,13 +2,8 @@ import {
   BaseGameData,
   updateGameState,
   makeMove,
-  showErrorToast,
-  getCurrentGameId,
   startNewGame,
-  makeAIMove,
   currentPlayerType,
-  startAIMovePolling,
-  stopAIMovePolling,
 } from './game_common.js'
 
 interface OthelloGameData extends BaseGameData {
@@ -19,7 +14,6 @@ interface OthelloGameData extends BaseGameData {
 }
 
 let gameOptions: { player1_type: string; player2_type: string }
-let aiMoveInterval: number
 
 document.addEventListener('DOMContentLoaded', () => {
   console.log('othello.ts loaded and DOMContentLoaded event fired.')
@@ -107,10 +101,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
       newGameButton!.onclick = () => {
         startNewGame('othello', gameOptions, renderGame)
-          .then(() => startAIMovePolling(renderGame))
           .catch((error) => console.error('Error starting new game:', error))
       }
-      stopAIMovePolling()
     } else {
       console.log('Game continuing. Current player:', data.current_player)
       status.textContent = `Current Turn: Player ${data.current_player}`
@@ -123,7 +115,6 @@ document.addEventListener('DOMContentLoaded', () => {
   updateGameState(renderGame)
     .then((data) => {
       gameOptions = data.options
-      startAIMovePolling(renderGame)
     })
     .catch((error) =>
       console.error('Error fetching initial game state:', error),

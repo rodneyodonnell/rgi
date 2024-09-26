@@ -2,13 +2,8 @@ import {
   BaseGameData,
   updateGameState,
   makeMove,
-  showErrorToast,
-  getCurrentGameId,
   startNewGame,
-  makeAIMove,
   currentPlayerType,
-  startAIMovePolling,
-  stopAIMovePolling,
 } from './game_common.js'
 
 interface Connect4GameData extends BaseGameData {
@@ -18,7 +13,6 @@ interface Connect4GameData extends BaseGameData {
 }
 
 let previousBoard: number[][]
-let aiMoveInterval: number
 let gameOptions: { player1_type: string; player2_type: string }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -90,14 +84,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
       newGameButton!.onclick = () => {
         startNewGame('connect4', gameOptions, renderGame)
-          .then(() => startAIMovePolling(renderGame))
           .catch((error) => console.error('Error starting new game:', error))
       }
-      stopAIMovePolling()
     } else {
       console.log('Game continuing. Current player:', data.current_player)
       status.textContent = `Current Turn: Player ${data.current_player}`
     }
+
+    console.log('Finished rendering game')
   }
 
   function findLastMove(newBoard: number[][]) {
@@ -139,7 +133,6 @@ document.addEventListener('DOMContentLoaded', () => {
   updateGameState(renderGame)
     .then((data) => {
       gameOptions = data.options
-      startAIMovePolling(renderGame)
     })
     .catch((error) =>
       console.error('Error fetching initial game state:', error),

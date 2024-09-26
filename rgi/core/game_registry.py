@@ -11,7 +11,7 @@ from rgi.games import othello
 @dataclass
 class RegisteredGame(Generic[TGameState, TPlayerId, TAction]):
     game_fn: type[Game[TGameState, TPlayerId, TAction]]
-    # Ideally this would be stricter, but this gets a bit tricky.
+    # Ideally this type would be stricter, but this gets a bit tricky.
     serializer_fn: type[GameSerializer[Any, TGameState, TAction]]
 
 

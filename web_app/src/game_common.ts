@@ -1,7 +1,7 @@
 import { Toast, Modal } from 'bootstrap'
 
 const urlParams = new URLSearchParams(window.location.search)
-const aiIntervalMs = Number(urlParams.get('ai_interval_ms') ?? '100')
+const aiIntervalMs = Number(urlParams.get('ai_interval_ms') ?? '150')
 
 declare global {
   interface Window {
@@ -63,6 +63,12 @@ export function updateGameState<T extends BaseGameData>(
     .then((data) => {
       console.log('Received game state:', data)
       renderGame(data as T)
+      
+      // Check if it's AI's turn after updating the state
+      if (!data.is_terminal && currentPlayerType(data as BaseGameData) !== 'human') {
+        makeAIMove(renderGame)
+      }
+      
       return data as T
     })
     .catch((error) => {
@@ -150,6 +156,8 @@ export function makeAIMove(renderGame: (data: any) => void) {
   const gameId = getCurrentGameId()
   console.log('Attempting AI move for game ID:', gameId)
 
+  const startTime = Date.now()
+
   fetch(`/games/${gameId}/ai_move`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -163,7 +171,13 @@ export function makeAIMove(renderGame: (data: any) => void) {
     .then((data) => {
       console.log('AI move response:', data)
       if (data.success) {
-        updateGameState(renderGame)
+        const elapsedTime = Date.now() - startTime
+        const remainingDelay = Math.max(0, aiIntervalMs - elapsedTime)
+
+        // Add artificial delay so AI doesn't feel too "fast".
+        setTimeout(() => {
+          updateGameState(renderGame)
+        }, remainingDelay)
       }
     })
     .catch((error) => {
@@ -175,18 +189,4 @@ export function currentPlayerType(data: BaseGameData): string {
   return data.current_player === 1
     ? data.options.player1_type
     : data.options.player2_type
-}
-
-let aiMoveInterval: number
-
-export function startAIMovePolling(renderGame: (data: any) => void) {
-  stopAIMovePolling() // Clear any existing interval
-  aiMoveInterval = setInterval(() => makeAIMove(renderGame), aiIntervalMs) // Poll every 100 ms
-}
-
-export function stopAIMovePolling() {
-  if (aiMoveInterval) {
-    clearInterval(aiMoveInterval)
-    aiMoveInterval = 0
-  }
 }
