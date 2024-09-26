@@ -1,20 +1,27 @@
-import pytest
 import textwrap
-from rgi.games.connect4 import Connect4Game, Connect4State
+from typing import Literal
+
+import pytest
+
+from rgi.games.connect4 import Connect4Game
+
+TPlayerId = Literal[1, 2]
+
+# pylint: disable=redefined-outer-name  # pytest fixtures trigger this false positive
 
 
 @pytest.fixture
-def game():
+def game() -> Connect4Game:
     return Connect4Game()
 
 
-def test_initial_state(game):
+def test_initial_state(game: Connect4Game) -> None:
     state = game.initial_state()
     assert state.current_player == 1
     assert all(state.board.get((row, col)) is None for row in range(1, 6 + 1) for col in range(1, 7 + 1))
 
 
-def test_legal_actions(game):
+def test_legal_actions(game: Connect4Game) -> None:
     state = game.initial_state()
     assert game.legal_actions(state) == list(range(1, 7 + 1))
 
@@ -24,14 +31,14 @@ def test_legal_actions(game):
     assert game.legal_actions(state) == list(range(2, 7 + 1))
 
 
-def test_next_state(game):
+def test_next_state(game: Connect4Game) -> None:
     state = game.initial_state()
     next_state = game.next_state(state, action=3)
     assert next_state.current_player == 2
     assert next_state.board.get((1, 3)) == 1
 
 
-def test_is_terminal(game):
+def test_is_terminal(game: Connect4Game) -> None:
     state = game.initial_state()
     assert not game.is_terminal(state)
 
@@ -46,7 +53,7 @@ def test_is_terminal(game):
     assert game.is_terminal(state)
 
 
-def test_reward(game):
+def test_reward(game: Connect4Game) -> None:
     state = game.initial_state()
     assert game.reward(state, 1) == 0
     assert game.reward(state, 2) == 0
@@ -60,7 +67,7 @@ def test_reward(game):
     assert game.reward(state, 2) == -1
 
 
-def test_vertical_win(game):
+def test_vertical_win(game: Connect4Game) -> None:
     state = game.initial_state()
     for _ in range(3):
         state = game.next_state(state, action=1)
@@ -70,7 +77,7 @@ def test_vertical_win(game):
     assert game.reward(state, 1) == 1
 
 
-def test_horizontal_win(game):
+def test_horizontal_win(game: Connect4Game) -> None:
     state = game.initial_state()
     for i in range(4):
         state = game.next_state(state, action=i + 1)
@@ -80,7 +87,7 @@ def test_horizontal_win(game):
     assert game.reward(state, 1) == 1
 
 
-def test_diagonal_win(game):
+def test_diagonal_win(game: Connect4Game) -> None:
     state = game.initial_state()
     moves = [0, 1, 1, 2, 2, 3, 2, 3, 3, 0, 3]
     for move in moves:
@@ -89,13 +96,13 @@ def test_diagonal_win(game):
     assert game.reward(state, 1) == 1
 
 
-def test_invalid_move(game):
+def test_invalid_move(game: Connect4Game) -> None:
     state = game.initial_state()
     with pytest.raises(ValueError):
         game.next_state(state, 8)
 
 
-def test_custom_board_size():
+def test_custom_board_size() -> None:
     game = Connect4Game(width=8, height=7, connect=5)
     state = game.initial_state()
     assert len(game.legal_actions(state)) == 8
@@ -105,7 +112,7 @@ def test_custom_board_size():
 
 
 @pytest.mark.parametrize("verbose", [True, False])
-def test_draw(game, verbose):
+def test_draw(game: Connect4Game, verbose: bool) -> None:
     state = game.initial_state()
     # fmt: off
     moves = [
@@ -181,13 +188,13 @@ def test_draw(game, verbose):
         ),
     ],
 )
-def test_connect4_parse_and_pretty_print(game, board_str, expected_player):
+def test_connect4_parse_and_pretty_print(game: Connect4Game, board_str: str, expected_player: TPlayerId) -> None:
     state = game.parse_board(board_str, current_player=expected_player)
     pretty_printed = game.pretty_str(state)
     assert pretty_printed.strip() == board_str.strip()
 
 
-def test_middle_of_row_win():
+def test_middle_of_row_win() -> None:
     game = Connect4Game()
 
     board_str = textwrap.dedent(
@@ -202,7 +209,7 @@ def test_middle_of_row_win():
         """
     )
     state = game.parse_board(board_str, current_player=1)
-    assert state.winner == None
+    assert state.winner is None
 
     new_state = game.next_state(state, 6)
     assert new_state.winner == 1, f"Expected Player 1 to win, but got {state.winner}"

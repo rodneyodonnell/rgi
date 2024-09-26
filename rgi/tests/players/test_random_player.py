@@ -1,21 +1,27 @@
+from typing import Any, cast
+
+from pytest_mock import MockerFixture
 import pytest
 from rgi.players.random_player import RandomPlayer
 from rgi.core.base import Game
 
-
-@pytest.fixture
-def game(mocker):
-    game = mocker.Mock(spec=Game)
-    game.legal_actions.return_value = [1, 2, 3]
-    return game
+# pylint: disable=redefined-outer-name  # pytest fixtures trigger this false positive
 
 
 @pytest.fixture
-def player():
+def game(mocker: MockerFixture) -> Game[Any, Any, int]:
+    mock_game = mocker.Mock(spec=Game)
+    mock_game.legal_actions.return_value = [1, 2, 3]
+    mock_game.pretty_str.return_value = "Mock pretty state"
+    return cast(Game[Any, Any, int], mock_game)
+
+
+@pytest.fixture
+def player() -> RandomPlayer[Any, Any]:
     return RandomPlayer()
 
 
-def test_select_action(game, player):
+def test_select_action(game: Game[Any, Any, int], player: RandomPlayer[Any, Any]) -> None:
     state = None  # RandomPlayer doesn't use the state
     actions = game.legal_actions(state)
 
@@ -26,7 +32,7 @@ def test_select_action(game, player):
     assert all(action in actions for action in selected_actions), "All selected actions should be legal"
 
 
-def test_update_state(player):
+def test_update_state(player: RandomPlayer[Any, Any]) -> None:
     # RandomPlayer's update_state should do nothing
     player.update_state(None, None)
     # If we reach here without error, the test passes

@@ -1,12 +1,12 @@
 from abc import ABC, abstractmethod
 from typing import Generic, TypeVar, Any
 
-TGame = TypeVar("TGame")
-TGameState = TypeVar("TGameState")
-TPlayerState = TypeVar("TPlayerState")
-TPlayerId = TypeVar("TPlayerId")
-TAction = TypeVar("TAction")
-TEmbedding = TypeVar("TEmbedding")
+TGame = TypeVar("TGame", bound="Game[Any, Any, Any]")  # pylint: disable=invalid-name
+TGameState = TypeVar("TGameState")  # pylint: disable=invalid-name
+TPlayerState = TypeVar("TPlayerState")  # pylint: disable=invalid-name
+TPlayerId = TypeVar("TPlayerId")  # pylint: disable=invalid-name
+TAction = TypeVar("TAction")  # pylint: disable=invalid-name
+TEmbedding = TypeVar("TEmbedding")  # pylint: disable=invalid-name
 
 
 class Game(ABC, Generic[TGameState, TPlayerId, TAction]):
@@ -21,7 +21,6 @@ class Game(ABC, Generic[TGameState, TPlayerId, TAction]):
     @abstractmethod
     def all_player_ids(self, state: TGameState) -> list[TPlayerId]:
         """Return a sequence of all player IDs in the game."""
-        pass
 
     @abstractmethod
     def legal_actions(self, state: TGameState) -> list[TAction]:
@@ -41,12 +40,10 @@ class Game(ABC, Generic[TGameState, TPlayerId, TAction]):
 
         This is typically 0 for non-terminal states, and -1, 0, or 1 for terminal states,
         depending on whether the player lost, drew, or won respectively."""
-        pass
 
     @abstractmethod
     def pretty_str(self, state: TGameState) -> str:
         """Return a human-readable string representation of the game state."""
-        pass
 
 
 class StateEmbedder(ABC, Generic[TGameState, TEmbedding]):
@@ -75,12 +72,10 @@ class GameSerializer(ABC, Generic[TGame, TGameState, TAction]):
     @abstractmethod
     def serialize_state(self, game: TGame, state: TGameState) -> dict[str, Any]:
         """Serialize the game state to a dictionary for frontend consumption."""
-        pass
 
     @abstractmethod
     def parse_action(self, game: TGame, action_data: dict[str, Any]) -> TAction:
         """Parse an action from frontend data."""
-        pass
 
 
 class Player(ABC, Generic[TGameState, TPlayerState, TAction]):
@@ -89,27 +84,26 @@ class Player(ABC, Generic[TGameState, TPlayerState, TAction]):
         pass
 
     @abstractmethod
-    def update_state(self, game_state: TGameState, action: TAction):
+    def update_state(self, game_state: TGameState, action: TAction) -> None:
         """Update the player's internal state based on the game state and action.
 
         This method is called after each action, allowing the player to update any
         internal state or learning parameters based on the game progression."""
-        pass
 
 
-class GameObserver(ABC, Generic[TGameState, TPlayerId]):
+class GameObserver(ABC, Generic[TGameState, TPlayerId, TAction]):
     @abstractmethod
-    def observe_initial_state(self, state: TGameState):
-        pass
-
-    @abstractmethod
-    def observe_action(self, state: TGameState, player: TPlayerId, action: TAction):
+    def observe_initial_state(self, state: TGameState) -> None:
         pass
 
     @abstractmethod
-    def observe_state_transition(self, old_state: TGameState, new_state: TGameState):
+    def observe_action(self, state: TGameState, player: TPlayerId, action: TAction) -> None:
         pass
 
     @abstractmethod
-    def observe_game_end(self, final_state: TGameState):
+    def observe_state_transition(self, old_state: TGameState, new_state: TGameState) -> None:
+        pass
+
+    @abstractmethod
+    def observe_game_end(self, final_state: TGameState) -> None:
         pass

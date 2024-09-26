@@ -84,3 +84,12 @@ pytest web_app/tests/test_connect4_frontend.py
 # Non-headless
 pytest web_app/tests/test_connect4_frontend.py -v --headed
 ```
+
+
+# Manually Run linters
+```
+mypy rgi
+pylint rgi/**/*.py
+yarn eslint 'web_app/static/**/*.ts'
+yarn tsc --noEmit
+```

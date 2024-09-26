@@ -1,17 +1,22 @@
+import re
+
 import pytest
 from playwright.sync_api import Page, expect
-import re
+
+# pylint: disable=redefined-outer-name  # pytest fixtures trigger this false positive
 
 # max timeout of 5s for each test
 pytestmark = pytest.mark.timeout(5)
 
 
 @pytest.fixture(scope="function")
-def game_page(page: Page):
+def game_page(page: Page) -> Page:
     return custom_game_page(page)
 
 
-def custom_game_page(page: Page, timeout_ms=500, player1_type: str = "human", player2_type: str = "human"):
+def custom_game_page(
+    page: Page, timeout_ms: int = 500, player1_type: str = "human", player2_type: str = "human"
+) -> Page:
     page.set_default_timeout(timeout_ms)
     expect.set_options(timeout=timeout_ms)
 
@@ -33,17 +38,17 @@ def custom_game_page(page: Page, timeout_ms=500, player1_type: str = "human", pl
     return page
 
 
-def test_create_new_game(game_page: Page):
+def test_create_new_game(game_page: Page) -> None:
     expect(game_page).to_have_url(re.compile(r"http://localhost:8000/connect4/\d+"))
     expect(game_page.locator(".grid-container")).to_be_visible()
 
 
-def test_make_move(game_page: Page):
+def test_make_move(game_page: Page) -> None:
     game_page.click(".grid-cell[data-column='0']")
     expect(game_page.locator(".grid-cell.player1")).to_be_visible()
 
 
-def test_game_over(game_page: Page):
+def test_game_over(game_page: Page) -> None:
     # Simulate moves to create a win condition
     for _ in range(3):
         game_page.click(".grid-cell[data-column='0']")
@@ -52,7 +57,7 @@ def test_game_over(game_page: Page):
     expect(game_page.locator("#modalBody")).to_contain_text("Wins!")
 
 
-def test_invalid_move(game_page: Page):
+def test_invalid_move(game_page: Page) -> None:
     # Fill a column
     for _ in range(6):
         print("Click!", _)
@@ -65,7 +70,7 @@ def test_invalid_move(game_page: Page):
     print("done.")
 
 
-def test_game_state_updates(game_page: Page):
+def test_game_state_updates(game_page: Page) -> None:
     # Capture initial state by counting filled cells
     initial_filled_cells = game_page.locator(".grid-cell.player1, .grid-cell.player2").count()
 
@@ -83,7 +88,7 @@ def test_game_state_updates(game_page: Page):
     assert updated_filled_cells == initial_filled_cells + 1, "Game state should update after a move"
 
 
-def test_human_vs_ai_player_move(page: Page):
+def test_human_vs_ai_player_move(page: Page) -> None:
     page = custom_game_page(page, player1_type="human", player2_type="random")
 
     for i in range(3):  # Simulate three moves
@@ -98,7 +103,7 @@ def test_human_vs_ai_player_move(page: Page):
         expect(ai_move).to_be_visible()
 
 
-def test_two_random_bots_play_to_end(page: Page):
+def test_two_random_bots_play_to_end(page: Page) -> None:
     # Setup the game with two random AI players
     page = custom_game_page(page, player1_type="random", player2_type="random")
 
@@ -107,7 +112,7 @@ def test_two_random_bots_play_to_end(page: Page):
     start_time = page.evaluate("performance.now()")
 
     # Helper function to count pieces on the board
-    def count_pieces():
+    def count_pieces() -> int:
         player1_pieces = page.locator(".grid-cell.player1").count()
         player2_pieces = page.locator(".grid-cell.player2").count()
         return player1_pieces + player2_pieces
@@ -134,12 +139,12 @@ def test_two_random_bots_play_to_end(page: Page):
     expect(modal_body).to_have_text(re.compile(r"(Player 1 Wins|Player 2 Wins|Draw)"))
 
 
-def test_game_reset(game_page: Page):
+def test_game_reset(game_page: Page) -> None:
     expect(game_page.locator(".grid-cell.player1, .grid-cell.player2")).to_have_count(0)
     expect(game_page.locator("#status")).to_contain_text("Current Turn: Player 1")
 
 
-def test_responsive_layout(game_page: Page):
+def test_responsive_layout(game_page: Page) -> None:
     # Test desktop layout
     desktop_css = game_page.evaluate(
         'window.getComputedStyle(document.querySelector(".grid-container")).getPropertyValue("grid-template-columns")'
@@ -155,7 +160,7 @@ def test_responsive_layout(game_page: Page):
     assert_grid_columns(mobile_css, expected_count=7, expected_size="60px")
 
 
-def assert_grid_columns(css_value: str, expected_count: int, expected_size: str):
+def assert_grid_columns(css_value: str, expected_count: int, expected_size: str) -> None:
     # Split the CSS value into individual column sizes
     columns = css_value.split()
 
@@ -169,7 +174,7 @@ def assert_grid_columns(css_value: str, expected_count: int, expected_size: str)
     print(f"Grid columns assertion passed: {css_value}")
 
 
-def test_game_draw(game_page: Page):
+def test_game_draw(game_page: Page) -> None:
     # Fill the board without a winner
     for col in range(6):
         for _ in range(3):
@@ -183,13 +188,13 @@ def test_game_draw(game_page: Page):
     expect(game_page.locator("#modalBody")).to_contain_text("draw")
 
 
-def test_last_move_highlight(game_page: Page):
+def test_last_move_highlight(game_page: Page) -> None:
     game_page.click(".grid-cell[data-column='3']")
     expect(game_page.locator(".grid-cell.last-move")).to_have_count(1)
     expect(game_page.locator(".grid-cell.last-move")).to_have_attribute("data-column", "3")
 
 
-def test_unique_game_ids(page):
+def test_unique_game_ids(page: Page) -> None:
     page = custom_game_page(page)
     url_1 = page.url
     assert re.match(r"http://localhost:8000/connect4/\d+", url_1), f"Unexpected URL: {url_1}"

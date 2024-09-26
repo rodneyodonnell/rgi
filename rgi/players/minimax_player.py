@@ -1,14 +1,12 @@
-from typing import TypeVar, Any, Optional
+from typing import Optional, Literal
 from typing_extensions import override
-from rgi.core.base import Game, Player
 
-# Defining the TypeVars to match the requested format
-TGameState = TypeVar("TGameState")
-TAction = TypeVar("TAction")
-TPlayerId = TypeVar("TPlayerId")
+from rgi.core.base import Game, Player, TGameState, TAction, TPlayerId
+
+TPlayerState = Literal[None]
 
 
-class MinimaxPlayer(Player[TGameState, Any, TAction]):
+class MinimaxPlayer(Player[TGameState, TPlayerState, TAction]):
     def __init__(self, game: Game[TGameState, TPlayerId, TAction], player_id: TPlayerId, max_depth: int = 4):
         self.game = game
         self.player_id = player_id
@@ -24,6 +22,7 @@ class MinimaxPlayer(Player[TGameState, Any, TAction]):
     def heuristic(self, state: TGameState) -> float:
         """Heuristic evaluation for non-terminal states."""
         # return state  # Replace with actual heuristic logic suitable for your game
+        del state  # Unused variable
         return 0
 
     def minimax(self, state: TGameState, depth: int, alpha: float, beta: float) -> tuple[float, Optional[TAction]]:
@@ -64,9 +63,10 @@ class MinimaxPlayer(Player[TGameState, Any, TAction]):
     @override
     def select_action(self, game_state: TGameState, legal_actions: list[TAction]) -> TAction:
         _, best_action = self.minimax(game_state, self.max_depth, -float("inf"), float("inf"))
+        if best_action is None:
+            return legal_actions[0]
         return best_action
 
     @override
     def update_state(self, game_state: TGameState, action: TAction) -> None:
         """No need for internal updates for this player."""
-        pass  # No need for internal updates for this player

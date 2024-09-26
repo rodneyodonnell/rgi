@@ -1,17 +1,22 @@
+import re
+
 import pytest
 from playwright.sync_api import Page, expect
-import re
+
+# pylint: disable=redefined-outer-name  # pytest fixtures trigger this false positive
 
 # max timeout of 5s for each test
 pytestmark = pytest.mark.timeout(5)
 
 
 @pytest.fixture(scope="function")
-def game_page(page: Page):
+def game_page(page: Page) -> Page:
     return custom_game_page(page)
 
 
-def custom_game_page(page: Page, timeout_ms=500, player1_type: str = "human", player2_type: str = "human"):
+def custom_game_page(
+    page: Page, timeout_ms: int = 500, player1_type: str = "human", player2_type: str = "human"
+) -> Page:
     page.set_default_timeout(timeout_ms)
     expect.set_options(timeout=timeout_ms)
 
@@ -33,31 +38,31 @@ def custom_game_page(page: Page, timeout_ms=500, player1_type: str = "human", pl
     return page
 
 
-def test_create_new_game(game_page: Page):
+def test_create_new_game(game_page: Page) -> None:
     expect(game_page).to_have_url(re.compile(r"http://localhost:8000/othello/\d+"))
     expect(game_page.locator(".grid-container")).to_be_visible()
 
 
-def test_initial_board_state(game_page: Page):
+def test_initial_board_state(game_page: Page) -> None:
     # Check for the initial four pieces in the center
     expect(game_page.locator(".grid-cell.player1")).to_have_count(2)
     expect(game_page.locator(".grid-cell.player2")).to_have_count(2)
 
 
-def test_make_move(game_page: Page):
+def test_make_move(game_page: Page) -> None:
     # Make a move to a valid position
     game_page.click(".grid-cell.legal-move")
     expect(game_page.locator(".grid-cell.player1")).to_have_count(4)  # 2 initial + 1 new + 1 flipped
 
 
-def test_invalid_move(game_page: Page):
+def test_invalid_move(game_page: Page) -> None:
     # Try to make an invalid move
     game_page.click(".grid-cell:not(.legal-move)")
     expect(game_page.locator("#errorToast")).to_be_visible()
     expect(game_page.locator("#toastBody")).to_contain_text("Invalid move")
 
 
-def test_game_state_updates(game_page: Page):
+def test_game_state_updates(game_page: Page) -> None:
     initial_filled_cells = game_page.locator(".grid-cell.player1, .grid-cell.player2").count()
     game_page.click(".grid-cell.legal-move")
 
@@ -66,7 +71,7 @@ def test_game_state_updates(game_page: Page):
     )
 
 
-def test_human_vs_ai_player_move(page: Page):
+def test_human_vs_ai_player_move(page: Page) -> None:
     page = custom_game_page(page, player1_type="human", player2_type="random")
 
     for i in range(3):  # Simulate three moves
@@ -94,7 +99,7 @@ def test_human_vs_ai_player_move(page: Page):
 
 
 @pytest.mark.timeout(60)
-def test_two_random_bots_play_to_end(page: Page):
+def test_two_random_bots_play_to_end(page: Page) -> None:
     page = custom_game_page(page, player1_type="random", player2_type="random")
 
     max_game_time_ms = 30_000
@@ -116,12 +121,12 @@ def test_two_random_bots_play_to_end(page: Page):
     expect(modal_body).to_have_text(re.compile(r"(Player 1 Wins|Player 2 Wins|The game is a draw)"))
 
 
-def test_legal_moves_highlight(game_page: Page):
+def test_legal_moves_highlight(game_page: Page) -> None:
     legal_moves = game_page.locator(".grid-cell.legal-move")
     expect(legal_moves).to_have_count(4)
 
 
-def test_unique_game_ids(page):
+def test_unique_game_ids(page: Page) -> None:
     page = custom_game_page(page)
     url_1 = page.url
     assert re.match(r"http://localhost:8000/othello/\d+", url_1), f"Unexpected URL: {url_1}"

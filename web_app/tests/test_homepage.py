@@ -1,9 +1,9 @@
-import pytest
-from playwright.sync_api import Page, expect
 import re
 
+from playwright.sync_api import Page, expect
 
-def test_homepage_new_game(page: Page):
+
+def test_homepage_new_game(page: Page) -> None:
     # Navigate to the homepage
     page.goto("http://localhost:8000")
 

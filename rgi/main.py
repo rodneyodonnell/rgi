@@ -1,17 +1,19 @@
 import argparse
-from typing import Type
+from typing import Literal, Any
 from collections import defaultdict
-from rgi.core.base import Game
-from rgi.core.game_runner import GameRunner
+from rgi.core.base import Game, Player, TGameState, TPlayerId, TAction
 from rgi.core import game_registry
 from rgi.players.random_player import RandomPlayer
 from rgi.players.minimax_player import MinimaxPlayer
 from rgi.players.human_player import HumanPlayer
 
-GAMES = {name: reg.game_fn for (name, reg) in game_registry.GAME_REGISTRY.items()}
+GAMES: dict[str, type[Game[Any, Any, Any]]] = {name: reg.game_fn for (name, reg) in game_registry.GAME_REGISTRY.items()}
 
 
-def parse_args():
+PlayerType = Literal["random", "human", "minimax"]
+
+
+def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run RGI games")
     parser.add_argument(
         "--game",
@@ -38,7 +40,7 @@ def parse_args():
     return parser.parse_args()
 
 
-def create_player(player_type: str, game: Game, player_id: int) -> Type:
+def create_player(player_type: PlayerType, game: Game[Any, Any, Any], player_id: int) -> Player[Any, Any, Any]:
     if player_type == "random":
         return RandomPlayer()
     elif player_type == "minimax":
@@ -49,13 +51,14 @@ def create_player(player_type: str, game: Game, player_id: int) -> Type:
         raise ValueError(f"Unknown player type: {player_type}")
 
 
-def print_aggregate_stats(stats, num_games):
-    wins = defaultdict(int)
-    total_moves = sum(stat["moves"] for stat in stats)
+def print_aggregate_stats(stats: list[dict[str, list[int] | int]], num_games: int) -> None:
+    wins: dict[int | str, int] = defaultdict(int)
+    total_moves = sum(stat["moves"] for stat in stats if isinstance(stat["moves"], int))
 
     for stat in stats:
-        if len(stat["winners"]) == 1:
-            wins[stat["winners"][0]] += 1
+        winners = stat["winners"]
+        if isinstance(winners, list) and len(winners) == 1:
+            wins[winners[0]] += 1
         else:
             wins["draw"] += 1
 
@@ -69,14 +72,16 @@ def print_aggregate_stats(stats, num_games):
     print(f"Draws: {wins['draw']} ({wins['draw']/num_games*100:.2f}%)")
 
 
-def run_games(game: Game, players: dict, num_games: int):
-    runner = GameRunner(game, players)
-    stats = []
+def run_games(
+    game: Game[TGameState, TPlayerId, TAction],
+    players: dict[TPlayerId, Player[Any, Any, Any]],
+    num_games: int,
+) -> None:
+    stats: list[dict[str, Any]] = []
 
     for i in range(num_games):
         print(f"Starting game {i+1}")
 
-        # Count moves manually
         move_count = 0
         state = game.initial_state()
         while not game.is_terminal(state):
@@ -116,7 +121,7 @@ def run_games(game: Game, players: dict, num_games: int):
         print_aggregate_stats(stats, num_games)
 
 
-def main():
+def main() -> None:
     args = parse_args()
 
     game_class = GAMES.get(args.game)
@@ -125,7 +130,7 @@ def main():
         return
 
     game = game_class()
-    players = {
+    players: dict[int, Player[Any, Any, Any]] = {
         1: create_player(args.player1, game, player_id=1),
         2: create_player(args.player2, game, player_id=2),
     }

@@ -11,6 +11,7 @@ find . \( -path "*/node_modules" -o \
           -path "*/.ipynb_checkpoints" -o \
           -path "*/pdfs" -o \
           -path "*/logs" -o \
+          -path "*/.mypy_cache" -o \
           -path "*/__pycache__" \) -prune \
        -o -not -name "TODO.md" \
        -not -name ".*" \

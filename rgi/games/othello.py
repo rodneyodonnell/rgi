@@ -1,18 +1,21 @@
-from typing import Optional, Any
+from dataclasses import dataclass
+from typing import Any, Literal
 from typing_extensions import override
+
 from immutables import Map
-from rgi.core.base import Game, GameSerializer, TPlayerId, TAction
+from rgi.core.base import Game, GameSerializer
 
 
+TPlayerId = Literal[1, 2]
+TAction = tuple[int, int]
+TPosition = tuple[int, int]
+
+
+@dataclass(frozen=True)
 class OthelloState:
-    def __init__(self, board: Map[tuple[int, int], int], current_player: int, is_terminal: bool):
-        # Immutable map of board positions to player IDs (1 or 2)
-        self.board = board
-        self.current_player = current_player
-        self.is_terminal = is_terminal
-
-    def __repr__(self) -> str:
-        return f"OthelloState(board={self.board}, current_player={self.current_player}, is_teminal={self.is_terminal})"
+    board: Map[TPosition, int]  # Indexed by (row,column). board[(1,1)] is bottom left corner.
+    current_player: TPlayerId  # The current player
+    is_terminal: bool  # The winner, if the game has ended
 
 
 class OthelloGame(Game[OthelloState, TPlayerId, TAction]):
@@ -38,7 +41,7 @@ class OthelloGame(Game[OthelloState, TPlayerId, TAction]):
 
     @override
     def initial_state(self) -> OthelloState:
-        board = Map()
+        board: Map[TPosition, int] = Map()
         mid = self.board_size // 2
         # Set up the initial four discs
         board = board.set((mid, mid), 2)  # White
@@ -51,16 +54,19 @@ class OthelloGame(Game[OthelloState, TPlayerId, TAction]):
     def current_player_id(self, state: OthelloState) -> TPlayerId:
         return state.current_player
 
+    def next_player(self, player: TPlayerId) -> TPlayerId:
+        return 1 if player == 2 else 2
+
     @override
     def all_player_ids(self, state: OthelloState) -> list[TPlayerId]:
         return [1, 2]
 
     @override
-    def legal_actions(self, state: OthelloState) -> list[tuple[int, int]]:
+    def legal_actions(self, state: OthelloState) -> list[TAction]:
         return self._get_legal_moves(state, state.current_player)
 
-    def _get_legal_moves(self, state: OthelloState, player: int) -> list[tuple[int, int]]:
-        opponent = 3 - player
+    def _get_legal_moves(self, state: OthelloState, player: TPlayerId) -> list[TAction]:
+        opponent = self.next_player(player)
         legal_moves = []
 
         for position in self._all_positions:
@@ -70,7 +76,7 @@ class OthelloGame(Game[OthelloState, TPlayerId, TAction]):
                 legal_moves.append(position)
         return legal_moves
 
-    def _would_flip(self, state: OthelloState, position: tuple[int, int], player: int, opponent: int) -> bool:
+    def _would_flip(self, state: OthelloState, position: TPosition, player: TPlayerId, opponent: TPlayerId) -> bool:
         for delta_row, delta_col in self.directions:
             row, col = position
             row += delta_row
@@ -93,13 +99,13 @@ class OthelloGame(Game[OthelloState, TPlayerId, TAction]):
         return False
 
     @override
-    def next_state(self, state: OthelloState, action: tuple[int, int]) -> OthelloState:
+    def next_state(self, state: OthelloState, action: TAction) -> OthelloState:
         _legal_actions = self.legal_actions(state)
         if action not in _legal_actions:
             raise ValueError(f"Invalid move: {action} is not a legal action {_legal_actions}.")
 
         player = state.current_player
-        opponent = 3 - player
+        opponent = self.next_player(player)
         new_board = state.board
 
         positions_to_flip = self._get_positions_to_flip(state, action, player, opponent)
@@ -112,7 +118,7 @@ class OthelloGame(Game[OthelloState, TPlayerId, TAction]):
             new_board = new_board.set(pos, player)
 
         # Determine next player
-        next_player = 3 - player  # Switch turns
+        next_player = self.next_player(player)
 
         is_terminal = False
         # If next player has no legal moves, current player plays again
@@ -126,8 +132,8 @@ class OthelloGame(Game[OthelloState, TPlayerId, TAction]):
         return OthelloState(board=new_board, current_player=next_player, is_terminal=is_terminal)
 
     def _get_positions_to_flip(
-        self, state: OthelloState, position: tuple[int, int], player: int, opponent: int
-    ) -> list[tuple[int, int]]:
+        self, state: OthelloState, position: TPosition, player: TPlayerId, opponent: TPlayerId
+    ) -> list[TPosition]:
         positions_to_flip = []
 
         for delta_row, delta_col in self.directions:
@@ -157,7 +163,7 @@ class OthelloGame(Game[OthelloState, TPlayerId, TAction]):
         return state.is_terminal
 
     @override
-    def reward(self, state: OthelloState, player_id: int) -> float:
+    def reward(self, state: OthelloState, player_id: TPlayerId) -> float:
         if not self.is_terminal(state):
             return 0.0
         player_count = sum(1 for p in state.board.values() if p == player_id)
@@ -171,7 +177,7 @@ class OthelloGame(Game[OthelloState, TPlayerId, TAction]):
 
     @override
     def pretty_str(self, state: OthelloState) -> str:
-        def cell_to_str(row, col):
+        def cell_to_str(row: int, col: int) -> str:
             pos = (row, col)
             if pos in state.board:
                 return "●" if state.board[pos] == 1 else "○"
@@ -184,9 +190,9 @@ class OthelloGame(Game[OthelloState, TPlayerId, TAction]):
 
         return "\n".join(rows)
 
-    def parse_board(self, board_str: str, current_player: int, is_terminal: bool) -> OthelloState:
+    def parse_board(self, board_str: str, current_player: TPlayerId, is_terminal: bool) -> OthelloState:
         """Parses a board string into an OthelloState."""
-        board = Map()
+        board: Map[TPosition, int] = Map()
         rows = board_str.strip().split("\n")[::-1]
         for r, row in enumerate(rows, start=1):
             cells = row.strip().split()
@@ -198,7 +204,7 @@ class OthelloGame(Game[OthelloState, TPlayerId, TAction]):
         return OthelloState(board=board, current_player=current_player, is_terminal=is_terminal)
 
 
-class OthelloSerializer(GameSerializer[OthelloGame, OthelloState, tuple[int, int]]):
+class OthelloSerializer(GameSerializer[OthelloGame, OthelloState, TAction]):
     @override
     def serialize_state(self, game: OthelloGame, state: OthelloState) -> dict[str, Any]:
         """Serialize the game state to a dictionary for frontend consumption."""
@@ -217,7 +223,7 @@ class OthelloSerializer(GameSerializer[OthelloGame, OthelloState, tuple[int, int
         }
 
     @override
-    def parse_action(self, game: OthelloGame, action_data: dict[str, Any]) -> tuple[int, int]:
+    def parse_action(self, game: OthelloGame, action_data: dict[str, Any]) -> TAction:
         """Parse an action from frontend data."""
         row = action_data.get("row")
         col = action_data.get("col")

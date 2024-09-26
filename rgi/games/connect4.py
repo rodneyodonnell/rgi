@@ -1,20 +1,20 @@
+from dataclasses import dataclass
 from typing import Literal, Optional, Any
 from typing_extensions import override
+
 from immutables import Map
-from rgi.core.base import Game, GameSerializer, TPlayerId, TAction
+from rgi.core.base import Game, GameSerializer
+
+TPlayerId = Literal[1, 2]
+TAction = int
+TPosition = tuple[int, int]
 
 
+@dataclass(frozen=True)
 class Connect4State:
-    def __init__(
-        self, board: Map[tuple[int, int], int], current_player: Literal[1, 2], winner: Optional[Literal[1, 2]] = None
-    ):
-        # Immutable map of board. Indexed by (row,column). board[(1,1)] is bottom left corner.
-        self.board = board
-        self.current_player = current_player
-        self.winner = winner
-
-    def __repr__(self) -> str:
-        return f"Connect4State(board={self.board}, current_player={self.current_player}, winner={self.winner})"
+    board: Map[tuple[int, int], int]  # Indexed by (row,column). board[(1,1)] is bottom left corner.
+    current_player: TPlayerId  # The current player
+    winner: Optional[TPlayerId] = None  # The winner, if the game has ended
 
 
 class Connect4Game(Game[Connect4State, TPlayerId, TAction]):
@@ -44,11 +44,11 @@ class Connect4Game(Game[Connect4State, TPlayerId, TAction]):
         return [1, 2]
 
     @override
-    def legal_actions(self, state: Connect4State) -> list[int]:
+    def legal_actions(self, state: Connect4State) -> list[TAction]:
         return [col for col in self._all_column_ids if (self.height, col) not in state.board]
 
     @override
-    def next_state(self, state: Connect4State, action: int) -> Connect4State:
+    def next_state(self, state: Connect4State, action: TAction) -> Connect4State:
         """Find the lowest empty row in the selected column and return the updated game state."""
         if action not in self.legal_actions(state):
             raise ValueError(f"Invalid move: Invalid column '{action}' no in {self._all_column_ids}")
@@ -57,12 +57,14 @@ class Connect4Game(Game[Connect4State, TPlayerId, TAction]):
             if (row, action) not in state.board:
                 new_board = state.board.set((row, action), state.current_player)
                 winner = self._calculate_winner(new_board, action, row, state.current_player)
-                next_player = 2 if state.current_player == 1 else 1
+                next_player: TPlayerId = 2 if state.current_player == 1 else 1
                 return Connect4State(board=new_board, current_player=next_player, winner=winner)
 
         raise ValueError("Invalid move: column is full")
 
-    def _calculate_winner(self, board: Map[tuple[int, int], int], col: int, row: int, player: int) -> Optional[int]:
+    def _calculate_winner(
+        self, board: Map[tuple[int, int], int], col: int, row: int, player: TPlayerId
+    ) -> Optional[TPlayerId]:
         """Check if the last move made at (row, col) by 'player' wins the game."""
         directions = [
             ((1, 0), (-1, 0)),  # Vertical
@@ -102,7 +104,7 @@ class Connect4Game(Game[Connect4State, TPlayerId, TAction]):
         return all((self.height, col) in state.board for col in self._all_column_ids)
 
     @override
-    def reward(self, state: Connect4State, player_id: int) -> float:
+    def reward(self, state: Connect4State, player_id: TPlayerId) -> float:
         if state.winner == player_id:
             return 1.0
         elif state.winner is not None:
@@ -120,10 +122,10 @@ class Connect4Game(Game[Connect4State, TPlayerId, TAction]):
             + "-+" * self.width
         )
 
-    def parse_board(self, board_str: str, current_player: int) -> Connect4State:
+    def parse_board(self, board_str: str, current_player: TPlayerId) -> Connect4State:
         """Parses the output of pretty_str into a Connect4State."""
         rows = board_str.strip().split("\n")[:-1]  # Skip the bottom border row
-        board = Map()
+        board: Map[TPosition, int] = Map()
         for r, row in enumerate(reversed(rows), start=1):
             row_cells = row.strip().split("|")[1:-1]  # Extract cells between borders
             for c, cell in enumerate(row_cells, start=1):
@@ -153,4 +155,6 @@ class Connect4Serializer(GameSerializer[Connect4Game, Connect4State, TAction]):
         column = action_data.get("column")
         if column is None:
             raise ValueError("Action data must include 'column'")
+        if not isinstance(column, int):
+            raise ValueError("Column must be an integer")
         return column
