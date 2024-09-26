@@ -63,7 +63,7 @@ comm==0.2.2
     # via
     #   ipykernel
     #   ipywidgets
-debugpy==1.8.5
+debugpy==1.8.6
     # via ipykernel
 decorator==5.1.1
     # via ipython
@@ -71,6 +71,8 @@ defusedxml==0.7.1
     # via nbconvert
 dill==0.3.8
     # via pylint
+execnet==2.1.1
+    # via pytest-xdist
 executing==2.1.0
     # via stack-data
 fastapi==0.114.1
@@ -300,7 +302,7 @@ pluggy==1.5.0
     # via pytest
 prometheus-client==0.21.0
     # via jupyter-server
-prompt-toolkit==3.0.47
+prompt-toolkit==3.0.48
     # via
     #   ipython
     #   jupyter-console
@@ -338,13 +340,14 @@ pyproject-hooks==1.1.0
     #   pip-tools
 pysocks==1.7.1
     # via urllib3
-pytest==8.3.2
+pytest==8.3.3
     # via
     #   -r requirements.in
     #   pytest-base-url
     #   pytest-mock
     #   pytest-playwright
     #   pytest-timeout
+    #   pytest-xdist
 pytest-base-url==2.1.0
     # via pytest-playwright
 pytest-mock==3.14.0
@@ -352,6 +355,8 @@ pytest-mock==3.14.0
 pytest-playwright==0.5.2
     # via -r requirements.in
 pytest-timeout==2.3.1
+    # via -r requirements.in
+pytest-xdist==3.6.1
     # via -r requirements.in
 python-dateutil==2.9.0.post0
     # via

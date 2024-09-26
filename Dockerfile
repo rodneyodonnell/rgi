@@ -31,6 +31,8 @@ ENV PYTHONPATH="/app"
 # Check versions
 RUN node -v && yarn -v
 
+RUN python3 -m pip install --upgrade pip
+
 # Install playwright for frontend testing
 RUN pip install playwright
 RUN python -m playwright install

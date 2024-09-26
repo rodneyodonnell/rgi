@@ -81,6 +81,9 @@ your_project/
 # Headless
 pytest web_app/tests/test_connect4_frontend.py
 
+# Headless parallel
+pytest -n 4
+
 # Non-headless
 pytest web_app/tests/test_connect4_frontend.py -v --headed
 ```
@@ -88,8 +91,14 @@ pytest web_app/tests/test_connect4_frontend.py -v --headed
 
 # Manually Run linters
 ```
-mypy rgi
-pylint rgi/**/*.py
+mypy .
+pylint .
 yarn eslint 'web_app/static/**/*.ts'
 yarn tsc --noEmit
+```
+
+
+# Auto-build typescript
+```
+yarn tsc --watch
 ```
