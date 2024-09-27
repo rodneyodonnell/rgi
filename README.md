@@ -32,6 +32,7 @@ python main.py --player1 minimax --player2 random --num_games 100
 ```
 python rgi/main.py --player1 human --player2 minimax --game connect4
 python rgi/main.py --player1 human --player2 minimax --game othello
+python rgi/main.py --player1 human --player2 minimax --game infiltr8
 ```
 
 # Profile code

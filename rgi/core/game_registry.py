@@ -5,6 +5,7 @@ from typing import Generic, Any
 
 from rgi.core.base import Game, GameSerializer, TGameState, TAction, TPlayerId
 from rgi.games import connect4
+from rgi.games import infiltr8
 from rgi.games import othello
 
 
@@ -18,5 +19,6 @@ class RegisteredGame(Generic[TGameState, TPlayerId, TAction]):
 GAME_REGISTRY: dict[str, RegisteredGame[Any, Any, Any]] = {
     "connect4": RegisteredGame(connect4.Connect4Game, connect4.Connect4Serializer),
     "othello": RegisteredGame(othello.OthelloGame, othello.OthelloSerializer),
+    "infiltr8": RegisteredGame(infiltr8.Infiltr8Game, infiltr8.Infiltr8Serializer),
     # Add new games here
 }
