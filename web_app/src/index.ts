@@ -3,6 +3,7 @@
 document.addEventListener('DOMContentLoaded', () => {
   const connect4Form = document.getElementById('connect4Form')
   const othelloForm = document.getElementById('othelloForm')
+  const infiltr8Form = document.getElementById('infiltr8Form')
 
   connect4Form?.addEventListener('submit', (e) => {
     e.preventDefault()
@@ -28,6 +29,19 @@ document.addEventListener('DOMContentLoaded', () => {
       )?.value,
     }
     startGame('othello', options)
+  })
+
+  infiltr8Form?.addEventListener('submit', (e) => {
+    e.preventDefault()
+    const options = {
+      player1_type: (
+        document.getElementById('infiltr8Player1') as HTMLInputElement
+      )?.value,
+      player2_type: (
+        document.getElementById('infiltr8Player2') as HTMLInputElement
+      )?.value,
+    }
+    startGame('infiltr8', options)
   })
 })
 
