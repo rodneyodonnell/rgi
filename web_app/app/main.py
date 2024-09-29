@@ -57,28 +57,27 @@ async def root(request: Request) -> HTMLResponse:
 async def create_game(request: Request) -> dict[str, Any]:
     data = await request.json()
     game_type: str = data.get("game_type", "")
-    player1_type: str = data.get("options", {}).get("player1_type", "")
-    player2_type: str = data.get("options", {}).get("player2_type", "")
-    logger.info("Creating new game. Type: %s, Player 1: %s, Player 2: %s", game_type, player1_type, player2_type)
+    game_options: dict[str, Any] = data.get("game_options", {})
+    player_options: dict[int, dict[str, Any]] = {int(k): v for k, v in data.get("player_options", {}).items()}
+    logger.info(
+        "Creating new game. Type: %s, Game Options: %s, Player Options: %s", game_type, game_options, player_options
+    )
 
     registry_entry = GAME_REGISTRY.get(game_type)
     if not registry_entry:
         logger.error("Invalid game type: %s", game_type)
         raise HTTPException(status_code=400, detail="Invalid game type")
 
-    game = registry_entry.game_fn()
+    game = registry_entry.game_fn(**game_options)
     game_serializer = registry_entry.serializer_fn()
     state = game.initial_state()
     game_id = game_counter.increment()
 
     # Initialize players
-    players: dict[int, Player[Any, Any, Any]] = {
-        1: create_player(player1_type, game, player_id=1),
-        2: create_player(player2_type, game, player_id=2),
-    }
-    logger.debug(
-        "Players initialized. Player 1: %s, Player 2: %s", type(players[1]).__name__, type(players[2]).__name__
-    )
+    players: dict[int, Player[Any, Any, Any]] = {}
+    for player_id, options in player_options.items():
+        players[player_id] = create_player(options.get("player_type", "human"), game, player_id, options)
+    logger.debug("Players initialized: %s", {pid: type(p).__name__ for pid, p in players.items()})
 
     # Store game session
     games[game_id] = {
@@ -86,25 +85,28 @@ async def create_game(request: Request) -> dict[str, Any]:
         "serializer": game_serializer,
         "state": state,
         "players": players,
-        "options": {
-            "player1_type": player1_type,
-            "player2_type": player2_type,
-        },
+        "game_options": game_options,
+        "player_options": player_options,
     }
-    logger.info("New game created. ID: %d, Player 1: %s, Player 2: %s", game_id, player1_type, player2_type)
+    logger.info("New game created. ID: %d, Game Options: %s, Player Options: %s", game_id, game_options, player_options)
     return {"game_id": game_id, "game_type": game_type}
 
 
-def create_player(player_type: str, game: Game[Any, Any, Any], player_id: int) -> Player[Any, Any, Any]:
+def create_player(
+    player_type: str, game: Game[Any, Any, Any], player_id: int, options: dict[str, Any]
+) -> Player[Any, Any, Any]:
+    # Remove 'player_type' from options to avoid passing it to the constructor
+    constructor_options = {k: v for k, v in options.items() if k != "player_type"}
+
     if player_type == "human":
-        return HumanPlayer(game)
-    elif player_type == "random":
-        return RandomPlayer()
-    elif player_type == "minimax":
-        return MinimaxPlayer(game, player_id)
-    else:
-        logger.error("Unknown player type: %s", player_type)
-        raise ValueError(f"Unknown player type: {player_type}")
+        return HumanPlayer(game, **constructor_options)
+    if player_type == "random":
+        return RandomPlayer(**constructor_options)
+    if player_type == "minimax":
+        return MinimaxPlayer(game, player_id, **constructor_options)
+
+    logger.error("Unknown player type: %s", player_type)
+    raise ValueError(f"Unknown player type: {player_type}")
 
 
 @app.get("/games/{game_id}/state")
@@ -120,8 +122,9 @@ async def get_game_state(game_id: int) -> dict[str, Any]:
     state = game_session["state"]
     game_state = serializer.serialize_state(game, state)
 
-    # Add AI player information to the game state
-    game_state["options"] = game_session["options"]
+    # Add game and player options to the game state
+    game_state["game_options"] = game_session["game_options"]
+    game_state["player_options"] = game_session["player_options"]
 
     if game.is_terminal(state):
         all_players = game.all_player_ids(state)

@@ -7,55 +7,72 @@ document.addEventListener('DOMContentLoaded', () => {
 
   connect4Form?.addEventListener('submit', (e) => {
     e.preventDefault()
-    const options = {
-      player1_type: (
-        document.getElementById('connect4Player1') as HTMLInputElement
-      )?.value,
-      player2_type: (
-        document.getElementById('connect4Player2') as HTMLInputElement
-      )?.value,
+    const gameOptions = {
+      // Add any Connect4-specific game options here
     }
-    startGame('connect4', options)
+    const playerOptions = {
+      1: {
+        player_type: (document.getElementById('connect4Player1') as HTMLSelectElement).value,
+      },
+      2: {
+        player_type: (document.getElementById('connect4Player2') as HTMLSelectElement).value,
+      },
+    }
+    startGame('connect4', gameOptions, playerOptions)
   })
 
   othelloForm?.addEventListener('submit', (e) => {
     e.preventDefault()
-    const options = {
-      player1_type: (
-        document.getElementById('othelloPlayer1') as HTMLInputElement
-      )?.value,
-      player2_type: (
-        document.getElementById('othelloPlayer2') as HTMLInputElement
-      )?.value,
+    const gameOptions = {
+      // Add any Othello-specific game options here
     }
-    startGame('othello', options)
+    const playerOptions = {
+      1: {
+        player_type: (document.getElementById('othelloPlayer1') as HTMLSelectElement).value,
+      },
+      2: {
+        player_type: (document.getElementById('othelloPlayer2') as HTMLSelectElement).value,
+      },
+    }
+    startGame('othello', gameOptions, playerOptions)
   })
 
   infiltr8Form?.addEventListener('submit', (e) => {
     e.preventDefault()
-    const options = {
-      player1_type: (
-        document.getElementById('infiltr8Player1') as HTMLInputElement
-      )?.value,
-      player2_type: (
-        document.getElementById('infiltr8Player2') as HTMLInputElement
-      )?.value,
+    const gameOptions = {
+      // Add any Infiltr8-specific game options here
     }
-    startGame('infiltr8', options)
+    const playerOptions = {
+      1: {
+        player_type: (document.getElementById('infiltr8Player1') as HTMLSelectElement).value,
+      },
+      2: {
+        player_type: (document.getElementById('infiltr8Player2') as HTMLSelectElement).value,
+      },
+      3: {
+        player_type: (document.getElementById('infiltr8Player3') as HTMLSelectElement).value,
+      },
+      4: {
+        player_type: (document.getElementById('infiltr8Player4') as HTMLSelectElement).value,
+      },
+    }
+    startGame('infiltr8', gameOptions, playerOptions)
   })
 })
 
 function startGame(
   gameType: string,
-  options: { player1_type: string; player2_type: string },
+  gameOptions: { [key: string]: any },
+  playerOptions: { [key: number]: { player_type: string; [key: string]: any } }
 ) {
-  console.log('Starting game:', { gameType, options })
+  console.log('Starting game:', { gameType, gameOptions, playerOptions })
   fetch('/games/new', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       game_type: gameType,
-      options: options,
+      game_options: gameOptions,
+      player_options: playerOptions,
     }),
   })
     .then((response) => {

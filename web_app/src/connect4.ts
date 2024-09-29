@@ -13,7 +13,8 @@ interface Connect4GameData extends BaseGameData {
 }
 
 let previousBoard: number[][]
-let gameOptions: { player1_type: string; player2_type: string }
+let gameOptions: { [key: string]: any }
+let playerOptions: { [key: number]: { player_type: string; [key: string]: any } }
 
 document.addEventListener('DOMContentLoaded', () => {
   console.log('connect4.ts loaded and DOMContentLoaded event fired.')
@@ -31,8 +32,10 @@ document.addEventListener('DOMContentLoaded', () => {
     )
     const newGameButton = document.getElementById('newGameButton')
 
-    gameOptions = data.options
+    gameOptions = data.game_options
+    playerOptions = data.player_options
     console.log('Updated gameOptions:', gameOptions)
+    console.log('Updated playerOptions:', playerOptions)
 
     // Clear previous game board
     gameArea.innerHTML = ''
@@ -83,7 +86,7 @@ document.addEventListener('DOMContentLoaded', () => {
       gameModal.show() // Show the Bootstrap modal when game ends
 
       newGameButton!.onclick = () => {
-        startNewGame('connect4', gameOptions, renderGame)
+        startNewGame('connect4', gameOptions, playerOptions, renderGame)
           .catch((error) => console.error('Error starting new game:', error))
       }
     } else {
@@ -132,7 +135,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // Initial game state fetch
   updateGameState(renderGame)
     .then((data) => {
-      gameOptions = data.options
+      gameOptions = data.game_options
+      playerOptions = data.player_options
     })
     .catch((error) =>
       console.error('Error fetching initial game state:', error),

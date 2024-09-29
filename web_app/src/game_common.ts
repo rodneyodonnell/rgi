@@ -18,10 +18,8 @@ export interface BaseGameData {
   is_terminal: boolean
   winner: number | null
   current_player: number
-  options: {
-    player1_type: string
-    player2_type: string
-  }
+  game_options: { [key: string]: any }
+  player_options: { [key: number]: { player_type: string; [key: string]: any } } }
 }
 
 export function getCurrentGameId(): string {
@@ -106,17 +104,19 @@ export function makeMove<T extends BaseGameData>(
 
 export function startNewGame(
   gameType: string,
-  gameOptions: { player1_type: string; player2_type: string },
+  gameOptions: { [key: string]: any },
+  playerOptions: { [key: number]: { player_type: string; [key: string]: any } },
   renderGame: (data: any) => void,
 ): Promise<void> {
-  console.log(`Starting a new ${gameType} game with options:`, gameOptions)
+  console.log(`Starting a new ${gameType} game with options:`, { gameOptions, playerOptions })
 
   return fetch('/games/new', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       game_type: gameType,
-      options: gameOptions,
+      game_options: gameOptions,
+      player_options: playerOptions,
     }),
   })
     .then((response) => {
@@ -186,7 +186,6 @@ export function makeAIMove(renderGame: (data: any) => void) {
 }
 
 export function currentPlayerType(data: BaseGameData): string {
-  return data.current_player === 1
-    ? data.options.player1_type
-    : data.options.player2_type
+  const playerOptions = data.player_options[data.current_player] || { player_type: 'human' }
+  return playerOptions.player_type
 }
