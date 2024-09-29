@@ -18,6 +18,8 @@ interface Infiltr8State extends BaseGameData {
     };
     current_player: number;
     legal_actions: Infiltr8Action[];
+    game_options: { [key: string]: any };
+    player_options: { [key: number]: { player_type: string; [key: string]: any } };
 }
 
 interface Infiltr8Action {
@@ -27,6 +29,9 @@ interface Infiltr8Action {
     guess_card?: string;  // Only used for GUESS action
 }
 
+let gameOptions: { [key: string]: any } = {};
+let playerOptions: { [key: number]: { player_type: string; [key: string]: any } } = {};
+
 document.addEventListener('DOMContentLoaded', () => {
     console.log('infiltr8.ts loaded and DOMContentLoaded event fired.')
 
@@ -35,11 +40,34 @@ document.addEventListener('DOMContentLoaded', () => {
         const gameArea = document.getElementById('game')
         const status = document.getElementById('status')
         const actionForm = document.getElementById('action-form')
+        const modalBody = document.getElementById('modalBody')
+        let gameModal: any = null
+
+        // Check if Bootstrap Modal is available
+        if (window.bootstrap && window.bootstrap.Modal) {
+            const modalElement = document.getElementById('gameModal')
+            if (modalElement) {
+                gameModal = new window.bootstrap.Modal(modalElement, {
+                    keyboard: false,
+                })
+            } else {
+                console.warn('Modal element not found')
+            }
+        } else {
+            console.warn('Bootstrap Modal is not available')
+        }
+
+        const newGameButton = document.getElementById('newGameButton')
 
         if (!gameArea || !status || !actionForm) {
             console.error('Required DOM elements not found.')
             return
         }
+
+        gameOptions = data.game_options
+        playerOptions = data.player_options
+        console.log('Updated gameOptions:', gameOptions)
+        console.log('Updated playerOptions:', playerOptions)
 
         let html = ''
 
@@ -74,6 +102,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Render action form
         actionForm.innerHTML = renderActionForm(data)
+
+        // Handle game over
+        if (data.is_terminal) {
+            console.log('Game is terminal. Winner:', data.winner)
+            const message = data.winner
+                ? `🎉 <strong>Player ${data.winner} Wins!</strong> 🎉`
+                : '🤝 <strong>The game is a draw!</strong> 🤝'
+
+            if (modalBody) {
+                modalBody.innerHTML = message
+            }
+            
+            if (gameModal) {
+                gameModal.show() // Show the Bootstrap modal when game ends
+            } else {
+                console.warn('Modal not available, displaying message in console')
+                console.log(message)
+            }
+
+            if (newGameButton) {
+                newGameButton.onclick = () => {
+                    startNewGame('infiltr8', gameOptions, playerOptions, renderGame)
+                        .catch((error) => console.error('Error starting new game:', error))
+                }
+            }
+        }
 
         console.log('Finished rendering game')
     }
@@ -111,6 +165,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initial game state fetch
     updateGameState(renderGame)
+        .then((data) => {
+            gameOptions = data.game_options
+            playerOptions = data.player_options
+        })
+        .catch((error) =>
+            console.error('Error fetching initial game state:', error),
+        )
 
     // Set up event listener for action form
     document.getElementById('action-form')?.addEventListener('click', (e) => {
@@ -124,6 +185,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Set up new game button
     document.getElementById('newGameButton')?.addEventListener('click', () => {
-        startNewGame('infiltr8', { player1_type: 'human', player2_type: 'ai' }, renderGame)
+        startNewGame('infiltr8', gameOptions, playerOptions, renderGame)
     })
 })

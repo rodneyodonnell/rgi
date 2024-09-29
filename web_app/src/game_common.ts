@@ -20,7 +20,7 @@ export interface BaseGameData {
   current_player: number
   game_options: { [key: string]: any }
   player_options: { [key: number]: { player_type: string; [key: string]: any } } }
-}
+
 
 export function getCurrentGameId(): string {
   return window.location.pathname.split('/').pop() || ''

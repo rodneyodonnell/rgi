@@ -11,9 +11,12 @@ interface OthelloGameData extends BaseGameData {
   columns: number
   state: number[][]
   legal_actions: [number, number][]
+  game_options: { [key: string]: any }
+  player_options: { [key: number]: { player_type: string; [key: string]: any } }
 }
 
-let gameOptions: { player1_type: string; player2_type: string }
+let gameOptions: { [key: string]: any } = {}
+let playerOptions: { [key: number]: { player_type: string; [key: string]: any } } = {}
 
 document.addEventListener('DOMContentLoaded', () => {
   console.log('othello.ts loaded and DOMContentLoaded event fired.')
@@ -36,8 +39,10 @@ document.addEventListener('DOMContentLoaded', () => {
       return
     }
 
-    gameOptions = data.options
+    gameOptions = data.game_options
+    playerOptions = data.player_options
     console.log('Updated gameOptions:', gameOptions)
+    console.log('Updated playerOptions:', playerOptions)
 
     // Clear previous game board
     gameArea.innerHTML = ''
@@ -100,7 +105,7 @@ document.addEventListener('DOMContentLoaded', () => {
       gameModal.show() // Show the Bootstrap modal when game ends
 
       newGameButton!.onclick = () => {
-        startNewGame('othello', gameOptions, renderGame)
+        startNewGame('othello', gameOptions, playerOptions, renderGame)
           .catch((error) => console.error('Error starting new game:', error))
       }
     } else {
@@ -114,9 +119,15 @@ document.addEventListener('DOMContentLoaded', () => {
   // Initial game state fetch
   updateGameState(renderGame)
     .then((data) => {
-      gameOptions = data.options
+      gameOptions = data.game_options
+      playerOptions = data.player_options
     })
     .catch((error) =>
       console.error('Error fetching initial game state:', error),
     )
+
+  // Set up new game button
+  document.getElementById('newGameButton')?.addEventListener('click', () => {
+    startNewGame('othello', gameOptions, playerOptions, renderGame)
+  })
 })
