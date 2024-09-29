@@ -181,7 +181,8 @@ async def make_ai_move(game_id: int) -> dict[str, Any]:
         return {"success": False, "reason": "Current player is human"}
 
     try:
-        ai_action = current_player.select_action(state, game.legal_actions(state))
+        legal_actions = game.legal_actions(state)
+        ai_action = current_player.select_action(state, legal_actions)
         new_state = game.next_state(state, ai_action)
         game_session["state"] = new_state
         logger.info("AI move made for player %d. Action: %s", current_player_id, ai_action)

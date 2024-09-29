@@ -178,14 +178,6 @@ class Infiltr8Game(Game[Infiltr8State, TPlayerId, Action]):
         turn_player = state.current_player_turn
         player_state = state.players[turn_player]
 
-        # If we have a CONDITIONAL_DISCARD card, we must play it if we also have a SWAP or FORCE_DISCARD card
-        if any(card.effect == CardEffect.CONDITIONAL_DISCARD for card in player_state.hand):
-            if any(card.effect in (CardEffect.SWAP, CardEffect.FORCE_DISCARD) for card in player_state.hand):
-                yield Action(
-                    action_type=ActionType.PLAY, card=CONDITIONAL_DISCARD_CARD, player_id=None, guess_card=None
-                )
-                return
-
         for action_card in player_state.hand:
             if action_card.effect == CardEffect.GUESS:
                 for other_player in self.all_player_ids(state):
@@ -197,17 +189,12 @@ class Infiltr8Game(Game[Infiltr8State, TPlayerId, Action]):
                                 player_id=other_player,
                                 guess_card=guess_card,
                             )
-            elif action_card.effect in (CardEffect.PEEK, CardEffect.COMPARE, CardEffect.SWAP):
+            elif action_card.effect in (CardEffect.PEEK, CardEffect.COMPARE, CardEffect.SWAP, CardEffect.FORCE_DISCARD):
                 for other_player in self.all_player_ids(state):
                     if other_player != turn_player and not state.players[other_player].is_protected:
                         yield Action(
                             action_type=ActionType.PLAY, card=action_card, player_id=other_player, guess_card=None
                         )
-            elif action_card.effect in (CardEffect.FORCE_DISCARD,):
-                for target_player in self.all_player_ids(state):
-                    yield Action(
-                        action_type=ActionType.PLAY, card=action_card, player_id=target_player, guess_card=None
-                    )
             elif action_card.effect in (CardEffect.PROTECT, CardEffect.CONDITIONAL_DISCARD, CardEffect.LOSE):
                 yield Action(action_type=ActionType.PLAY, card=action_card, player_id=None, guess_card=None)
             else:

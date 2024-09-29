@@ -24,7 +24,7 @@ interface Infiltr8Action {
     action_type: "DRAW" | "PLAY";
     card?: string;
     player_id?: number;
-    guess_card?: string;
+    guess_card?: string;  // Only used for GUESS action
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -98,10 +98,10 @@ document.addEventListener('DOMContentLoaded', () => {
             return "Draw a card"
         } else if (action.action_type === "PLAY") {
             let actionText = `Play ${action.card}`
-            if (action.player_id !== undefined) {
+            if (action.player_id !== undefined && action.player_id !== null) {
                 actionText += ` on Player ${action.player_id}`
             }
-            if (action.guess_card !== undefined) {
+            if (action.card === "Guess" && action.guess_card !== undefined) {
                 actionText += ` guessing ${action.guess_card}`
             }
             return actionText
