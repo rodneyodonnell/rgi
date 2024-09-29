@@ -107,18 +107,21 @@ def test_action_guess_2p(game: Infiltr8Game) -> None:
     state = game.next_state(state, DRAW_ACTION)
     state = set_hand(state, 1, (infiltr8.GUESS_CARD, infiltr8.LOSE_CARD))
     legal_actions = game.legal_actions(state)
-    assert len(legal_actions) == 9
+    assert len(legal_actions) == 8  # 7 guessable cards + 1 LOSE card action
 
     assert legal_actions[0] == Action(
-        ActionType.PLAY, card=infiltr8.GUESS_CARD, player_id=2, guess_card=infiltr8.GUESS_CARD
-    )
-    assert legal_actions[1] == Action(
         ActionType.PLAY, card=infiltr8.GUESS_CARD, player_id=2, guess_card=infiltr8.PEEK_CARD
     )
-    assert legal_actions[7] == Action(
+    assert legal_actions[1] == Action(
+        ActionType.PLAY, card=infiltr8.GUESS_CARD, player_id=2, guess_card=infiltr8.COMPARE_CARD
+    )
+    assert legal_actions[6] == Action(
         ActionType.PLAY, card=infiltr8.GUESS_CARD, player_id=2, guess_card=infiltr8.LOSE_CARD
     )
-    assert legal_actions[8] == Action(ActionType.PLAY, card=infiltr8.LOSE_CARD, player_id=None, guess_card=None)
+    assert legal_actions[7] == Action(ActionType.PLAY, card=infiltr8.LOSE_CARD, player_id=None, guess_card=None)
+
+    # Ensure GUESS is not in the guessable cards
+    assert not any(action.guess_card == infiltr8.GUESS_CARD for action in legal_actions)
 
 
 def test_action_guess_4p(game_4p: Infiltr8Game) -> None:
@@ -345,18 +348,17 @@ def test_distinct_legal_actions(game: Infiltr8Game) -> None:
     legal_actions = game.legal_actions(state)
 
     # Check that we have the correct number of distinct actions
-    assert len(legal_actions) == 8  # One for each unique card that can be guessed
+    assert len(legal_actions) == 7  # One for each unique card that can be guessed (excluding GUESS)
 
     # Check that all actions are for GUESS card
     assert all(action.card == infiltr8.GUESS_CARD for action in legal_actions)
 
-    # Check that we have one action for each unique card that can be guessed
+    # Check that we have one action for each unique card that can be guessed (excluding GUESS)
     guessed_cards = set(action.guess_card for action in legal_actions)
-    assert guessed_cards == set(infiltr8.UNIQUE_CARDS)
+    assert guessed_cards == set(card for card in infiltr8.UNIQUE_CARDS if card != infiltr8.GUESS_CARD)
 
     # Check that all actions are unique
     assert len(set(legal_actions)) == len(legal_actions)
 
-    # Check that we have actions for all other players
-    player_ids = set(action.player_id for action in legal_actions)
-    assert player_ids == {2}  # In a 2-player game, the other player is 2
+    # Ensure GUESS is not in the guessable cards
+    assert not any(action.guess_card == infiltr8.GUESS_CARD for action in legal_actions)

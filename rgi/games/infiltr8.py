@@ -190,7 +190,7 @@ class Infiltr8Game(Game[Infiltr8State, TPlayerId, Action]):
             if action_card.effect == CardEffect.GUESS:
                 for other_player in self.all_player_ids(state):
                     if other_player != turn_player and not state.players[other_player].is_protected:
-                        for guess_card in UNIQUE_CARDS:
+                        for guess_card in [card for card in UNIQUE_CARDS if card != GUESS_CARD]:
                             yield Action(
                                 action_type=ActionType.PLAY,
                                 card=action_card,
