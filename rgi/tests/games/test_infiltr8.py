@@ -129,15 +129,11 @@ def test_action_guess_4p(game_4p: Infiltr8Game) -> None:
     state = game_4p.next_state(state, DRAW_ACTION)
     state = set_hand(state, 1, (infiltr8.GUESS_CARD, infiltr8.LOSE_CARD))
     legal_actions = game_4p.legal_actions(state)
-    assert len(legal_actions) == 25
+    assert len(legal_actions) == 22
 
-    assert legal_actions[0] == Action(
-        ActionType.PLAY, card=infiltr8.GUESS_CARD, player_id=2, guess_card=infiltr8.GUESS_CARD
-    )
-    assert legal_actions[23] == Action(
-        ActionType.PLAY, card=infiltr8.GUESS_CARD, player_id=4, guess_card=infiltr8.LOSE_CARD
-    )
-    assert legal_actions[24] == Action(ActionType.PLAY, card=infiltr8.LOSE_CARD, player_id=None, guess_card=None)
+    assert legal_actions[0] == Action(ActionType.PLAY, infiltr8.GUESS_CARD, player_id=2, guess_card=infiltr8.PEEK_CARD)
+    assert legal_actions[-2] == Action(ActionType.PLAY, infiltr8.GUESS_CARD, player_id=4, guess_card=infiltr8.LOSE_CARD)
+    assert legal_actions[-1] == Action(ActionType.PLAY, infiltr8.LOSE_CARD, player_id=None, guess_card=None)
 
 
 @pytest.mark.parametrize("card", [infiltr8.PEEK_CARD, infiltr8.COMPARE_CARD, infiltr8.SWAP_CARD])
@@ -362,3 +358,51 @@ def test_distinct_legal_actions(game: Infiltr8Game) -> None:
 
     # Ensure GUESS is not in the guessable cards
     assert not any(action.guess_card == infiltr8.GUESS_CARD for action in legal_actions)
+
+
+def test_legal_actions_exclude_out_players(game_4p: Infiltr8Game) -> None:
+    state = game_4p.initial_state(random_seed=123)
+    state = game_4p.next_state(state, DRAW_ACTION)
+
+    # Set player 1's hand to GUESS card
+    state = set_hand(state, 1, (infiltr8.GUESS_CARD,))
+
+    # Set player 2 as out
+    updated_player2 = replace(state.players[2], is_out=True)
+    updated_players = state.players.set(2, updated_player2)
+    state = replace(state, players=updated_players)
+
+    legal_actions = game_4p.legal_actions(state)
+
+    # Check that no actions target player 2
+    assert all(action.player_id != 2 for action in legal_actions if action.player_id is not None)
+
+    # Check that we can still target players 3 and 4
+    assert any(action.player_id == 3 for action in legal_actions)
+    assert any(action.player_id == 4 for action in legal_actions)
+
+    # Check that the number of actions is correct (7 guess options each for players 3 and 4)
+    assert len(legal_actions) == 14
+
+
+def test_legal_actions_all_other_players_out(game_4p: Infiltr8Game) -> None:
+    state = game_4p.initial_state(random_seed=123)
+    state = game_4p.next_state(state, DRAW_ACTION)
+
+    # Set player 1's hand to GUESS card
+    state = set_hand(state, 1, (infiltr8.GUESS_CARD,))
+
+    # Player 2 & 4 are out.
+    for player_id in [2, 4]:
+        updated_player = replace(state.players[player_id], is_out=True)
+        updated_players = state.players.set(player_id, updated_player)
+        state = replace(state, players=updated_players)
+
+    legal_actions = game_4p.legal_actions(state)
+
+    # Check that there are no legal actions for the GUESS card
+    assert len(legal_actions) == 7
+    assert Action(ActionType.PLAY, infiltr8.GUESS_CARD, player_id=3, guess_card=infiltr8.PEEK_CARD) in legal_actions
+    assert Action(ActionType.PLAY, infiltr8.GUESS_CARD, player_id=1, guess_card=infiltr8.PEEK_CARD) not in legal_actions
+    assert Action(ActionType.PLAY, infiltr8.GUESS_CARD, player_id=2, guess_card=infiltr8.PEEK_CARD) not in legal_actions
+    assert Action(ActionType.PLAY, infiltr8.GUESS_CARD, player_id=4, guess_card=infiltr8.PEEK_CARD) not in legal_actions

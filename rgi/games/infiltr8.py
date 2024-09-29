@@ -126,9 +126,9 @@ UNIQUE_CARDS = [
 ]
 
 
-def distinct_list(items):
+def distinct_list(items: Iterator[Action]) -> list[Action]:
     seen = set()
-    return [x for x in items if x not in seen and not seen.add(x)]
+    return [x for x in items if x not in seen and not seen.add(x)]  # type: ignore
 
 
 class Infiltr8Game(Game[Infiltr8State, TPlayerId, Action]):
@@ -178,10 +178,21 @@ class Infiltr8Game(Game[Infiltr8State, TPlayerId, Action]):
         turn_player = state.current_player_turn
         player_state = state.players[turn_player]
 
+        # if hand contains CONDITIONAL_DISCARD and either (FORCE_DISCARD, SWAP), then CONDITIONAL_DISCARD must be played
+        hand_effects = set(card.effect for card in player_state.hand)
+        if CardEffect.CONDITIONAL_DISCARD in hand_effects:
+            if CardEffect.FORCE_DISCARD in hand_effects or CardEffect.SWAP in hand_effects:
+                yield Action(ActionType.PLAY, CONDITIONAL_DISCARD_CARD, player_id=None, guess_card=None)
+                return
+
         for action_card in player_state.hand:
             if action_card.effect == CardEffect.GUESS:
                 for other_player in self.all_player_ids(state):
-                    if other_player != turn_player and not state.players[other_player].is_protected:
+                    if (
+                        other_player != turn_player
+                        and not state.players[other_player].is_protected
+                        and not state.players[other_player].is_out
+                    ):
                         for guess_card in [card for card in UNIQUE_CARDS if card != GUESS_CARD]:
                             yield Action(
                                 action_type=ActionType.PLAY,
@@ -191,7 +202,11 @@ class Infiltr8Game(Game[Infiltr8State, TPlayerId, Action]):
                             )
             elif action_card.effect in (CardEffect.PEEK, CardEffect.COMPARE, CardEffect.SWAP, CardEffect.FORCE_DISCARD):
                 for other_player in self.all_player_ids(state):
-                    if other_player != turn_player and not state.players[other_player].is_protected:
+                    if (
+                        other_player != turn_player
+                        and not state.players[other_player].is_protected
+                        and not state.players[other_player].is_out
+                    ):
                         yield Action(
                             action_type=ActionType.PLAY, card=action_card, player_id=other_player, guess_card=None
                         )
