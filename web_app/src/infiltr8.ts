@@ -8,25 +8,26 @@ import {
 
 interface Infiltr8State extends BaseGameData {
     deck_size: number;
-    discard_pile: { name: string; value: number }[];
+    discard_pile: { name: string; value: number; description: string }[];
     players: {
         [key: number]: {
             is_protected: boolean;
             is_out: boolean;
-            hand: string[];
+            hand: { name: string; description: string }[];
         };
     };
     current_player: number;
     legal_actions: Infiltr8Action[];
     game_options: { [key: string]: any };
     player_options: { [key: number]: { player_type: string; [key: string]: any } };
+    action_log: string[];
 }
 
 interface Infiltr8Action {
     action_type: "DRAW" | "PLAY";
     card?: string;
     player_id?: number;
-    guess_card?: string;  // Only used for GUESS action
+    guess_card?: string;
 }
 
 let gameOptions: { [key: string]: any } = {};
@@ -37,61 +38,64 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const renderGame = (data: Infiltr8State) => {
         console.log('Rendering game with data:', JSON.stringify(data, null, 2))
-        const gameArea = document.getElementById('game')
+        const gameArea = document.querySelector('.game-area')
         const status = document.getElementById('status')
         const actionForm = document.getElementById('action-form')
-        const modalBody = document.getElementById('modalBody')
-        let gameModal: any = null
+        const actionLogList = document.getElementById('action-log-list')
 
-        // Check if Bootstrap Modal is available
-        if (window.bootstrap && window.bootstrap.Modal) {
-            const modalElement = document.getElementById('gameModal')
-            if (modalElement) {
-                gameModal = new window.bootstrap.Modal(modalElement, {
-                    keyboard: false,
-                })
-            } else {
-                console.warn('Modal element not found')
-            }
-        } else {
-            console.warn('Bootstrap Modal is not available')
-        }
-
-        const newGameButton = document.getElementById('newGameButton')
-
-        if (!gameArea || !status || !actionForm) {
+        if (!gameArea || !status || !actionForm || !actionLogList) {
             console.error('Required DOM elements not found.')
             return
         }
-
-        gameOptions = data.game_options
-        playerOptions = data.player_options
-        console.log('Updated gameOptions:', gameOptions)
-        console.log('Updated playerOptions:', playerOptions)
 
         let html = ''
 
         // Render players
         for (const [id, player] of Object.entries(data.players)) {
             const isCurrentPlayer = parseInt(id) === data.current_player
+            const playerStatus = player.is_out ? 'eliminated' : player.is_protected ? 'protected' : 'active'
             html += `
-                <div class="player-area ${isCurrentPlayer ? 'current-player' : ''}">
-                    <h3>Player ${id} ${isCurrentPlayer ? '(Current Player)' : ''}</h3>
-                    <p>Status: ${player.is_protected ? 'Protected' : player.is_out ? 'Out' : 'Active'}</p>
-                    <p>Hand: ${player.hand.join(', ')}</p>
+                <div class="player-area ${playerStatus} ${isCurrentPlayer ? 'current-player' : ''}">
+                    <div class="player-header">
+                        <h3>Player ${id}</h3>
+                        ${isCurrentPlayer ? '<div class="current-player-indicator" id="player-indicator-${id}"></div>' : ''}
+                    </div>
+                    <p class="player-status ${playerStatus}">${playerStatus.charAt(0).toUpperCase() + playerStatus.slice(1)}</p>
+                    <div class="hand">
+                        ${player.hand.map(card => `
+                            <div class="card" title="${card.description}">
+                                <div class="card-body">
+                                    <h5 class="card-title">${card.name}</h5>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
                 </div>
             `
         }
 
         // Render deck and discard pile
         html += `
-            <div class="deck">
-                <h3>Deck</h3>
-                <p>Cards remaining: ${data.deck_size}</p>
-            </div>
-            <div class="discard-pile">
-                <h3>Discard Pile</h3>
-                ${data.discard_pile.map(card => `<div class="card">${card.name}</div>`).join('')}
+            <div class="deck-and-discard">
+                <div class="deck">
+                    <h3>Deck</h3>
+                    <div class="card-stack">
+                        <div class="card-back"></div>
+                        <p class="cards-remaining">${data.deck_size}</p>
+                    </div>
+                </div>
+                <div class="discard-pile">
+                    <h3>Discard Pile</h3>
+                    <div class="discard-stack">
+                        ${data.discard_pile.map((card, index) => `
+                            <div class="card discard-card" style="top: ${index * 5}px;" title="${card.description}">
+                                <div class="card-body">
+                                    <h5 class="card-title">${card.name}</h5>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
             </div>
         `
 
@@ -103,31 +107,10 @@ document.addEventListener('DOMContentLoaded', () => {
         // Render action form
         actionForm.innerHTML = renderActionForm(data)
 
-        // Handle game over
-        if (data.is_terminal) {
-            console.log('Game is terminal. Winner:', data.winner)
-            const message = data.winner
-                ? `🎉 <strong>Player ${data.winner} Wins!</strong> 🎉`
-                : '🤝 <strong>The game is a draw!</strong> 🤝'
-
-            if (modalBody) {
-                modalBody.innerHTML = message
-            }
-            
-            if (gameModal) {
-                gameModal.show() // Show the Bootstrap modal when game ends
-            } else {
-                console.warn('Modal not available, displaying message in console')
-                console.log(message)
-            }
-
-            if (newGameButton) {
-                newGameButton.onclick = () => {
-                    startNewGame('infiltr8', gameOptions, playerOptions, renderGame)
-                        .catch((error) => console.error('Error starting new game:', error))
-                }
-            }
-        }
+        // Render action log
+        actionLogList.innerHTML = data.action_log && data.action_log.length > 0
+            ? data.action_log.map(action => `<li class="list-group-item">${action}</li>`).join('')
+            : '<li class="list-group-item">No actions yet.</li>'
 
         console.log('Finished rendering game')
     }
@@ -137,25 +120,25 @@ document.addEventListener('DOMContentLoaded', () => {
             return ''
         }
 
-        let html = '<select class="action-select">'
+        let html = '<select class="form-select action-select">'
         for (const action of data.legal_actions) {
-            html += `<option value='${JSON.stringify(action)}'>${renderAction(action)}</option>`
+            html += `<option value='${JSON.stringify(action)}'>${renderAction(action, data.current_player)}</option>`
         }
         html += '</select>'
-        html += '<button class="submit-action mt-2">Submit Action</button>'
+        html += '<button class="btn btn-primary submit-action mt-2">Submit Action</button>'
 
         return html
     }
 
-    function renderAction(action: Infiltr8Action): string {
+    function renderAction(action: Infiltr8Action, currentPlayer: number): string {
         if (action.action_type === "DRAW") {
             return "Draw a card"
         } else if (action.action_type === "PLAY") {
-            let actionText = `Play ${action.card}`
+            let actionText = `Player ${currentPlayer} played ${action.card}`
             if (action.player_id !== undefined && action.player_id !== null) {
                 actionText += ` on Player ${action.player_id}`
             }
-            if (action.card === "Guess" && action.guess_card !== undefined) {
+            if (action.card === "Hack" && action.guess_card !== undefined) {
                 actionText += ` guessing ${action.guess_card}`
             }
             return actionText

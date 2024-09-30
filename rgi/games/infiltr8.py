@@ -97,25 +97,26 @@ class Infiltr8State:
     current_player_turn: TPlayerId  # Player ID of the player whose turn it is
     pending_action: Optional[PendingAction]
     turn_phase: TurnPhase
+    action_log: tuple[str, ...]  # Add this line
 
 
 CARD_NAMES = {
-    Card.GUESS: "Guess",
-    Card.PEEK: "Peek",
-    Card.COMPARE: "Compare",
-    Card.PROTECT: "Protect",
-    Card.FORCE_DISCARD: "Force Discard",
-    Card.SWAP: "Swap",
-    Card.CONDITIONAL_DISCARD: "Conditional Discard",
-    Card.LOSE: "Lose",
+    Card.GUESS: "Hack",
+    Card.PEEK: "Scan",
+    Card.COMPARE: "Benchmark",
+    Card.PROTECT: "Firewall",
+    Card.FORCE_DISCARD: "Core Dump",
+    Card.SWAP: "Data Swap",
+    Card.CONDITIONAL_DISCARD: "AI",
+    Card.LOSE: "Superintelligence",
 }
 
 CARD_DESCRIPTIONS = {
-    Card.GUESS: "Guess a card in another player's hand",
+    Card.GUESS: "Guess a card in another player's hand to eliminate them",
     Card.PEEK: "Look at another player's hand",
-    Card.COMPARE: "Compare your card with another player's card",
+    Card.COMPARE: "Compare your card with another player's card, lowest card is eliminated",
     Card.PROTECT: "Become immune to effects until your next turn",
-    Card.FORCE_DISCARD: "Force another player to discard their card",
+    Card.FORCE_DISCARD: "Force any player to discard their card",
     Card.SWAP: "Swap your card with another player's card",
     Card.CONDITIONAL_DISCARD: "Discard if holding certain cards",
     Card.LOSE: "Immediately lose if discarded",
@@ -158,6 +159,7 @@ class Infiltr8Game(Game[Infiltr8State, TPlayerId, Action]):
             current_player_turn=1,
             pending_action=None,
             turn_phase=TurnPhase.DRAW,
+            action_log=(),
         )
 
     @override
@@ -269,11 +271,16 @@ class Infiltr8Game(Game[Infiltr8State, TPlayerId, Action]):
         new_state = replace(state, players=new_players, discard_pile=new_discard_pile)
         new_state = self._apply_card_effect(new_state, action)
 
+        # Add the action to the log
+        action_description = self._get_action_description(action, state.current_player_turn)
+        new_action_log = state.action_log + (action_description,)
+
         next_player = self._get_next_player(new_state)
         return replace(
             new_state,
             current_player_turn=next_player,
             turn_phase=TurnPhase.DRAW,
+            action_log=new_action_log,
         )
 
     def _apply_card_effect(self, state: Infiltr8State, action: Action) -> Infiltr8State:
@@ -425,6 +432,19 @@ class Infiltr8Game(Game[Infiltr8State, TPlayerId, Action]):
             )
         return "\n".join(output)
 
+    def _get_action_description(self, action: Action, player_id: TPlayerId) -> str:
+        if action.action_type == ActionType.DRAW:
+            return f"Player {player_id} drew a card"
+        elif action.action_type == ActionType.PLAY:
+            description = f"Player {player_id} played {CARD_NAMES[action.card]}"
+            if action.player_id is not None:
+                description += f" on Player {action.player_id}"
+            if action.guess_card is not None:
+                description += f" guessing {CARD_NAMES[action.guess_card]}"
+            return description
+        else:
+            return str(action)
+
 
 class Infiltr8Serializer(GameSerializer[Infiltr8Game, Infiltr8State, Action]):
     @override
@@ -432,16 +452,22 @@ class Infiltr8Serializer(GameSerializer[Infiltr8Game, Infiltr8State, Action]):
         return {
             "current_player": state.current_player_turn,
             "deck_size": len(state.deck),
-            "discard_pile": [{"name": CARD_NAMES[card], "value": card.value} for card in state.discard_pile[-3:]],
+            "discard_pile": [
+                {"name": CARD_NAMES[card], "value": card.value, "description": CARD_DESCRIPTIONS[card]}
+                for card in state.discard_pile[-3:]
+            ],
             "players": {
                 player_id: {
                     "is_protected": player_state.is_protected,
                     "is_out": player_state.is_out,
-                    "hand": [CARD_NAMES[card] for card in player_state.hand],
+                    "hand": [
+                        {"name": CARD_NAMES[card], "description": CARD_DESCRIPTIONS[card]} for card in player_state.hand
+                    ],
                 }
                 for player_id, player_state in state.players.items()
             },
             "legal_actions": [self.serialize_action(action) for action in game.legal_actions(state)],
+            "action_log": list(state.action_log),  # Add this line
         }
 
     def serialize_action(self, action: Action) -> dict[str, Any]:

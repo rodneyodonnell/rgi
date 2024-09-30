@@ -269,7 +269,7 @@ def test_serialize_action(serializer: Infiltr8Serializer) -> None:
 
     action = Action(ActionType.PLAY, card=Card.GUESS, player_id=2, guess_card=Card.PEEK)
     serialized = serializer.serialize_action(action)
-    assert serialized == {"action_type": "PLAY", "card": "Guess", "player_id": 2, "guess_card": "Peek"}
+    assert serialized == {"action_type": "PLAY", "card": "Hack", "player_id": 2, "guess_card": "Scan"}
 
 
 def test_parse_action(game: Infiltr8Game, serializer: Infiltr8Serializer) -> None:
@@ -277,7 +277,7 @@ def test_parse_action(game: Infiltr8Game, serializer: Infiltr8Serializer) -> Non
     parsed = serializer.parse_action(game, action_data)
     assert parsed == Action(ActionType.DRAW, card=None, player_id=None, guess_card=None)
 
-    action_data = {"action_type": "PLAY", "card": "Guess", "player_id": 2, "guess_card": "Peek"}
+    action_data = {"action_type": "PLAY", "card": "Hack", "player_id": 2, "guess_card": "Scan"}
     parsed = serializer.parse_action(game, action_data)
     assert parsed == Action(ActionType.PLAY, card=Card.GUESS, player_id=2, guess_card=Card.PEEK)
 

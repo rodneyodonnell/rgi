@@ -37,8 +37,12 @@ Tech stack:
 
 This is a list of tasks we are working on now or planning to work on soon.
 
+- Infiltr8: Show log of actions.
+- Infiltr8: Should only show things we know.
+- Infiltr8: Handle case where no actionsa are legal (opponents all protected)
 - Expand games: not board
 - Expand games: not sequential turns
+- Split cursor_context.md into separte design docs for each game, algorithm, etc.
 
 
 ## Python Style Guide.
@@ -314,6 +318,10 @@ Claude's observations and thoughts:
 - Remember to update this section with new insights and lessons learned from interactions.
 - When in doubt, ask for more context or clarification from the user.
 - Aim to provide focused, targeted assistance rather than broad, unsolicited changes.
+- There's an issue with the modal implementation in the Infiltr8 game that needs to be addressed:
+  1. We need to ensure the modal HTML is present in the template
+  2. We should verify that Bootstrap JS is properly loaded
+  3. We should consider if a modal is really needed for game end, or if we should use a different UI element
 
 GPT-4's observations and thoughts:
 - When making changes, ensure to follow the existing conventions and style guides provided.
@@ -322,3 +330,9 @@ GPT-4's observations and thoughts:
 - When dealing with test failures, provide detailed explanations and potential fixes based on the error messages.
 - Keep track of any recurring issues or patterns in the codebase to provide more efficient assistance in the future.
 - If additional context is needed, don't hesitate to ask the user for more information to ensure accurate and effective help.
+
+## User Notes
+
+This section is for notes requested by the user to be added for future reference or discussion.
+
+- Reminder: When the user asks to make a note, it should be added here rather than in the code or in the AI's personal observations.

@@ -103,3 +103,8 @@ yarn tsc --noEmit
 ```
 yarn tsc --watch
 ```
+
+
+# Load multiple files into VSCode
+Open-matching-files (alt-f)
+*infiltr8*.{ts,py,html}

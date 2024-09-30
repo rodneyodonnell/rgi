@@ -5,65 +5,104 @@
 <style>
     .infiltr8-game {
         font-family: Arial, sans-serif;
-        max-width: 800px;
+        max-width: 1800px;
         margin: 0 auto;
         padding: 20px;
+        display: grid;
+        grid-template-columns: 3fr 2fr;
+        gap: 20px;
     }
+
+    .game-area {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 20px;
+    }
+
     .player-area {
         border: 1px solid #ccc;
         padding: 10px;
+        border-radius: 5px;
+    }
+
+    .deck-and-discard {
+        grid-column: span 2;
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 20px;
+    }
+
+    .sidebar {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .action-log {
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        padding: 10px;
+        background-color: #f8f9fa;
+        flex-grow: 1;
+        overflow-y: auto;
+    }
+
+    #status {
         margin-bottom: 10px;
-        border-radius: 5px;
     }
-    .current-player {
-        background-color: #e6f3ff;
-    }
-    .card {
-        display: inline-block;
-        width: 80px;
-        height: 120px;
-        border: 1px solid #000;
-        border-radius: 5px;
-        margin: 5px;
-        padding: 5px;
-        text-align: center;
-        vertical-align: top;
-    }
-    .deck, .discard-pile {
+
+    #action-form {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
         margin-top: 20px;
     }
-    .action-select {
+
+    #action-form select,
+    #action-form button {
+        margin: 10px 0;
         width: 100%;
-        padding: 10px;
-        margin-top: 20px;
     }
-    .submit-action {
-        display: block;
-        width: 100%;
-        padding: 10px;
-        margin-top: 10px;
-        background-color: #007bff;
-        color: #ffffff;
-        border: none;
-        border-radius: 5px;
-        cursor: pointer;
+
+    @media (max-width: 1200px) {
+        .infiltr8-game {
+            grid-template-columns: 1fr;
+        }
     }
-    .submit-action:hover {
-        background-color: #0056b3;
+
+    @media (max-width: 768px) {
+        .game-area {
+            grid-template-columns: 1fr;
+        }
+        .deck-and-discard {
+            grid-column: span 1;
+        }
     }
+
+    /* ... (other styles remain the same) ... */
 </style>
 {% endblock %}
 
 {% block content %}
-<h1 class="text-center">Infiltr8</h1>
+<h1 class="text-center mb-4">Infiltr8</h1>
 
-<div id="game" class="infiltr8-game mt-4">
-    <!-- Game board will be rendered here by the JavaScript -->
-</div>
-<h2 id="status" class="mt-3"></h2>
-
-<div id="action-form" class="mt-4">
-    <!-- Action form will be rendered here by the JavaScript -->
+<div class="container-fluid">
+    <div id="game" class="infiltr8-game">
+        <div class="game-area">
+            <!-- Game board will be rendered here by the JavaScript -->
+        </div>
+        <div class="sidebar">
+            <h2 id="status"></h2>
+            <div id="action-form">
+                <!-- Action form will be rendered here by the JavaScript -->
+            </div>
+            <div class="action-log">
+                <h3>Action Log</h3>
+                <ul class="list-group" id="action-log-list">
+                    <!-- Action log will be rendered here by the JavaScript -->
+                </ul>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
