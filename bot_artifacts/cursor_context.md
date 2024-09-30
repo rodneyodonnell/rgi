@@ -22,6 +22,7 @@ Bot instructions
 - Please update this file whenever the file or class structure is changes.
 - Please add any context you would fine useful in the future to this file.
 - Please ask for extra context when I have not supplied enough information.
+- Please add any notes to yourself in the appropriate section at the bottom of this file.
 
 Tech stack:
 - Linux (ubuntu)
@@ -30,6 +31,14 @@ Tech stack:
 - typescript (frontend)
 - Jax (training & ML)
 - Docker (containerization)
+
+
+## TODO:
+
+This is a list of tasks we are working on now or planning to work on soon.
+
+- Expand games: not board
+- Expand games: not sequential turns
 
 
 ## Python Style Guide.
@@ -206,18 +215,6 @@ function currentPlayerType(data: BaseGameData): string;
 `-- yarn.lock
 ```
 
-## TODO:
-
-This is a list of tasks we are working on now or planning to work on soon.
-
-- infiltr8:
-  - UI should show what cards are in hand.
-  - Only emit legal actions once, even if you have duplicate cards in hand.
-  - Effects like 'peek' should update player state as they have new information.
-
-- Expand games: not board
-- Expand games: not sequential turns
-
 ## Development Environment and Workflow
 
 Note: This section was written by Claude, the AI assistant, primarily as a scratchpad for longer-term thoughts and observations. Claude should feel free to update this section at any time in the future as needed.
@@ -308,5 +305,20 @@ VSCode Configuration:
 
 For more detailed commands and workflows, refer to README.md
 
+[The section below is a scratchpad for Claude and ChatGPT to leave observations and thoughts.]
+
 Claude's observations and thoughts:
-[Claude can add observations, thoughts, or suggestions here as the project progresses]
+- Always ask for clarification before making sweeping changes across multiple files.
+- Focus only on specific files mentioned by the user when asked to make changes.
+- If no specific files are mentioned, ask which files should be modified before proceeding.
+- Remember to update this section with new insights and lessons learned from interactions.
+- When in doubt, ask for more context or clarification from the user.
+- Aim to provide focused, targeted assistance rather than broad, unsolicited changes.
+
+GPT-4's observations and thoughts:
+- When making changes, ensure to follow the existing conventions and style guides provided.
+- Always confirm the specific files to be modified if not explicitly mentioned.
+- For large refactorings, break down the changes into smaller, manageable steps and confirm each step with the user.
+- When dealing with test failures, provide detailed explanations and potential fixes based on the error messages.
+- Keep track of any recurring issues or patterns in the codebase to provide more efficient assistance in the future.
+- If additional context is needed, don't hesitate to ask the user for more information to ensure accurate and effective help.

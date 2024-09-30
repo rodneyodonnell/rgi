@@ -51,7 +51,7 @@ class ActionType(Enum):
 
 
 # fmt: off
-class CardEffect(Enum):
+class Card(Enum):
     GUESS = 1          # Player guesses a card value in another player's hand
     PEEK = 2           # Player looks at another player's hand without revealing it
     COMPARE = 3        # Player compares their card with another player's card
@@ -66,12 +66,6 @@ class CardEffect(Enum):
 class TurnPhase(Enum):
     DRAW = 1
     PLAY = 2
-
-
-@dataclass(frozen=True)
-class Card:
-    name: str
-    effect: CardEffect
 
 
 @dataclass(frozen=True)
@@ -92,7 +86,7 @@ class PlayerState:
 @dataclass(frozen=True)
 class PendingAction:
     player_id: TPlayerId
-    effect: CardEffect
+    effect: Card
 
 
 @dataclass(frozen=True)
@@ -105,25 +99,27 @@ class Infiltr8State:
     turn_phase: TurnPhase
 
 
-GUESS_CARD = Card(name="Guess", effect=CardEffect.GUESS)
-PEEK_CARD = Card(name="Peek", effect=CardEffect.PEEK)
-COMPARE_CARD = Card(name="Compare", effect=CardEffect.COMPARE)
-PROTECT_CARD = Card(name="Protect", effect=CardEffect.PROTECT)
-FORCE_DISCARD_CARD = Card(name="Force Discard", effect=CardEffect.FORCE_DISCARD)
-SWAP_CARD = Card(name="Swap", effect=CardEffect.SWAP)
-CONDITIONAL_DISCARD_CARD = Card(name="Conditional Discard", effect=CardEffect.CONDITIONAL_DISCARD)
-LOSE_CARD = Card(name="Lose", effect=CardEffect.LOSE)
+CARD_NAMES = {
+    Card.GUESS: "Guess",
+    Card.PEEK: "Peek",
+    Card.COMPARE: "Compare",
+    Card.PROTECT: "Protect",
+    Card.FORCE_DISCARD: "Force Discard",
+    Card.SWAP: "Swap",
+    Card.CONDITIONAL_DISCARD: "Conditional Discard",
+    Card.LOSE: "Lose",
+}
 
-UNIQUE_CARDS = [
-    GUESS_CARD,
-    PEEK_CARD,
-    COMPARE_CARD,
-    PROTECT_CARD,
-    FORCE_DISCARD_CARD,
-    SWAP_CARD,
-    CONDITIONAL_DISCARD_CARD,
-    LOSE_CARD,
-]
+CARD_DESCRIPTIONS = {
+    Card.GUESS: "Guess a card in another player's hand",
+    Card.PEEK: "Look at another player's hand",
+    Card.COMPARE: "Compare your card with another player's card",
+    Card.PROTECT: "Become immune to effects until your next turn",
+    Card.FORCE_DISCARD: "Force another player to discard their card",
+    Card.SWAP: "Swap your card with another player's card",
+    Card.CONDITIONAL_DISCARD: "Discard if holding certain cards",
+    Card.LOSE: "Immediately lose if discarded",
+}
 
 
 def distinct_list(items: Iterator[Action]) -> list[Action]:
@@ -138,12 +134,12 @@ class Infiltr8Game(Game[Infiltr8State, TPlayerId, Action]):
             raise ValueError("Number of players must be between 2 and 4")
         self.num_players = num_players
         self.full_deck = (
-            [GUESS_CARD] * 5
-            + [PEEK_CARD] * 2
-            + [COMPARE_CARD] * 2
-            + [PROTECT_CARD] * 2
-            + [FORCE_DISCARD_CARD] * 2
-            + [SWAP_CARD, CONDITIONAL_DISCARD_CARD, LOSE_CARD]
+            [Card.GUESS] * 5
+            + [Card.PEEK] * 2
+            + [Card.COMPARE] * 2
+            + [Card.PROTECT] * 2
+            + [Card.FORCE_DISCARD] * 2
+            + [Card.SWAP, Card.CONDITIONAL_DISCARD, Card.LOSE]
         )
 
     @override
@@ -179,28 +175,28 @@ class Infiltr8Game(Game[Infiltr8State, TPlayerId, Action]):
         player_state = state.players[turn_player]
 
         # if hand contains CONDITIONAL_DISCARD and either (FORCE_DISCARD, SWAP), then CONDITIONAL_DISCARD must be played
-        hand_effects = set(card.effect for card in player_state.hand)
-        if CardEffect.CONDITIONAL_DISCARD in hand_effects:
-            if CardEffect.FORCE_DISCARD in hand_effects or CardEffect.SWAP in hand_effects:
-                yield Action(ActionType.PLAY, CONDITIONAL_DISCARD_CARD, player_id=None, guess_card=None)
+        hand_effects = set(player_state.hand)
+        if Card.CONDITIONAL_DISCARD in hand_effects:
+            if Card.FORCE_DISCARD in hand_effects or Card.SWAP in hand_effects:
+                yield Action(ActionType.PLAY, Card.CONDITIONAL_DISCARD, player_id=None, guess_card=None)
                 return
 
         for action_card in player_state.hand:
-            if action_card.effect == CardEffect.GUESS:
+            if action_card == Card.GUESS:
                 for other_player in self.all_player_ids(state):
                     if (
                         other_player != turn_player
                         and not state.players[other_player].is_protected
                         and not state.players[other_player].is_out
                     ):
-                        for guess_card in [card for card in UNIQUE_CARDS if card != GUESS_CARD]:
+                        for guess_card in [card for card in list(Card) if card != Card.GUESS]:
                             yield Action(
                                 action_type=ActionType.PLAY,
                                 card=action_card,
                                 player_id=other_player,
                                 guess_card=guess_card,
                             )
-            elif action_card.effect in (CardEffect.PEEK, CardEffect.COMPARE, CardEffect.SWAP, CardEffect.FORCE_DISCARD):
+            elif action_card in (Card.PEEK, Card.COMPARE, Card.SWAP, Card.FORCE_DISCARD):
                 for other_player in self.all_player_ids(state):
                     if (
                         other_player != turn_player
@@ -210,7 +206,7 @@ class Infiltr8Game(Game[Infiltr8State, TPlayerId, Action]):
                         yield Action(
                             action_type=ActionType.PLAY, card=action_card, player_id=other_player, guess_card=None
                         )
-            elif action_card.effect in (CardEffect.PROTECT, CardEffect.CONDITIONAL_DISCARD, CardEffect.LOSE):
+            elif action_card in (Card.PROTECT, Card.CONDITIONAL_DISCARD, Card.LOSE):
                 yield Action(action_type=ActionType.PLAY, card=action_card, player_id=None, guess_card=None)
             else:
                 raise ValueError(f"Unknown card effect: {action_card}")
@@ -283,19 +279,19 @@ class Infiltr8Game(Game[Infiltr8State, TPlayerId, Action]):
     def _apply_card_effect(self, state: Infiltr8State, action: Action) -> Infiltr8State:
         assert action.card is not None
         effect_handlers = {
-            CardEffect.GUESS: self._handle_guess_effect,
-            CardEffect.PEEK: self._handle_peek_effect,
-            CardEffect.COMPARE: self._handle_compare_effect,
-            CardEffect.PROTECT: self._handle_protect_effect,
-            CardEffect.FORCE_DISCARD: self._handle_force_discard_effect,
-            CardEffect.SWAP: self._handle_swap_effect,
-            CardEffect.CONDITIONAL_DISCARD: self._handle_conditional_discard_effect,
-            CardEffect.LOSE: self._handle_lose_effect,
+            Card.GUESS: self._handle_guess_effect,
+            Card.PEEK: self._handle_peek_effect,
+            Card.COMPARE: self._handle_compare_effect,
+            Card.PROTECT: self._handle_protect_effect,
+            Card.FORCE_DISCARD: self._handle_force_discard_effect,
+            Card.SWAP: self._handle_swap_effect,
+            Card.CONDITIONAL_DISCARD: self._handle_conditional_discard_effect,
+            Card.LOSE: self._handle_lose_effect,
         }
 
-        handler = effect_handlers.get(action.card.effect)
+        handler = effect_handlers.get(action.card)
         if not handler:
-            raise ValueError(f"Unknown card effect: {action.card.effect}")
+            raise ValueError(f"Unknown card effect: {action.card}")
         return handler(state, action)
 
     def _handle_guess_effect(self, state: Infiltr8State, action: Action) -> Infiltr8State:
@@ -320,10 +316,10 @@ class Infiltr8Game(Game[Infiltr8State, TPlayerId, Action]):
         target_player = state.players[action.player_id]
         target_card = target_player.hand[0]
         new_players = state.players
-        if player_card.effect.value < target_card.effect.value:
+        if player_card.value < target_card.value:
             new_player_state = replace(state.players[turn_player], is_out=True)
             new_players = new_players.set(turn_player, new_player_state)
-        elif player_card.effect.value > target_card.effect.value:
+        elif player_card.value > target_card.value:
             new_target_player = replace(target_player, is_out=True)
             new_players = new_players.set(action.player_id, new_target_player)
         return replace(state, players=new_players)
@@ -364,10 +360,8 @@ class Infiltr8Game(Game[Infiltr8State, TPlayerId, Action]):
     def _handle_conditional_discard_effect(self, state: Infiltr8State, _action: Action) -> Infiltr8State:
         turn_player = state.current_player_turn
         player_state = state.players[turn_player]
-        if any(card.effect in (CardEffect.SWAP, CardEffect.FORCE_DISCARD) for card in player_state.hand):
-            discarded_card = next(
-                card for card in player_state.hand if card.effect in (CardEffect.SWAP, CardEffect.FORCE_DISCARD)
-            )
+        if any(card in (Card.SWAP, Card.FORCE_DISCARD) for card in player_state.hand):
+            discarded_card = next(card for card in player_state.hand if card in (Card.SWAP, Card.FORCE_DISCARD))
             new_hand = tuple(card for card in player_state.hand if card != discarded_card)
             new_player_state = replace(player_state, hand=new_hand)
             new_players = state.players.set(turn_player, new_player_state)
@@ -407,11 +401,9 @@ class Infiltr8Game(Game[Infiltr8State, TPlayerId, Action]):
             return 1.0 if player_id == active_players[0] else -1.0
 
         # If multiple players are active (deck is empty), highest card wins
-        highest_value = max(player.hand[0].effect.value for player in state.players.values() if not player.is_out)
+        highest_value = max(player.hand[0].value for player in state.players.values() if not player.is_out)
         winners = [
-            pid
-            for pid, player in state.players.items()
-            if not player.is_out and player.hand[0].effect.value == highest_value
+            pid for pid, player in state.players.items() if not player.is_out and player.hand[0].value == highest_value
         ]
 
         if player_id in winners:
@@ -423,12 +415,14 @@ class Infiltr8Game(Game[Infiltr8State, TPlayerId, Action]):
         output = []
         output.append(f"Current player: {state.current_player_turn}")
         output.append(f"Deck size: {len(state.deck)}")
-        output.append(f"Discard pile: {', '.join(card.name for card in state.discard_pile[-3:])}")
+        output.append(f"Discard pile: {', '.join(CARD_NAMES[card] for card in state.discard_pile[-3:])}")
         for player_id, player_state in state.players.items():
             status = "Protected" if player_state.is_protected else "Active"
             if player_state.is_out:
                 status = "Out"
-            output.append(f"Player {player_id}: {status}, Hand: {', '.join(card.name for card in player_state.hand)}")
+            output.append(
+                f"Player {player_id}: {status}, Hand: {', '.join(CARD_NAMES[card] for card in player_state.hand)}"
+            )
         return "\n".join(output)
 
 
@@ -438,12 +432,12 @@ class Infiltr8Serializer(GameSerializer[Infiltr8Game, Infiltr8State, Action]):
         return {
             "current_player": state.current_player_turn,
             "deck_size": len(state.deck),
-            "discard_pile": [{"name": card.name, "value": card.effect.value} for card in state.discard_pile[-3:]],
+            "discard_pile": [{"name": CARD_NAMES[card], "value": card.value} for card in state.discard_pile[-3:]],
             "players": {
                 player_id: {
                     "is_protected": player_state.is_protected,
                     "is_out": player_state.is_out,
-                    "hand": [card.name for card in player_state.hand],
+                    "hand": [CARD_NAMES[card] for card in player_state.hand],
                 }
                 for player_id, player_state in state.players.items()
             },
@@ -453,16 +447,16 @@ class Infiltr8Serializer(GameSerializer[Infiltr8Game, Infiltr8State, Action]):
     def serialize_action(self, action: Action) -> dict[str, Any]:
         return {
             "action_type": action.action_type.name,
-            "card": action.card.name if action.card else None,
+            "card": CARD_NAMES[action.card] if action.card else None,
             "player_id": action.player_id,
-            "guess_card": action.guess_card.name if action.guess_card else None,
+            "guess_card": CARD_NAMES[action.guess_card] if action.guess_card else None,
         }
 
     @override
     def parse_action(self, game: Infiltr8Game, action_data: dict[str, Any]) -> Action:
         return Action(
             action_type=ActionType[action_data["action_type"]],
-            card=next((card for card in UNIQUE_CARDS if card.name == action_data["card"]), None),
+            card=next((effect for effect, name in CARD_NAMES.items() if name == action_data["card"]), None),
             player_id=action_data["player_id"],
-            guess_card=next((card for card in UNIQUE_CARDS if card.name == action_data["guess_card"]), None),
+            guess_card=next((effect for effect, name in CARD_NAMES.items() if name == action_data["guess_card"]), None),
         )

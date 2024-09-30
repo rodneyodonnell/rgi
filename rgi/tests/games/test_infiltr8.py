@@ -11,8 +11,8 @@ from rgi.games.infiltr8 import (
     ActionType,
     TurnPhase,
     Infiltr8Serializer,
+    CARD_NAMES,
 )
-from rgi.games import infiltr8
 
 # pylint: disable=redefined-outer-name  # pytest fixtures trigger this false positive
 
@@ -105,42 +105,36 @@ def test_first_draw_action(game: Infiltr8Game) -> None:
 def test_action_guess_2p(game: Infiltr8Game) -> None:
     state = game.initial_state(random_seed=123)
     state = game.next_state(state, DRAW_ACTION)
-    state = set_hand(state, 1, (infiltr8.GUESS_CARD, infiltr8.LOSE_CARD))
+    state = set_hand(state, 1, (Card.GUESS, Card.LOSE))
     legal_actions = game.legal_actions(state)
     assert len(legal_actions) == 8  # 7 guessable cards + 1 LOSE card action
 
-    assert legal_actions[0] == Action(
-        ActionType.PLAY, card=infiltr8.GUESS_CARD, player_id=2, guess_card=infiltr8.PEEK_CARD
-    )
-    assert legal_actions[1] == Action(
-        ActionType.PLAY, card=infiltr8.GUESS_CARD, player_id=2, guess_card=infiltr8.COMPARE_CARD
-    )
-    assert legal_actions[6] == Action(
-        ActionType.PLAY, card=infiltr8.GUESS_CARD, player_id=2, guess_card=infiltr8.LOSE_CARD
-    )
-    assert legal_actions[7] == Action(ActionType.PLAY, card=infiltr8.LOSE_CARD, player_id=None, guess_card=None)
+    assert legal_actions[0] == Action(ActionType.PLAY, card=Card.GUESS, player_id=2, guess_card=Card.PEEK)
+    assert legal_actions[1] == Action(ActionType.PLAY, card=Card.GUESS, player_id=2, guess_card=Card.COMPARE)
+    assert legal_actions[6] == Action(ActionType.PLAY, card=Card.GUESS, player_id=2, guess_card=Card.LOSE)
+    assert legal_actions[7] == Action(ActionType.PLAY, card=Card.LOSE, player_id=None, guess_card=None)
 
     # Ensure GUESS is not in the guessable cards
-    assert not any(action.guess_card == infiltr8.GUESS_CARD for action in legal_actions)
+    assert not any(action.guess_card == Card.GUESS for action in legal_actions)
 
 
 def test_action_guess_4p(game_4p: Infiltr8Game) -> None:
     state = game_4p.initial_state(random_seed=123)
     state = game_4p.next_state(state, DRAW_ACTION)
-    state = set_hand(state, 1, (infiltr8.GUESS_CARD, infiltr8.LOSE_CARD))
+    state = set_hand(state, 1, (Card.GUESS, Card.LOSE))
     legal_actions = game_4p.legal_actions(state)
     assert len(legal_actions) == 22
 
-    assert legal_actions[0] == Action(ActionType.PLAY, infiltr8.GUESS_CARD, player_id=2, guess_card=infiltr8.PEEK_CARD)
-    assert legal_actions[-2] == Action(ActionType.PLAY, infiltr8.GUESS_CARD, player_id=4, guess_card=infiltr8.LOSE_CARD)
-    assert legal_actions[-1] == Action(ActionType.PLAY, infiltr8.LOSE_CARD, player_id=None, guess_card=None)
+    assert legal_actions[0] == Action(ActionType.PLAY, Card.GUESS, player_id=2, guess_card=Card.PEEK)
+    assert legal_actions[-2] == Action(ActionType.PLAY, Card.GUESS, player_id=4, guess_card=Card.LOSE)
+    assert legal_actions[-1] == Action(ActionType.PLAY, Card.LOSE, player_id=None, guess_card=None)
 
 
-@pytest.mark.parametrize("card", [infiltr8.PEEK_CARD, infiltr8.COMPARE_CARD, infiltr8.SWAP_CARD])
-def test_action_target_other_player_4p(game_4p: Infiltr8Game, card: Card) -> None:  # Added card parameter type
+@pytest.mark.parametrize("card", [Card.PEEK, Card.COMPARE, Card.SWAP])
+def test_action_target_other_player_4p(game_4p: Infiltr8Game, card: Card) -> None:
     state: Infiltr8State = game_4p.initial_state(random_seed=123)
     state = game_4p.next_state(state, DRAW_ACTION)
-    state = set_hand(state, 1, (card, infiltr8.LOSE_CARD))
+    state = set_hand(state, 1, (card, Card.LOSE))
     legal_actions: list[Action] = game_4p.legal_actions(state)
     assert len(legal_actions) == 4
 
@@ -149,11 +143,11 @@ def test_action_target_other_player_4p(game_4p: Infiltr8Game, card: Card) -> Non
     assert legal_actions[2] == Action(ActionType.PLAY, card=card, player_id=4, guess_card=None)
 
 
-@pytest.mark.parametrize("card", [infiltr8.PROTECT_CARD, infiltr8.CONDITIONAL_DISCARD_CARD, infiltr8.LOSE_CARD])
+@pytest.mark.parametrize("card", [Card.PROTECT, Card.CONDITIONAL_DISCARD, Card.LOSE])
 def test_action_no_target(game: Infiltr8Game, card: Card) -> None:
     state: Infiltr8State = game.initial_state(random_seed=123)
     state = game.next_state(state, DRAW_ACTION)
-    card2 = infiltr8.LOSE_CARD if card != infiltr8.LOSE_CARD else infiltr8.PROTECT_CARD  # test 2 distinct cards.
+    card2 = Card.LOSE if card != Card.LOSE else Card.PROTECT  # test 2 distinct cards.
     state = set_hand(state, 1, (card, card2))
     legal_actions: list[Action] = game.legal_actions(state)
     assert len(legal_actions) == 2
@@ -164,29 +158,26 @@ def test_action_no_target(game: Infiltr8Game, card: Card) -> None:
 @pytest.mark.parametrize(
     "card2, is_force_discard",
     [
-        (infiltr8.GUESS_CARD, False),
-        (infiltr8.PEEK_CARD, False),
-        (infiltr8.COMPARE_CARD, False),
-        (infiltr8.PROTECT_CARD, False),
-        (infiltr8.SWAP_CARD, True),
-        (infiltr8.FORCE_DISCARD_CARD, True),
-        (infiltr8.LOSE_CARD, False),
+        (Card.GUESS, False),
+        (Card.PEEK, False),
+        (Card.COMPARE, False),
+        (Card.PROTECT, False),
+        (Card.SWAP, True),
+        (Card.FORCE_DISCARD, True),
+        (Card.LOSE, False),
     ],
 )
 def test_action_conditional_discard_4p(game_4p: Infiltr8Game, card2: Card, is_force_discard: bool) -> None:
     state: Infiltr8State = game_4p.initial_state(random_seed=123)
     state = game_4p.next_state(state, DRAW_ACTION)
-    state = set_hand(state, 1, (infiltr8.CONDITIONAL_DISCARD_CARD, card2))
+    state = set_hand(state, 1, (Card.CONDITIONAL_DISCARD, card2))
     legal_actions: list[Action] = game_4p.legal_actions(state)
 
     if is_force_discard:
         assert len(legal_actions) == 1
     else:
         assert len(legal_actions) > 1
-    assert (
-        Action(ActionType.PLAY, card=infiltr8.CONDITIONAL_DISCARD_CARD, player_id=None, guess_card=None)
-        in legal_actions
-    )
+    assert Action(ActionType.PLAY, card=Card.CONDITIONAL_DISCARD, player_id=None, guess_card=None) in legal_actions
 
 
 def test_next_state_draw(game: Infiltr8Game) -> None:
@@ -201,11 +192,11 @@ def test_next_state_draw(game: Infiltr8Game) -> None:
 
 def test_next_state_play_guess_correct(game_4p: Infiltr8Game) -> None:
     state = game_4p.initial_state(random_seed=42)
-    state = set_hand(state, 1, (infiltr8.GUESS_CARD,))
-    state = set_hand(state, 2, (infiltr8.PROTECT_CARD,))
+    state = set_hand(state, 1, (Card.GUESS,))
+    state = set_hand(state, 2, (Card.PROTECT,))
     state = replace(state, turn_phase=TurnPhase.PLAY)
 
-    action = Action(ActionType.PLAY, card=infiltr8.GUESS_CARD, player_id=2, guess_card=infiltr8.PROTECT_CARD)
+    action = Action(ActionType.PLAY, card=Card.GUESS, player_id=2, guess_card=Card.PROTECT)
     new_state = game_4p.next_state(state, action)
 
     assert new_state.players[2].is_out
@@ -215,11 +206,11 @@ def test_next_state_play_guess_correct(game_4p: Infiltr8Game) -> None:
 
 def test_next_state_play_guess_incorrect(game: Infiltr8Game) -> None:
     state = game.initial_state(random_seed=42)
-    state = set_hand(state, 1, (infiltr8.GUESS_CARD,))
-    state = set_hand(state, 2, (infiltr8.PROTECT_CARD,))
+    state = set_hand(state, 1, (Card.GUESS,))
+    state = set_hand(state, 2, (Card.PROTECT,))
     state = replace(state, turn_phase=TurnPhase.PLAY)
 
-    action = Action(ActionType.PLAY, card=infiltr8.GUESS_CARD, player_id=2, guess_card=infiltr8.PEEK_CARD)
+    action = Action(ActionType.PLAY, card=Card.GUESS, player_id=2, guess_card=Card.PEEK)
     new_state = game.next_state(state, action)
 
     assert not new_state.players[2].is_out
@@ -229,10 +220,10 @@ def test_next_state_play_guess_incorrect(game: Infiltr8Game) -> None:
 
 def test_next_state_play_protect(game: Infiltr8Game) -> None:
     state = game.initial_state(random_seed=42)
-    state = set_hand(state, 1, (infiltr8.PROTECT_CARD,))
+    state = set_hand(state, 1, (Card.PROTECT,))
     state = replace(state, turn_phase=TurnPhase.PLAY)
 
-    action = Action(ActionType.PLAY, card=infiltr8.PROTECT_CARD, player_id=None, guess_card=None)
+    action = Action(ActionType.PLAY, card=Card.PROTECT, player_id=None, guess_card=None)
     new_state = game.next_state(state, action)
 
     assert new_state.players[1].is_protected
@@ -242,15 +233,15 @@ def test_next_state_play_protect(game: Infiltr8Game) -> None:
 
 def test_next_state_play_force_discard(game: Infiltr8Game) -> None:
     state = game.initial_state(random_seed=42)
-    state = set_hand(state, 1, (infiltr8.FORCE_DISCARD_CARD,))
-    state = set_hand(state, 2, (infiltr8.PEEK_CARD,))
+    state = set_hand(state, 1, (Card.FORCE_DISCARD,))
+    state = set_hand(state, 2, (Card.PEEK,))
     state = replace(state, turn_phase=TurnPhase.PLAY)
 
-    action = Action(ActionType.PLAY, card=infiltr8.FORCE_DISCARD_CARD, player_id=2, guess_card=None)
+    action = Action(ActionType.PLAY, card=Card.FORCE_DISCARD, player_id=2, guess_card=None)
     new_state = game.next_state(state, action)
 
     assert len(new_state.players[2].hand) == 1
-    assert new_state.players[2].hand[0] != infiltr8.PEEK_CARD
+    assert new_state.players[2].hand[0] != Card.PEEK
     assert len(new_state.discard_pile) == 2  # FORCE_DISCARD_CARD and PEEK_CARD
     assert new_state.current_player_turn == 2
     assert new_state.turn_phase == TurnPhase.DRAW
@@ -258,15 +249,15 @@ def test_next_state_play_force_discard(game: Infiltr8Game) -> None:
 
 def test_next_state_play_swap(game: Infiltr8Game) -> None:
     state = game.initial_state(random_seed=42)
-    state = set_hand(state, 1, (infiltr8.SWAP_CARD,))
-    state = set_hand(state, 2, (infiltr8.PEEK_CARD,))
+    state = set_hand(state, 1, (Card.SWAP,))
+    state = set_hand(state, 2, (Card.PEEK,))
     state = replace(state, turn_phase=TurnPhase.PLAY)
 
-    action = Action(ActionType.PLAY, card=infiltr8.SWAP_CARD, player_id=2, guess_card=None)
+    action = Action(ActionType.PLAY, card=Card.SWAP, player_id=2, guess_card=None)
     new_state = game.next_state(state, action)
 
-    assert new_state.players[1].hand[0] == infiltr8.PEEK_CARD
-    assert new_state.players[2].hand[0] == infiltr8.SWAP_CARD
+    assert new_state.players[1].hand[0] == Card.PEEK
+    assert new_state.players[2].hand[0] == Card.SWAP
     assert new_state.current_player_turn == 2
     assert new_state.turn_phase == TurnPhase.DRAW
 
@@ -276,7 +267,7 @@ def test_serialize_action(serializer: Infiltr8Serializer) -> None:
     serialized = serializer.serialize_action(action)
     assert serialized == {"action_type": "DRAW", "card": None, "player_id": None, "guess_card": None}
 
-    action = Action(ActionType.PLAY, card=infiltr8.GUESS_CARD, player_id=2, guess_card=infiltr8.PEEK_CARD)
+    action = Action(ActionType.PLAY, card=Card.GUESS, player_id=2, guess_card=Card.PEEK)
     serialized = serializer.serialize_action(action)
     assert serialized == {"action_type": "PLAY", "card": "Guess", "player_id": 2, "guess_card": "Peek"}
 
@@ -288,7 +279,7 @@ def test_parse_action(game: Infiltr8Game, serializer: Infiltr8Serializer) -> Non
 
     action_data = {"action_type": "PLAY", "card": "Guess", "player_id": 2, "guess_card": "Peek"}
     parsed = serializer.parse_action(game, action_data)
-    assert parsed == Action(ActionType.PLAY, card=infiltr8.GUESS_CARD, player_id=2, guess_card=infiltr8.PEEK_CARD)
+    assert parsed == Action(ActionType.PLAY, card=Card.GUESS, player_id=2, guess_card=Card.PEEK)
 
 
 def test_serialize_state(game: Infiltr8Game, serializer: Infiltr8Serializer) -> None:
@@ -339,7 +330,7 @@ def test_distinct_legal_actions(game: Infiltr8Game) -> None:
     state = game.next_state(state, DRAW_ACTION)
 
     # Set the player's hand to have two identical GUESS cards
-    state = set_hand(state, 1, (infiltr8.GUESS_CARD, infiltr8.GUESS_CARD))
+    state = set_hand(state, 1, (Card.GUESS, Card.GUESS))
 
     legal_actions = game.legal_actions(state)
 
@@ -347,17 +338,17 @@ def test_distinct_legal_actions(game: Infiltr8Game) -> None:
     assert len(legal_actions) == 7  # One for each unique card that can be guessed (excluding GUESS)
 
     # Check that all actions are for GUESS card
-    assert all(action.card == infiltr8.GUESS_CARD for action in legal_actions)
+    assert all(action.card == Card.GUESS for action in legal_actions)
 
     # Check that we have one action for each unique card that can be guessed (excluding GUESS)
     guessed_cards = set(action.guess_card for action in legal_actions)
-    assert guessed_cards == set(card for card in infiltr8.UNIQUE_CARDS if card != infiltr8.GUESS_CARD)
+    assert guessed_cards == set(card for card in list(Card) if card != Card.GUESS)
 
     # Check that all actions are unique
     assert len(set(legal_actions)) == len(legal_actions)
 
     # Ensure GUESS is not in the guessable cards
-    assert not any(action.guess_card == infiltr8.GUESS_CARD for action in legal_actions)
+    assert not any(action.guess_card == Card.GUESS for action in legal_actions)
 
 
 def test_legal_actions_exclude_out_players(game_4p: Infiltr8Game) -> None:
@@ -365,7 +356,7 @@ def test_legal_actions_exclude_out_players(game_4p: Infiltr8Game) -> None:
     state = game_4p.next_state(state, DRAW_ACTION)
 
     # Set player 1's hand to GUESS card
-    state = set_hand(state, 1, (infiltr8.GUESS_CARD,))
+    state = set_hand(state, 1, (Card.GUESS,))
 
     # Set player 2 as out
     updated_player2 = replace(state.players[2], is_out=True)
@@ -390,7 +381,7 @@ def test_legal_actions_all_other_players_out(game_4p: Infiltr8Game) -> None:
     state = game_4p.next_state(state, DRAW_ACTION)
 
     # Set player 1's hand to GUESS card
-    state = set_hand(state, 1, (infiltr8.GUESS_CARD,))
+    state = set_hand(state, 1, (Card.GUESS,))
 
     # Player 2 & 4 are out.
     for player_id in [2, 4]:
@@ -402,7 +393,7 @@ def test_legal_actions_all_other_players_out(game_4p: Infiltr8Game) -> None:
 
     # Check that there are no legal actions for the GUESS card
     assert len(legal_actions) == 7
-    assert Action(ActionType.PLAY, infiltr8.GUESS_CARD, player_id=3, guess_card=infiltr8.PEEK_CARD) in legal_actions
-    assert Action(ActionType.PLAY, infiltr8.GUESS_CARD, player_id=1, guess_card=infiltr8.PEEK_CARD) not in legal_actions
-    assert Action(ActionType.PLAY, infiltr8.GUESS_CARD, player_id=2, guess_card=infiltr8.PEEK_CARD) not in legal_actions
-    assert Action(ActionType.PLAY, infiltr8.GUESS_CARD, player_id=4, guess_card=infiltr8.PEEK_CARD) not in legal_actions
+    assert Action(ActionType.PLAY, Card.GUESS, player_id=3, guess_card=Card.PEEK) in legal_actions
+    assert Action(ActionType.PLAY, Card.GUESS, player_id=1, guess_card=Card.PEEK) not in legal_actions
+    assert Action(ActionType.PLAY, Card.GUESS, player_id=2, guess_card=Card.PEEK) not in legal_actions
+    assert Action(ActionType.PLAY, Card.GUESS, player_id=4, guess_card=Card.PEEK) not in legal_actions
