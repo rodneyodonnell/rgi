@@ -34,7 +34,7 @@
 """
 
 from dataclasses import dataclass, replace
-from typing import Optional, Any, Iterator
+from typing import Optional, Any, Iterable, TypeVar, Hashable
 import random
 from enum import Enum
 from immutables import Map
@@ -48,6 +48,7 @@ TPlayerId = int
 class ActionType(Enum):
     DRAW = 1
     PLAY = 2
+    DISCARD = 3  # New action type
 
 
 # fmt: off
@@ -122,9 +123,11 @@ CARD_DESCRIPTIONS = {
     Card.LOSE: "Immediately lose if discarded",
 }
 
+T = TypeVar("T", bound=Hashable)
 
-def distinct_list(items: Iterator[Action]) -> list[Action]:
-    seen = set()
+
+def distinct_list(items: Iterable[T]) -> list[T]:
+    seen: set[T] = set()
     return [x for x in items if x not in seen and not seen.add(x)]  # type: ignore
 
 
@@ -172,7 +175,7 @@ class Infiltr8Game(Game[Infiltr8State, TPlayerId, Action]):
     def all_player_ids(self, state: Infiltr8State) -> list[TPlayerId]:
         return list(range(1, self.num_players + 1))
 
-    def _legal_play_actions_iter(self, state: Infiltr8State) -> Iterator[Action]:
+    def _legal_play_actions_iter(self, state: Infiltr8State) -> Iterable[Action]:
         turn_player = state.current_player_turn
         player_state = state.players[turn_player]
 
@@ -183,7 +186,7 @@ class Infiltr8Game(Game[Infiltr8State, TPlayerId, Action]):
                 yield Action(ActionType.PLAY, Card.CONDITIONAL_DISCARD, player_id=None, guess_card=None)
                 return
 
-        for action_card in player_state.hand:
+        for action_card in distinct_list(player_state.hand):
             if action_card == Card.GUESS:
                 for other_player in self.all_player_ids(state):
                     if (
@@ -229,7 +232,12 @@ class Infiltr8Game(Game[Infiltr8State, TPlayerId, Action]):
         if state.turn_phase == TurnPhase.DRAW:
             return [Action(action_type=ActionType.DRAW, card=None, player_id=None, guess_card=None)]
 
-        return distinct_list(self._legal_play_actions_iter(state))
+        play_actions = list(self._legal_play_actions_iter(state))
+        if play_actions:
+            return play_actions
+
+        # If no play actions are available, offer discard actions
+        return self._legal_discard_actions(state)
 
     @override
     def next_state(self, state: Infiltr8State, action: Action) -> Infiltr8State:
@@ -242,6 +250,8 @@ class Infiltr8Game(Game[Infiltr8State, TPlayerId, Action]):
             return self._handle_draw_action(state, action)
         if action.action_type == ActionType.PLAY:
             return self._handle_play_action(state, action)
+        if action.action_type == ActionType.DISCARD:
+            return self._handle_discard_action(state, action)
         raise ValueError(f"Unknown action type: {action.action_type}")
 
     def _handle_draw_action(self, state: Infiltr8State, _action: Action) -> Infiltr8State:
@@ -444,6 +454,50 @@ class Infiltr8Game(Game[Infiltr8State, TPlayerId, Action]):
             return description
         else:
             return str(action)
+
+    def _legal_discard_actions(self, state: Infiltr8State) -> list[Action]:
+        turn_player = state.current_player_turn
+        player_state = state.players[turn_player]
+
+        return [
+            Action(action_type=ActionType.DISCARD, card=card, player_id=None, guess_card=None)
+            for card in set(player_state.hand)
+        ]
+
+    def _handle_discard_action(self, state: Infiltr8State, action: Action) -> Infiltr8State:
+        turn_player = state.current_player_turn
+        player_state = state.players[turn_player]
+        discarded_card = action.card
+        if discarded_card is None:
+            raise ValueError("No card specified for Discard action")
+        if discarded_card not in player_state.hand:
+            raise ValueError(f"Cannot discard card {discarded_card} that is not in hand")
+
+        # Discard only one instance of the card
+        new_hand = list(player_state.hand)
+        new_hand.remove(discarded_card)
+        new_hand = tuple(new_hand)
+
+        if len(new_hand) == len(player_state.hand):
+            raise ValueError(f"Failed to discard card {discarded_card}")
+
+        new_player_state = replace(player_state, hand=new_hand)
+        new_players = state.players.set(turn_player, new_player_state)
+        new_discard_pile = state.discard_pile + (discarded_card,)
+
+        # Add the action to the log
+        action_description = f"Player {turn_player} discarded {CARD_NAMES[discarded_card]}"
+        new_action_log = state.action_log + (action_description,)
+
+        next_player = self._get_next_player(state)
+        return replace(
+            state,
+            players=new_players,
+            discard_pile=new_discard_pile,
+            current_player_turn=next_player,
+            turn_phase=TurnPhase.DRAW,
+            action_log=new_action_log,
+        )
 
 
 class Infiltr8Serializer(GameSerializer[Infiltr8Game, Infiltr8State, Action]):

@@ -397,3 +397,76 @@ def test_legal_actions_all_other_players_out(game_4p: Infiltr8Game) -> None:
     assert Action(ActionType.PLAY, Card.GUESS, player_id=1, guess_card=Card.PEEK) not in legal_actions
     assert Action(ActionType.PLAY, Card.GUESS, player_id=2, guess_card=Card.PEEK) not in legal_actions
     assert Action(ActionType.PLAY, Card.GUESS, player_id=4, guess_card=Card.PEEK) not in legal_actions
+
+
+def test_legal_actions_all_opponents_protected(game_4p: Infiltr8Game) -> None:
+    state = game_4p.initial_state(random_seed=123)
+    state = game_4p.next_state(state, DRAW_ACTION)
+
+    # Set player 1's hand to two different cards
+    state = set_hand(state, 1, (Card.GUESS, Card.PEEK))
+
+    # Set all other players as protected
+    for player_id in [2, 3, 4]:
+        updated_player = replace(state.players[player_id], is_protected=True)
+        updated_players = state.players.set(player_id, updated_player)
+        state = replace(state, players=updated_players)
+
+    legal_actions = game_4p.legal_actions(state)
+
+    # Check that we have two DISCARD actions, one for each card
+    assert len(legal_actions) == 2
+    assert Action(ActionType.DISCARD, Card.GUESS, player_id=None, guess_card=None) in legal_actions
+    assert Action(ActionType.DISCARD, Card.PEEK, player_id=None, guess_card=None) in legal_actions
+
+
+def test_handle_discard_action(game_4p: Infiltr8Game) -> None:
+    state = game_4p.initial_state(random_seed=123)
+    state = game_4p.next_state(state, DRAW_ACTION)
+
+    # Set player 1's hand to two different cards
+    initial_hand = (Card.GUESS, Card.PEEK)
+    state = set_hand(state, 1, initial_hand)
+
+    # Create a discard action
+    discard_action = Action(ActionType.DISCARD, Card.GUESS, player_id=None, guess_card=None)
+
+    # Apply the discard action
+    new_state = game_4p.next_state(state, discard_action)
+
+    # Check that only one card was discarded
+    assert new_state.players[1].hand == (Card.PEEK,)
+    assert new_state.discard_pile[-1] == Card.GUESS
+
+    # Check that the turn moved to the next player
+    assert new_state.current_player_turn == 2
+    assert new_state.turn_phase == TurnPhase.DRAW
+
+    # Check that the action was logged
+    assert new_state.action_log[-1] == f"Player 1 discarded {CARD_NAMES[Card.GUESS]}"
+
+
+def test_handle_discard_action_with_duplicate_cards(game_4p: Infiltr8Game) -> None:
+    state = game_4p.initial_state(random_seed=123)
+    state = game_4p.next_state(state, DRAW_ACTION)
+
+    # Set player 1's hand to two identical cards
+    initial_hand = (Card.GUESS, Card.GUESS)
+    state = set_hand(state, 1, initial_hand)
+
+    # Create a discard action
+    discard_action = Action(ActionType.DISCARD, Card.GUESS, player_id=None, guess_card=None)
+
+    # Apply the discard action
+    new_state = game_4p.next_state(state, discard_action)
+
+    # Check that only one card was discarded
+    assert new_state.players[1].hand == (Card.GUESS,)
+    assert new_state.discard_pile[-1] == Card.GUESS
+
+    # Check that the turn moved to the next player
+    assert new_state.current_player_turn == 2
+    assert new_state.turn_phase == TurnPhase.DRAW
+
+    # Check that the action was logged
+    assert new_state.action_log[-1] == f"Player 1 discarded {CARD_NAMES[Card.GUESS]}"

@@ -38,6 +38,8 @@ Tech stack:
 This is a list of tasks we are working on now or planning to work on soon.
 
 - Infiltr8: Show log of actions.
+- Infiltr8: Update player state based on actions (peek, etc.)
+- Infiltr8: Protection should not stop a player being targeted. So you are not forced to play superintelligence if all players are protected.
 - Infiltr8: Should only show things we know.
 - Infiltr8: Handle case where no actionsa are legal (opponents all protected)
 - Expand games: not board
