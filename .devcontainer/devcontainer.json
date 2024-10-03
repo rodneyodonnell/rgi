@@ -37,7 +37,8 @@
                 "prettier.prettier-vscode",
                 "ms-python.vscode-pylance",
                 "ms-python.pylint",
-                "ms-python.mypy-type-checker"
+                "ms-python.mypy-type-checker",
+                "bcanzanella.openmatchingfiles"
             ]
         }
     }
