@@ -3,7 +3,7 @@ from typing import Literal
 
 import pytest
 
-from rgi.games.connect4 import Connect4Game
+from rgi.games.connect4 import Connect4Game, Connect4State
 
 TPlayerId = Literal[1, 2]
 

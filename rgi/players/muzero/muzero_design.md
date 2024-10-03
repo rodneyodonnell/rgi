@@ -113,7 +113,7 @@ Description: Develop a StateEmbedder for Connect4 that converts game states into
 
 Code Entry Points:
 
-File: `rgi/games/connect4/connect4_state_embedder.py`
+File: `rgi/games/connect4/connect4_embeddings.py`
 
 Subtasks:
 
@@ -124,16 +124,16 @@ import jax.numpy as jnp
 from rgi.core.base import StateEmbedder
 from typing import Any
 
-class Connect4StateEmbedder(StateEmbedder[Connect4State, jnp.ndarray]):
+class Connect4StateEmbedder(StateEmbedder[Connect4State, jax.Array]):
     def __init__(self, cnn_model: Any):
         self.cnn_model = cnn_model
 
-    def embed_state(self, params: dict, state: Connect4State) -> jnp.ndarray:
+    def embed_state(self, params: dict, state: Connect4State) -> jax.Array:
         board_tensor = self._state_to_tensor(state)
         embedding = self.cnn_model.apply(params['cnn_model'], board_tensor)
         return embedding
 
-    def _state_to_tensor(self, state: Connect4State) -> jnp.ndarray:
+    def _state_to_tensor(self, state: Connect4State) -> jax.Array:
         board_array = jnp.zeros((6, 7), dtype=jnp.float32)
         for (row, col), value in state.board.items():
             board_array = board_array.at[row - 1, col - 1].set(1.0 if value == 1 else -1.0)
@@ -176,42 +176,26 @@ Acceptance Criteria:
 
 ##### Task 2: Implement Connect4ActionEmbedder
 
-Description: Develop an ActionEmbedder for Connect4 that converts actions into embeddings.
+Description: Develop an ActionEmbedder for Connect4 that converts actions into learned, fixed-dimensional embeddings.
 
 Code Entry Points:
 
-File: `rgi/games/connect4/connect4_action_embedder.py`
+File: `rgi/games/connect4/connect4_embeddings.py`
 
 Subtasks:
 
-a. Implement the Connect4ActionEmbedder class:
+a. Implement the Connect4ActionEmbedder class as a Flax Module:
 
 ```python
-class Connect4ActionEmbedder(ActionEmbedder[TAction, jnp.ndarray]):
-    def __init__(self, embedding_dim: int = 64):
-        self.embedding_dim = embedding_dim
-        self.action_embedding_matrix = jnp.eye(7, self.embedding_dim)  # For Connect4 with 7 actions
+from flax import linen as nn
 
-    def embed_action(self, action: TAction) -> jnp.ndarray:
-        return self.action_embedding_matrix[action - 1]
+class Connect4ActionEmbedder(nn.Module):
+    embedding_dim: int = 64
 
-    def get_embedding_dim(self) -> int:
-        return self.embedding_dim
-```
-
-b. Alternatively, define an embedding layer:
-
-```python
-class Connect4ActionEmbedder(ActionEmbedder[TAction, jnp.ndarray]):
-    def __init__(self, embedding_dim: int = 64):
-        self.embedding_layer = nn.Embed(num_embeddings=7, features=embedding_dim)
-
-    def embed_action(self, params: dict, action: TAction) -> jnp.ndarray:
-        action_index = action - 1  # Actions are columns 1-7
-        return self.embedding_layer.apply(params['action_embedder'], action_index)
-
-    def get_embedding_dim(self) -> int:
-        return self.embedding_layer.features
+    @nn.compact
+    def __call__(self, action: int):
+        action_embedding = nn.Embed(num_embeddings=7, features=self.embedding_dim)(action - 1)
+        return action_embedding
 ```
 
 Testing Criteria:
@@ -252,7 +236,7 @@ class MuZeroModel(nn.Module):
         
         if action is not None:
             # Get action embedding
-            action_embedding = self.action_embedder.embed_action(action)
+            action_embedding = self.action_embedder(action)
             # Dynamics model
             x = jnp.concatenate([state_embedding, action_embedding], axis=-1)
             x = nn.Dense(128)(x)
@@ -269,7 +253,7 @@ class MuZeroModel(nn.Module):
         # Policy model (Two-Tower approach)
         # Compute dot product between state embedding and all action embeddings
         all_actions = range(1, 8)  # Actions are columns 1-7
-        all_action_embeddings = jnp.stack([self.action_embedder.embed_action(a) for a in all_actions])
+        all_action_embeddings = jnp.stack([self.action_embedder(a) for a in all_actions])
         logits = jnp.dot(all_action_embeddings, state_embedding)
 
         return next_state_embedding, reward, logits
@@ -449,16 +433,16 @@ b. Implement the Transformer model using Flax:
 c. Create the TransformerStateEmbedder class:
 
 ```python
-class TransformerStateEmbedder(StateEmbedder[Any, jnp.ndarray]):
+class TransformerStateEmbedder(StateEmbedder[Any, jax.Array]):
     def __init__(self, transformer_model: nn.Module):
         self.transformer_model = transformer_model
 
-    def embed_state(self, params: dict, state: Any) -> jnp.ndarray:
+    def embed_state(self, params: dict, state: Any) -> jax.Array:
         tokenized_state = self._tokenize_state(state)
         embedding = self.transformer_model.apply(params['transformer_model'], tokenized_state)
         return embedding
 
-    def _tokenize_state(self, state: Any) -> jnp.ndarray:
+    def _tokenize_state(self, state: Any) -> jax.Array:
         # Implement tokenization logic
         pass
 
@@ -493,16 +477,16 @@ b. Implement the Transformer model or adapt the state embedder to handle actions
 c. Create the TransformerActionEmbedder class:
 
 ```python
-class TransformerActionEmbedder(ActionEmbedder[Any, jnp.ndarray]):
+class TransformerActionEmbedder(ActionEmbedder[Any, jax.Array]):
     def __init__(self, transformer_model: nn.Module):
         self.transformer_model = transformer_model
 
-    def embed_action(self, params: dict, action: Any) -> jnp.ndarray:
+    def embed_action(self, params: dict, action: Any) -> jax.Array:
         tokenized_action = self._tokenize_action(action)
         embedding = self.transformer_model.apply(params['transformer_model'], tokenized_action)
         return embedding
 
-    def _tokenize_action(self, action: Any) -> jnp.ndarray:
+    def _tokenize_action(self, action: Any) -> jax.Array:
         # Implement tokenization logic
         pass
 

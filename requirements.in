@@ -14,6 +14,7 @@ tensorflow
 numpy
 jupyter
 immutables
+flax
 
 # Frontend
 fastapi==0.114.1

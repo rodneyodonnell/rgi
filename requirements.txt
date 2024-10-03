@@ -6,7 +6,10 @@
 #
 absl-py==2.1.0
     # via
+    #   chex
     #   keras
+    #   optax
+    #   orbax-checkpoint
     #   tensorboard
     #   tensorflow
 annotated-types==0.7.0
@@ -55,6 +58,8 @@ cffi==1.17.1
     # via argon2-cffi-bindings
 charset-normalizer==3.3.2
     # via requests
+chex==0.1.87
+    # via optax
 click==8.1.7
     # via
     #   pip-tools
@@ -71,6 +76,10 @@ defusedxml==0.7.1
     # via nbconvert
 dill==0.3.8
     # via pylint
+etils[epath,epy]==1.9.4
+    # via
+    #   optax
+    #   orbax-checkpoint
 execnet==2.1.1
     # via pytest-xdist
 executing==2.1.0
@@ -81,8 +90,12 @@ fastjsonschema==2.20.0
     # via nbformat
 flatbuffers==24.3.25
     # via tensorflow
+flax==0.9.0
+    # via -r requirements.in
 fqdn==1.5.1
     # via jsonschema
+fsspec==2024.9.0
+    # via etils
 gast==0.6.0
     # via tensorflow
 google-pasta==0.2.0
@@ -108,6 +121,8 @@ httptools==0.6.1
     # via uvicorn
 httpx==0.27.2
     # via jupyterlab
+humanize==4.10.0
+    # via orbax-checkpoint
 idna==3.10
     # via
     #   anyio
@@ -117,6 +132,8 @@ idna==3.10
     #   trio
 immutables==0.20
     # via -r requirements.in
+importlib-resources==6.4.5
+    # via etils
 iniconfig==2.0.0
     # via pytest
 ipykernel==6.29.5
@@ -135,6 +152,18 @@ isoduration==20.11.0
     # via jsonschema
 isort==5.13.2
     # via pylint
+jax==0.4.33
+    # via
+    #   chex
+    #   flax
+    #   optax
+    #   orbax-checkpoint
+jaxlib==0.4.33
+    # via
+    #   chex
+    #   jax
+    #   optax
+    #   orbax-checkpoint
 jedi==0.19.1
     # via ipython
 jinja2==3.1.4
@@ -225,8 +254,15 @@ mistune==3.0.2
     # via nbconvert
 ml-dtypes==0.4.1
     # via
+    #   jax
+    #   jaxlib
     #   keras
     #   tensorflow
+    #   tensorstore
+msgpack==1.1.0
+    # via
+    #   flax
+    #   orbax-checkpoint
 mypy==1.11.2
     # via -r requirements.in
 mypy-extensions==1.0.0
@@ -245,7 +281,9 @@ nbformat==5.10.4
     #   nbclient
     #   nbconvert
 nest-asyncio==1.6.0
-    # via ipykernel
+    # via
+    #   ipykernel
+    #   orbax-checkpoint
 notebook==7.2.2
     # via jupyter
 notebook-shim==0.2.4
@@ -255,16 +293,30 @@ notebook-shim==0.2.4
 numpy==1.26.4
     # via
     #   -r requirements.in
+    #   chex
+    #   flax
     #   h5py
+    #   jax
+    #   jaxlib
     #   keras
     #   ml-dtypes
     #   opt-einsum
+    #   optax
+    #   orbax-checkpoint
+    #   scipy
     #   tensorboard
     #   tensorflow
+    #   tensorstore
 opt-einsum==3.3.0
-    # via tensorflow
+    # via
+    #   jax
+    #   tensorflow
+optax==0.2.3
+    # via flax
 optree==0.12.1
     # via keras
+orbax-checkpoint==0.6.4
+    # via flax
 outcome==1.3.0.post0
     # via trio
 overrides==7.7.0
@@ -308,6 +360,7 @@ prompt-toolkit==3.0.48
     #   jupyter-console
 protobuf==4.25.5
     # via
+    #   orbax-checkpoint
     #   tensorboard
     #   tensorflow
 psutil==6.0.0
@@ -372,7 +425,9 @@ python-slugify==8.0.4
     # via pytest-playwright
 pyyaml==6.0.2
     # via
+    #   flax
     #   jupyter-events
+    #   orbax-checkpoint
     #   uvicorn
 pyzmq==26.2.0
     # via
@@ -400,11 +455,17 @@ rfc3986-validator==0.1.1
     #   jsonschema
     #   jupyter-events
 rich==13.8.1
-    # via keras
+    # via
+    #   flax
+    #   keras
 rpds-py==0.20.0
     # via
     #   jsonschema
     #   referencing
+scipy==1.14.1
+    # via
+    #   jax
+    #   jaxlib
 selenium==4.24.0
     # via -r requirements.in
 send2trash==1.8.3
@@ -440,6 +501,10 @@ tensorflow==2.17.0
     # via -r requirements.in
 tensorflow-io-gcs-filesystem==0.37.1
     # via tensorflow
+tensorstore==0.1.66
+    # via
+    #   flax
+    #   orbax-checkpoint
 termcolor==2.4.0
     # via tensorflow
 terminado==0.18.1
@@ -452,6 +517,8 @@ tinycss2==1.3.0
     # via nbconvert
 tomlkit==0.13.2
     # via pylint
+toolz==0.12.1
+    # via chex
 tornado==6.4.1
     # via
     #   ipykernel
@@ -486,10 +553,14 @@ types-python-dateutil==2.9.0.20240906
     # via arrow
 typing-extensions==4.12.2
     # via
+    #   chex
+    #   etils
     #   fastapi
+    #   flax
     #   ipython
     #   mypy
     #   optree
+    #   orbax-checkpoint
     #   pydantic
     #   pydantic-core
     #   pyee
@@ -535,6 +606,8 @@ wrapt==1.16.0
     # via tensorflow
 wsproto==1.2.0
     # via trio-websocket
+zipp==3.20.2
+    # via etils
 
 # The following packages are considered to be unsafe in a requirements file:
 # pip
