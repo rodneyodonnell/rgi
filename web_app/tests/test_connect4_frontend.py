@@ -15,7 +15,10 @@ def game_page(page: Page) -> Page:
 
 
 def custom_game_page(
-    page: Page, timeout_ms: int = 500, player1_type: str = "human", player2_type: str = "human"
+    page: Page,
+    timeout_ms: int = 500,
+    player1_type: str = "human",
+    player2_type: str = "human",
 ) -> Page:
     page.set_default_timeout(timeout_ms)
     expect.set_options(timeout=timeout_ms)

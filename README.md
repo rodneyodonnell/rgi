@@ -93,7 +93,7 @@ pytest web_app/tests/test_connect4_frontend.py -v --headed
 # Manually Run linters
 ```
 mypy .
-pylint .
+pylint --rcfile=pyproject.toml $(git ls-files '*.py')
 yarn eslint 'web_app/static/**/*.ts'
 yarn tsc --noEmit
 ```

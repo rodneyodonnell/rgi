@@ -38,8 +38,21 @@
                 "ms-python.vscode-pylance",
                 "ms-python.pylint",
                 "ms-python.mypy-type-checker",
-                "bcanzanella.openmatchingfiles"
-            ]
+                "bcanzanella.openmatchingfiles",
+                "ms-python.debugpy"
+            ],
+            "settings": {
+                "editor.formatOnSave": true,
+                "[python]": {
+                    "editor.codeActionsOnSave": {
+                        "source.organizeImports": "explicit"
+                    },
+                    "editor.defaultFormatter": "ms-python.black-formatter"
+                },
+                "python.analysis.typeCheckingMode": "basic",
+                "pylint.enabled": true
+            }
         }
-    }
+    },
+    "postCreateCommand": "pip install black pylint mypy debugpy"
 }

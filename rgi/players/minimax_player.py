@@ -7,7 +7,12 @@ TPlayerState = Literal[None]
 
 
 class MinimaxPlayer(Player[TGameState, TPlayerState, TAction]):
-    def __init__(self, game: Game[TGameState, TPlayerId, TAction], player_id: TPlayerId, max_depth: int = 4):
+    def __init__(
+        self,
+        game: Game[TGameState, TPlayerId, TAction],
+        player_id: TPlayerId,
+        max_depth: int = 4,
+    ):
         self.game = game
         self.player_id = player_id
         self.max_depth = max_depth

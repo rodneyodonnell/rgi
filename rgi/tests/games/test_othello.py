@@ -199,7 +199,10 @@ def test_corner_capture(game: OthelloGame) -> None:
 def test_no_flip_move(game: OthelloGame) -> None:
     # Attempting to make a move that doesn't flip any discs
     state = game.initial_state()
-    illegal_action: TPosition = (1, 1)  # An empty corner at the start, which doesn't flip any discs
+    illegal_action: TPosition = (
+        1,
+        1,
+    )  # An empty corner at the start, which doesn't flip any discs
     with pytest.raises(ValueError):
         game.next_state(state, illegal_action)
 
@@ -209,7 +212,10 @@ def test_full_board_playthrough(game: OthelloGame) -> None:
     state = game.initial_state()
     player1: RandomPlayer[OthelloState, TAction] = RandomPlayer()
     player2: RandomPlayer[OthelloState, TAction] = RandomPlayer()
-    players: dict[TPlayerId, RandomPlayer[OthelloState, TAction]] = {1: player1, 2: player2}
+    players: dict[TPlayerId, RandomPlayer[OthelloState, TAction]] = {
+        1: player1,
+        2: player2,
+    }
 
     while not game.is_terminal(state):
         current_player_id = game.current_player_id(state)

@@ -35,7 +35,10 @@ def player(game: Game[Any, Any, int]) -> HumanPlayer[Game[Any, Any, int], Any, i
     ],
 )
 def test_select_action(
-    game: Game[Any, Any, int], player: HumanPlayer[Game[Any, Any, int], Any, int], user_input: str, expected_action: int
+    game: Game[Any, Any, int],
+    player: HumanPlayer[Game[Any, Any, int], Any, int],
+    user_input: str,
+    expected_action: int,
 ) -> None:
     with patch("builtins.input", return_value=user_input):
         action = player.select_action(None, game.legal_actions(None))

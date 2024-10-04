@@ -177,7 +177,15 @@ def test_action_conditional_discard_4p(game_4p: Infiltr8Game, card2: Card, is_fo
         assert len(legal_actions) == 1
     else:
         assert len(legal_actions) > 1
-    assert Action(ActionType.PLAY, card=Card.CONDITIONAL_DISCARD, player_id=None, guess_card=None) in legal_actions
+    assert (
+        Action(
+            ActionType.PLAY,
+            card=Card.CONDITIONAL_DISCARD,
+            player_id=None,
+            guess_card=None,
+        )
+        in legal_actions
+    )
 
 
 def test_next_state_draw(game: Infiltr8Game) -> None:
@@ -265,19 +273,39 @@ def test_next_state_play_swap(game: Infiltr8Game) -> None:
 def test_serialize_action(serializer: Infiltr8Serializer) -> None:
     action = Action(ActionType.DRAW, card=None, player_id=None, guess_card=None)
     serialized = serializer.serialize_action(action)
-    assert serialized == {"action_type": "DRAW", "card": None, "player_id": None, "guess_card": None}
+    assert serialized == {
+        "action_type": "DRAW",
+        "card": None,
+        "player_id": None,
+        "guess_card": None,
+    }
 
     action = Action(ActionType.PLAY, card=Card.GUESS, player_id=2, guess_card=Card.PEEK)
     serialized = serializer.serialize_action(action)
-    assert serialized == {"action_type": "PLAY", "card": "Hack", "player_id": 2, "guess_card": "Scan"}
+    assert serialized == {
+        "action_type": "PLAY",
+        "card": "Hack",
+        "player_id": 2,
+        "guess_card": "Scan",
+    }
 
 
 def test_parse_action(game: Infiltr8Game, serializer: Infiltr8Serializer) -> None:
-    action_data: dict[str, Any] = {"action_type": "DRAW", "card": None, "player_id": None, "guess_card": None}
+    action_data: dict[str, Any] = {
+        "action_type": "DRAW",
+        "card": None,
+        "player_id": None,
+        "guess_card": None,
+    }
     parsed = serializer.parse_action(game, action_data)
     assert parsed == Action(ActionType.DRAW, card=None, player_id=None, guess_card=None)
 
-    action_data = {"action_type": "PLAY", "card": "Hack", "player_id": 2, "guess_card": "Scan"}
+    action_data = {
+        "action_type": "PLAY",
+        "card": "Hack",
+        "player_id": 2,
+        "guess_card": "Scan",
+    }
     parsed = serializer.parse_action(game, action_data)
     assert parsed == Action(ActionType.PLAY, card=Card.GUESS, player_id=2, guess_card=Card.PEEK)
 

@@ -76,7 +76,13 @@ class OthelloGame(Game[OthelloState, TPlayerId, TAction]):
                 legal_moves.append(position)
         return legal_moves
 
-    def _would_flip(self, state: OthelloState, position: TPosition, player: TPlayerId, opponent: TPlayerId) -> bool:
+    def _would_flip(
+        self,
+        state: OthelloState,
+        position: TPosition,
+        player: TPlayerId,
+        opponent: TPlayerId,
+    ) -> bool:
         for delta_row, delta_col in self.directions:
             row, col = position
             row += delta_row
@@ -132,7 +138,11 @@ class OthelloGame(Game[OthelloState, TPlayerId, TAction]):
         return OthelloState(board=new_board, current_player=next_player, is_terminal=is_terminal)
 
     def _get_positions_to_flip(
-        self, state: OthelloState, position: TPosition, player: TPlayerId, opponent: TPlayerId
+        self,
+        state: OthelloState,
+        position: TPosition,
+        player: TPlayerId,
+        opponent: TPlayerId,
     ) -> list[TPosition]:
         positions_to_flip = []
 

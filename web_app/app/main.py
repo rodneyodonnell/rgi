@@ -60,7 +60,10 @@ async def create_game(request: Request) -> dict[str, Any]:
     game_options: dict[str, Any] = data.get("game_options", {})
     player_options: dict[int, dict[str, Any]] = {int(k): v for k, v in data.get("player_options", {}).items()}
     logger.info(
-        "Creating new game. Type: %s, Game Options: %s, Player Options: %s", game_type, game_options, player_options
+        "Creating new game. Type: %s, Game Options: %s, Player Options: %s",
+        game_type,
+        game_options,
+        player_options,
     )
 
     registry_entry = GAME_REGISTRY.get(game_type)
@@ -88,7 +91,12 @@ async def create_game(request: Request) -> dict[str, Any]:
         "game_options": game_options,
         "player_options": player_options,
     }
-    logger.info("New game created. ID: %d, Game Options: %s, Player Options: %s", game_id, game_options, player_options)
+    logger.info(
+        "New game created. ID: %d, Game Options: %s, Player Options: %s",
+        game_id,
+        game_options,
+        player_options,
+    )
     return {"game_id": game_id, "game_type": game_type}
 
 

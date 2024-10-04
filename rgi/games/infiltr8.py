@@ -183,7 +183,12 @@ class Infiltr8Game(Game[Infiltr8State, TPlayerId, Action]):
         hand_effects = set(player_state.hand)
         if Card.CONDITIONAL_DISCARD in hand_effects:
             if Card.FORCE_DISCARD in hand_effects or Card.SWAP in hand_effects:
-                yield Action(ActionType.PLAY, Card.CONDITIONAL_DISCARD, player_id=None, guess_card=None)
+                yield Action(
+                    ActionType.PLAY,
+                    Card.CONDITIONAL_DISCARD,
+                    player_id=None,
+                    guess_card=None,
+                )
                 return
 
         for action_card in distinct_list(player_state.hand):
@@ -201,7 +206,12 @@ class Infiltr8Game(Game[Infiltr8State, TPlayerId, Action]):
                                 player_id=other_player,
                                 guess_card=guess_card,
                             )
-            elif action_card in (Card.PEEK, Card.COMPARE, Card.SWAP, Card.FORCE_DISCARD):
+            elif action_card in (
+                Card.PEEK,
+                Card.COMPARE,
+                Card.SWAP,
+                Card.FORCE_DISCARD,
+            ):
                 for other_player in self.all_player_ids(state):
                     if (
                         other_player != turn_player
@@ -209,10 +219,18 @@ class Infiltr8Game(Game[Infiltr8State, TPlayerId, Action]):
                         and not state.players[other_player].is_out
                     ):
                         yield Action(
-                            action_type=ActionType.PLAY, card=action_card, player_id=other_player, guess_card=None
+                            action_type=ActionType.PLAY,
+                            card=action_card,
+                            player_id=other_player,
+                            guess_card=None,
                         )
             elif action_card in (Card.PROTECT, Card.CONDITIONAL_DISCARD, Card.LOSE):
-                yield Action(action_type=ActionType.PLAY, card=action_card, player_id=None, guess_card=None)
+                yield Action(
+                    action_type=ActionType.PLAY,
+                    card=action_card,
+                    player_id=None,
+                    guess_card=None,
+                )
             else:
                 raise ValueError(f"Unknown card effect: {action_card}")
 
@@ -230,7 +248,14 @@ class Infiltr8Game(Game[Infiltr8State, TPlayerId, Action]):
             raise NotImplementedError(f"Pending action not implemented yet for {state.pending_action}")
 
         if state.turn_phase == TurnPhase.DRAW:
-            return [Action(action_type=ActionType.DRAW, card=None, player_id=None, guess_card=None)]
+            return [
+                Action(
+                    action_type=ActionType.DRAW,
+                    card=None,
+                    player_id=None,
+                    guess_card=None,
+                )
+            ]
 
         play_actions = list(self._legal_play_actions_iter(state))
         if play_actions:
@@ -446,6 +471,8 @@ class Infiltr8Game(Game[Infiltr8State, TPlayerId, Action]):
         if action.action_type == ActionType.DRAW:
             return f"Player {player_id} drew a card"
         elif action.action_type == ActionType.PLAY:
+            if action.card is None:
+                raise ValueError("No card specified for Play action")
             description = f"Player {player_id} played {CARD_NAMES[action.card]}"
             if action.player_id is not None:
                 description += f" on Player {action.player_id}"
@@ -460,7 +487,12 @@ class Infiltr8Game(Game[Infiltr8State, TPlayerId, Action]):
         player_state = state.players[turn_player]
 
         return [
-            Action(action_type=ActionType.DISCARD, card=card, player_id=None, guess_card=None)
+            Action(
+                action_type=ActionType.DISCARD,
+                card=card,
+                player_id=None,
+                guess_card=None,
+            )
             for card in set(player_state.hand)
         ]
 
@@ -474,9 +506,9 @@ class Infiltr8Game(Game[Infiltr8State, TPlayerId, Action]):
             raise ValueError(f"Cannot discard card {discarded_card} that is not in hand")
 
         # Discard only one instance of the card
-        new_hand = list(player_state.hand)
-        new_hand.remove(discarded_card)
-        new_hand = tuple(new_hand)
+        new_hand_list = list(player_state.hand)
+        new_hand_list.remove(discarded_card)
+        new_hand = tuple(new_hand_list)
 
         if len(new_hand) == len(player_state.hand):
             raise ValueError(f"Failed to discard card {discarded_card}")
@@ -507,7 +539,11 @@ class Infiltr8Serializer(GameSerializer[Infiltr8Game, Infiltr8State, Action]):
             "current_player": state.current_player_turn,
             "deck_size": len(state.deck),
             "discard_pile": [
-                {"name": CARD_NAMES[card], "value": card.value, "description": CARD_DESCRIPTIONS[card]}
+                {
+                    "name": CARD_NAMES[card],
+                    "value": card.value,
+                    "description": CARD_DESCRIPTIONS[card],
+                }
                 for card in state.discard_pile[-3:]
             ],
             "players": {
@@ -515,7 +551,11 @@ class Infiltr8Serializer(GameSerializer[Infiltr8Game, Infiltr8State, Action]):
                     "is_protected": player_state.is_protected,
                     "is_out": player_state.is_out,
                     "hand": [
-                        {"name": CARD_NAMES[card], "description": CARD_DESCRIPTIONS[card]} for card in player_state.hand
+                        {
+                            "name": CARD_NAMES[card],
+                            "description": CARD_DESCRIPTIONS[card],
+                        }
+                        for card in player_state.hand
                     ],
                 }
                 for player_id, player_state in state.players.items()
@@ -536,7 +576,13 @@ class Infiltr8Serializer(GameSerializer[Infiltr8Game, Infiltr8State, Action]):
     def parse_action(self, game: Infiltr8Game, action_data: dict[str, Any]) -> Action:
         return Action(
             action_type=ActionType[action_data["action_type"]],
-            card=next((effect for effect, name in CARD_NAMES.items() if name == action_data["card"]), None),
+            card=next(
+                (effect for effect, name in CARD_NAMES.items() if name == action_data["card"]),
+                None,
+            ),
             player_id=action_data["player_id"],
-            guess_card=next((effect for effect, name in CARD_NAMES.items() if name == action_data["guess_card"]), None),
+            guess_card=next(
+                (effect for effect, name in CARD_NAMES.items() if name == action_data["guess_card"]),
+                None,
+            ),
         )

@@ -1,7 +1,7 @@
 import argparse
 from typing import Literal, Any
 from collections import defaultdict
-from rgi.core.base import Game, Player, TGameState, TPlayerId, TAction
+from rgi.core.base import Game, Player, TPlayerId
 from rgi.core import game_registry
 from rgi.players.random_player import RandomPlayer
 from rgi.players.minimax_player import MinimaxPlayer
@@ -43,12 +43,12 @@ def parse_args() -> argparse.Namespace:
 def create_player(player_type: PlayerType, game: Game[Any, Any, Any], player_id: int) -> Player[Any, Any, Any]:
     if player_type == "random":
         return RandomPlayer()
-    elif player_type == "minimax":
+    if player_type == "minimax":
         return MinimaxPlayer(game, player_id)
-    elif player_type == "human":
+    if player_type == "human":
         return HumanPlayer(game)
-    else:
-        raise ValueError(f"Unknown player type: {player_type}")
+
+    raise ValueError(f"Unknown player type: {player_type}")
 
 
 def print_aggregate_stats(stats: list[dict[str, list[int] | int]], num_games: int) -> None:
@@ -73,7 +73,7 @@ def print_aggregate_stats(stats: list[dict[str, list[int] | int]], num_games: in
 
 
 def run_games(
-    game: Game[TGameState, TPlayerId, TAction],
+    game: Game[Any, TPlayerId, Any],
     players: dict[TPlayerId, Player[Any, Any, Any]],
     num_games: int,
 ) -> None:

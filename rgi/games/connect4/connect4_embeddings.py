@@ -1,12 +1,16 @@
+from typing import Any
+from typing_extensions import override
+
 import jax
 import jax.numpy as jnp
 from flax import linen as nn
 from flax.typing import FrozenVariableDict
 from rgi.core.base import StateEmbedder, ActionEmbedder
-from rgi.games.connect4.connect4 import Connect4State
-from typing import Any, Dict
+from rgi.games.connect4.connect4 import Connect4State, TAction
 
 TJaxParams = FrozenVariableDict | dict[str, Any]
+TEmbedding = jax.Array
+
 
 class Connect4CNN(nn.Module):
     embedding_dim: int = 64
@@ -21,40 +25,47 @@ class Connect4CNN(nn.Module):
         x = nn.Dense(features=self.embedding_dim)(x)
         return x
 
-class Connect4StateEmbedder(StateEmbedder[Connect4State, jax.Array]):
+
+class Connect4StateEmbedder(StateEmbedder[Connect4State, TEmbedding]):
     def __init__(self, cnn_model: Connect4CNN):
         self.cnn_model = cnn_model
 
-    def embed_state(self, params: Dict[str, Any], state: Connect4State) -> jax.Array:
+    @override
+    def embed_state(self, params: dict[str, Any], state: Connect4State) -> TEmbedding:
         if not isinstance(state, Connect4State):
             raise ValueError("Input must be a Connect4State")
         board_array = self._state_to_array(state)
         board_batch = board_array[jnp.newaxis, ..., jnp.newaxis]
-        embedding = self.cnn_model.apply(params['cnn_model'], board_batch)
+        embedding = self.cnn_model.apply(params["cnn_model"], board_batch)
         if not isinstance(embedding, jax.Array):
             raise TypeError(f"Expected jax.Array, got {type(embedding)}")
         return embedding
 
-    def _state_to_array(self, state: Connect4State) -> jax.Array:
+    def _state_to_array(self, state: Connect4State) -> TEmbedding:
         board_array = jnp.zeros((6, 7), dtype=jnp.float32)
         for (row, col), value in state.board.items():
             board_array = board_array.at[row - 1, col - 1].set(1.0 if value == 1 else -1.0)
         return board_array
 
+    @override
     def get_embedding_dim(self) -> int:
         return self.cnn_model.embedding_dim
 
-class Connect4ActionEmbedder(nn.Module):
+
+class Connect4ActionEmbedder(ActionEmbedder[TAction, TEmbedding], nn.Module):
     embedding_dim: int = 64
     num_actions: int = 7
 
     @nn.compact
     def __call__(self, action: jax.Array) -> jax.Array:
-        action_embeddings = self.param('action_embeddings',
-                                       nn.initializers.normal(stddev=0.02),
-                                       (self.num_actions, self.embedding_dim))
+        action_embeddings = self.param(
+            "action_embeddings",
+            nn.initializers.normal(stddev=0.02),
+            (self.num_actions, self.embedding_dim),
+        )
         return action_embeddings[action]
 
+    @override
     def embed_action(self, params: TJaxParams, action: int) -> jax.Array:
         if not 1 <= action <= self.num_actions:
             raise ValueError(f"Action must be between 1 and {self.num_actions}")
@@ -62,6 +73,7 @@ class Connect4ActionEmbedder(nn.Module):
         if not isinstance(embedding, jax.Array):
             raise TypeError(f"Expected jax.Array, got {type(embedding)}")
         return embedding
-    
+
+    @override
     def get_embedding_dim(self) -> int:
         return self.embedding_dim

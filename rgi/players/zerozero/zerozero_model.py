@@ -1,12 +1,21 @@
+from typing import Any, Generic
 import jax
 import jax.numpy as jnp
 from flax import linen as nn
-from typing import Any, Dict, Optional, Tuple, Generic, Literal
-from rgi.core.base import StateEmbedder, ActionEmbedder, TGameState, TPlayerState, TAction
+from rgi.core.base import (
+    StateEmbedder,
+    ActionEmbedder,
+    TGameState,
+    TPlayerState,
+    TAction,
+)
+
+# pylint: disable=attribute-defined-outside-init  # vars are defined in setup() for flax code.
 
 TEmbedding = jax.Array
 
-class ZeroZeroModel(nn.Module, Generic[TGameState, TPlayerState, TAction]):
+
+class ZeroZeroModel(Generic[TGameState, TPlayerState, TAction], nn.Module):
     state_embedder: StateEmbedder[TGameState, TEmbedding]
     action_embedder: ActionEmbedder[TAction, TEmbedding]
     possible_actions: list[TAction]
@@ -14,33 +23,17 @@ class ZeroZeroModel(nn.Module, Generic[TGameState, TPlayerState, TAction]):
     hidden_dim: int = 128
     shared_dim: int = 256
 
-    def setup(self):
-        self.shared_layer: nn.Module = nn.Sequential([
-            nn.Dense(self.shared_dim),
-            nn.relu
-        ])
-
-        self.dynamics_head: nn.Module = nn.Sequential([
-            nn.Dense(self.hidden_dim),
-            nn.relu,
-            nn.Dense(self.embedding_dim)
-        ])
-
-        self.reward_head: nn.Module = nn.Sequential([
-            nn.Dense(self.hidden_dim),
-            nn.relu,
-            nn.Dense(1)
-        ])
-
-        self.policy_head: nn.Module = nn.Sequential([
-            nn.Dense(self.hidden_dim),
-            nn.relu,
-            nn.Dense(self.embedding_dim)
-        ])
+    def setup(self) -> None:
+        self.shared_layer: nn.Module = nn.Sequential([nn.Dense(self.shared_dim), nn.relu])
+        self.dynamics_head: nn.Module = nn.Sequential(
+            [nn.Dense(self.hidden_dim), nn.relu, nn.Dense(self.embedding_dim)]
+        )
+        self.reward_head: nn.Module = nn.Sequential([nn.Dense(self.hidden_dim), nn.relu, nn.Dense(1)])
+        self.policy_head: nn.Module = nn.Sequential([nn.Dense(self.hidden_dim), nn.relu, nn.Dense(self.embedding_dim)])
 
     @nn.compact
     def __call__(self, state: TGameState, action: TAction) -> tuple[TEmbedding, float, TEmbedding]:
-        state_embedding = self.state_embedder.embed_state(state)       
+        state_embedding = self.state_embedder.embed_state(state)
         action_embedding = self.action_embedder.embed_action(action)
         combined_embedding = jnp.concatenate([state_embedding, action_embedding])
 
@@ -54,21 +47,32 @@ class ZeroZeroModel(nn.Module, Generic[TGameState, TPlayerState, TAction]):
 
     def compute_action_probabilities(self, policy_embedding: TEmbedding) -> TEmbedding:
         # TODO: Precompute this?
-        all_action_embeddings = jnp.array([self.action_embedder.embed_action(action) for action in self.possible_actions])
+        all_action_embeddings = jnp.array(
+            [self.action_embedder.embed_action(action) for action in self.possible_actions]
+        )
         logits = jnp.dot(all_action_embeddings, policy_embedding)
         return jax.nn.softmax(logits)
 
-def zerozero_loss(params: Dict[str, Any], model: ZeroZeroModel[TGameState, TPlayerState, TAction], 
-                  state: TGameState, action: TAction, next_state: TGameState, 
-                  reward: float, policy_target: jax.Array) -> Tuple[float, Dict[str, float]]:
+
+def zerozero_loss(
+    params: dict[str, Any],
+    model: ZeroZeroModel[TGameState, Any, TAction],
+    state: TGameState,
+    action: TAction,
+    next_state: TGameState,
+    reward: float,
+    policy_target: jax.Array,
+) -> tuple[float, dict[str, float]]:
     next_state_pred: jax.Array
     reward_pred: float
     policy_embedding: jax.Array
-    next_state_pred, reward_pred, policy_embedding = model.apply(params, state, action) # type: ignore
+    next_state_pred, reward_pred, policy_embedding = model.apply(params, state, action)  # type: ignore
     next_state_true = model.state_embedder.embed_state(next_state)
 
     # Dynamics loss (cosine similarity)
-    dynamics_loss = 1 - jnp.dot(next_state_pred, next_state_true) / (jnp.linalg.norm(next_state_pred) * jnp.linalg.norm(next_state_true))
+    dynamics_loss = 1 - jnp.dot(next_state_pred, next_state_true) / (
+        jnp.linalg.norm(next_state_pred) * jnp.linalg.norm(next_state_true)
+    )
 
     # Reward loss (MSE)
     reward_loss = jnp.mean((reward_pred - reward) ** 2)
@@ -79,10 +83,10 @@ def zerozero_loss(params: Dict[str, Any], model: ZeroZeroModel[TGameState, TPlay
 
     total_loss = dynamics_loss + reward_loss + policy_loss
     loss_dict = {
-        'total_loss': total_loss,
-        'dynamics_loss': dynamics_loss,
-        'reward_loss': reward_loss,
-        'policy_loss': policy_loss
+        "total_loss": total_loss,
+        "dynamics_loss": dynamics_loss,
+        "reward_loss": reward_loss,
+        "policy_loss": policy_loss,
     }
 
     return total_loss, loss_dict
