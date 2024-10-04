@@ -99,7 +99,7 @@ These components enable planning through MCTS by simulating future states and re
 ### 5.2. Training Methodology
 
 - Loss Functions:
-  - Dynamics Loss: Difference between predicted and actual next state embeddings.
+  - Dynamics Loss: Cosine similarity between predicted and actual next state embeddings.
   - Reward Loss: Mean squared error between predicted and actual rewards.
   - Policy Loss: Cross-entropy loss between predicted and actual actions taken.
 - Optimization: Use techniques like stochastic gradient descent or Adam optimizer.
@@ -788,11 +788,20 @@ Week 9:
 - Flexibility: Adjust timelines based on progress, challenges encountered, and resource availability.
 - Parallelization: Tasks may be parallelized where possible to expedite the development process.
 
-## 10. Future Work
+## 10. Future Work and Experiments
 
 - Explore Advanced Techniques: Investigate methods like curriculum learning, meta-learning, or unsupervised pre-training to enhance model capabilities.
 - Real-World Applications: Extend the framework to real-world tasks beyond games, such as robotics, logistics, or decision-making systems.
 - Community Engagement: Open-source the project to involve the community in testing, feedback, and contributions.
+- Loss Function Experiments: 
+  - Compare different loss functions for embedding comparisons, such as:
+    - Mean Squared Error (MSE)
+    - Cosine Similarity (currently used)
+    - Contrastive Loss
+    - Combination of multiple loss functions
+  - Analyze the impact of different loss functions on model performance and generalization across games.
+- Embedding Dimension Experiments: Study the effect of varying embedding dimensions on model performance and computational efficiency.
+- Transfer Learning Strategies: Experiment with different approaches to transfer learning between games, such as fine-tuning, domain adaptation, or meta-learning techniques.
 
 ## 11. Conclusion
 

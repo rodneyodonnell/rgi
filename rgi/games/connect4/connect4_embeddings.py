@@ -1,9 +1,12 @@
 import jax
 import jax.numpy as jnp
 from flax import linen as nn
+from flax.typing import FrozenVariableDict
 from rgi.core.base import StateEmbedder, ActionEmbedder
 from rgi.games.connect4.connect4 import Connect4State
 from typing import Any, Dict
+
+TJaxParams = FrozenVariableDict | dict[str, Any]
 
 class Connect4CNN(nn.Module):
     embedding_dim: int = 64
@@ -52,12 +55,13 @@ class Connect4ActionEmbedder(nn.Module):
                                        (self.num_actions, self.embedding_dim))
         return action_embeddings[action]
 
-    def embed_action(self, params: Dict[str, Any], action: int) -> jax.Array:
+    def embed_action(self, params: TJaxParams, action: int) -> jax.Array:
         if not 1 <= action <= self.num_actions:
             raise ValueError(f"Action must be between 1 and {self.num_actions}")
         embedding = self.apply(params, jnp.array(action - 1))
         if not isinstance(embedding, jax.Array):
             raise TypeError(f"Expected jax.Array, got {type(embedding)}")
         return embedding
+    
     def get_embedding_dim(self) -> int:
         return self.embedding_dim
