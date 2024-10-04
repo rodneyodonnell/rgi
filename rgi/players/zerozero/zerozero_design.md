@@ -1,10 +1,10 @@
-# Design Document: Generalized MuZero-like Algorithm for Game Playing AI
+# Design Document: ZeroZero - A Generalized Game Playing AI Algorithm
 
 ## 0. Introduction
 
 ### 0.1. Author and Context
 
-This design document was created by an AI assistant to assist in developing a generalized MuZero-like algorithm for the RGI game-playing AI project. The document is based on instructions provided by the user, who intends to use this document to delegate tasks to less powerful models or junior developers.
+This design document was created by an AI assistant to assist in developing the ZeroZero algorithm for the RGI game-playing AI project. ZeroZero is an extension and generalization of the MuZero algorithm, aimed at creating a more flexible and powerful game-playing AI capable of learning and performing well across multiple games.
 
 Instructions Summary:
 
@@ -15,9 +15,25 @@ Instructions Summary:
 - Include a "Section 0" summarizing the author and instructions for future updates.
 - Provide examples of defining a Player class and demonstrate how action and state embeddings interact, including the dot product and softmax (two-tower model approach).
 
+### 0.2. ZeroZero: An Extension of MuZero
+
+ZeroZero builds upon the foundations laid by MuZero, extending and generalizing its approach in several key ways:
+
+1. Multi-game learning: ZeroZero is designed to learn and play multiple games using a shared architecture, enabling transfer learning between different game domains.
+
+2. Flexible state and action representations: Unlike MuZero, which typically uses game-specific representations, ZeroZero aims to handle arbitrary JSON representations for both states and actions, making it more adaptable to various game types.
+
+3. Enhanced embedding models: ZeroZero incorporates more advanced embedding techniques, potentially using transformers or other architectures to better capture the structure of diverse game states and actions.
+
+4. Improved MCTS integration: The algorithm includes optimizations and enhancements to the Monte Carlo Tree Search process, making it more efficient and effective across different game types.
+
+5. Transfer learning focus: ZeroZero places a stronger emphasis on leveraging knowledge across games, potentially leading to faster learning and better generalization.
+
+These extensions aim to create a more versatile and powerful game-playing AI system that can adapt to a wide range of games and potentially even non-game decision-making scenarios.
+
 ## 1. Introduction
 
-This document outlines the design of a generalized MuZero-like algorithm, referred to as Generalized MuZero, for developing a game-playing AI capable of learning and performing well across multiple games. The approach focuses on embedding states and actions into a shared space and integrating these embeddings with Monte Carlo Tree Search (MCTS) for reinforcement learning.
+This document outlines the design of the ZeroZero algorithm, a generalized game-playing AI capable of learning and performing well across multiple games. The approach focuses on embedding states and actions into a shared space and integrating these embeddings with Monte Carlo Tree Search (MCTS) for reinforcement learning.
 
 ## 2. Goals and Objectives
 
