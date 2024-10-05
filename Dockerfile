@@ -56,5 +56,8 @@ COPY rgi rgi
 COPY scripts scripts
 COPY notebooks notebooks
 
+# Update .bashrc to source the custom rgi.bashrc file
+RUN echo "source /app/scripts/rgi.bashrc" >> /home/$USERNAME/.bashrc
+
 
 CMD ["bash"]
