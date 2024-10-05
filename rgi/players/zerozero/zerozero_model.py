@@ -48,9 +48,11 @@ class ZeroZeroModel(Generic[TGameState, TPlayerState, TAction], nn.Module):
         self.policy_head: nn.Module = nn.Sequential([nn.Dense(self.hidden_dim), nn.relu, nn.Dense(self.embedding_dim)])
 
     @nn.compact
-    def __call__(self, state: TGameState, action: TAction) -> tuple[TEmbedding, float, TEmbedding]:
+    def __call__(self, state: TGameState, action: TAction | None) -> tuple[TEmbedding, float, TEmbedding]:
         state_embedding = self.state_embedder(state)
-        action_embedding = self.action_embedder(action)
+        action_embedding = (
+            self.action_embedder(action) if action is not None else jnp.zeros(self.action_embedder.embedding_dim)
+        )
         combined_embedding = jnp.concatenate([state_embedding, action_embedding])
 
         shared_features = self.shared_layer(combined_embedding)

@@ -13,11 +13,11 @@ class Connect4StateEmbedder(StateEmbedder[Connect4State]):
     embedding_dim: int = 64
 
     def _state_to_array(self, state: Connect4State) -> jax.Array:
+        if not isinstance(state, Connect4State):
+            raise ValueError("Invalid state type")
         board_array = jnp.zeros((6, 7), dtype=jnp.float32)
         for (row, col), value in state.board.items():
-            board_array = board_array.at[row - 1, col - 1].set(
-                1.0 if value == 1 else -1.0
-            )
+            board_array = board_array.at[row - 1, col - 1].set(1.0 if value == 1 else -1.0)
         return board_array
 
     @nn.compact
