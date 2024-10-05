@@ -7,6 +7,7 @@ TPlayerState = TypeVar("TPlayerState")  # pylint: disable=invalid-name
 TPlayerId = TypeVar("TPlayerId")  # pylint: disable=invalid-name
 TAction = TypeVar("TAction")  # pylint: disable=invalid-name
 TEmbedding = TypeVar("TEmbedding")  # pylint: disable=invalid-name
+TParams = TypeVar("TParams")  # pylint: disable=invalid-name
 
 
 class Game(ABC, Generic[TGameState, TPlayerId, TAction]):
@@ -44,26 +45,6 @@ class Game(ABC, Generic[TGameState, TPlayerId, TAction]):
     @abstractmethod
     def pretty_str(self, state: TGameState) -> str:
         """Return a human-readable string representation of the game state."""
-
-
-class StateEmbedder(ABC, Generic[TGameState, TEmbedding]):
-    @abstractmethod
-    def embed_state(self, state: TGameState) -> TEmbedding:
-        pass
-
-    @abstractmethod
-    def get_embedding_dim(self) -> int:
-        pass
-
-
-class ActionEmbedder(ABC, Generic[TAction, TEmbedding]):
-    @abstractmethod
-    def embed_action(self, action: TAction) -> TEmbedding:
-        pass
-
-    @abstractmethod
-    def get_embedding_dim(self) -> int:
-        pass
 
 
 class GameSerializer(ABC, Generic[TGame, TGameState, TAction]):

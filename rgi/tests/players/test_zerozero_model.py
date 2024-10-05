@@ -4,32 +4,30 @@ import jax
 import jax.numpy as jnp
 import pytest
 from rgi.players.zerozero.zerozero_model import ZeroZeroModel, zerozero_loss
-from rgi.core.base import StateEmbedder, ActionEmbedder
+from rgi.players.zerozero.zerozero_model import StateEmbedder, ActionEmbedder
+from flax import linen as nn
 
 # pylint: disable=redefined-outer-name  # pytest fixtures trigger this false positive
 
 TAction = int
-TEmbedding = jax.Array
+TGameState = tuple[int, int]
 
 
-class DummyStateEmbedder(StateEmbedder[Any, TEmbedding]):
-    @override
-    def embed_state(self, state: Any) -> TEmbedding:
-        return jnp.array(state)
+# Dummy embedders for testing
+class DummyStateEmbedder(StateEmbedder[TGameState]):
+    embedding_dim: int = 64
 
-    @override
-    def get_embedding_dim(self) -> int:
-        return 64
+    @nn.compact
+    def __call__(self, state: TGameState) -> jax.Array:
+        return jnp.zeros(64).at[state[0]].set(10).at[state[1]].set(20)
 
 
-class DummyActionEmbedder(ActionEmbedder[TAction, TEmbedding]):
-    @override
-    def embed_action(self, action: TAction) -> TEmbedding:
+class DummyActionEmbedder(ActionEmbedder[TAction]):
+    embedding_dim: int = 64
+
+    @nn.compact
+    def __call__(self, action: TAction) -> jax.Array:
         return jnp.zeros(64).at[action].set(1)
-
-    @override
-    def get_embedding_dim(self) -> int:
-        return 64
 
 
 @pytest.fixture
@@ -46,15 +44,14 @@ def model() -> ZeroZeroModel[Any, Any, TAction]:
 @pytest.fixture
 def params(model: ZeroZeroModel[Any, Any, TAction]) -> dict[str, Any]:
     key = jax.random.PRNGKey(0)
-    dummy_state = jnp.zeros(64)
-    dummy_state = dummy_state.at[0].set(999)
-    dummy_action = 2
+    dummy_state: TGameState = (1, 5)
+    dummy_action: TAction = 2
     init_params = model.init(key, dummy_state, dummy_action)
     return dict(init_params)
 
 
 def test_model_output_shapes(model: ZeroZeroModel[Any, Any, TAction], params: dict[str, Any]) -> None:
-    state: jax.Array = jnp.zeros(64)
+    state: TGameState = (1, 2)
     action: TAction = 5
 
     output = model.apply(params, state, action)
@@ -80,13 +77,13 @@ def test_compute_action_probabilities(model: ZeroZeroModel[Any, Any, TAction], p
 
 
 def test_zerozero_loss(model: ZeroZeroModel[Any, Any, TAction], params: dict[str, Any]) -> None:
-    state: jax.Array = jnp.zeros(64)
+    state: TGameState = (1, 2)
     action: TAction = 5
-    next_state: jax.Array = jnp.ones(64)
+    next_state: TGameState = (1, 3)
     reward: float = 1.0
     policy_target: jax.Array = jnp.array([0.1, 0.2, 0.3, 0.1, 0.1, 0.1, 0.1])
 
-    total_loss, loss_dict = zerozero_loss(params, model, state, action, next_state, reward, policy_target)
+    total_loss, loss_dict = zerozero_loss(model, params, state, action, next_state, reward, policy_target)
 
     assert isinstance(total_loss, jax.Array)
     assert total_loss.shape == ()

@@ -121,7 +121,7 @@ These components enable planning through MCTS by simulating future states and re
 
 This phase focuses on developing a working prototype of the MuZero-like algorithm using Connect4. The tasks are broken down into manageable units suitable for implementation by junior developers or less sophisticated AI agents. Each task includes detailed descriptions, code entry points, code snippets, and acceptance criteria.
 
-#### 7.1.1. Implement State and Action Embedding Models
+#### 7.1.1. Implement State and Action Embedding Models [completed]
 
 ##### Task 1: Implement Connect4StateEmbedder
 
@@ -237,42 +237,43 @@ File: `rgi/players/muzero_player/muzero_model.py`
 
 Subtasks:
 
-a. Define the MuZeroModel class:
+a. Define the ZeroZeroModel class:
 
 ```python
-class MuZeroModel(nn.Module):
-    state_embedder: Any  # Instance of Connect4StateEmbedder
-    action_embedder: Any  # Instance of Connect4ActionEmbedder
+class ZeroZeroModel(Generic[TGameState, TPlayerState, TAction], nn.Module):
+    state_embedder: StateEmbedder[TGameState]
+    action_embedder: ActionEmbedder[TAction]
+    possible_actions: list[TAction]
     embedding_dim: int = 64
+    hidden_dim: int = 128
+    shared_dim: int = 256
+
+    def setup(self) -> None:
+        self.shared_layer: nn.Module = nn.Sequential([nn.Dense(self.shared_dim), nn.relu])
+        self.dynamics_head: nn.Module = nn.Sequential(
+            [nn.Dense(self.hidden_dim), nn.relu, nn.Dense(self.embedding_dim)]
+        )
+        self.reward_head: nn.Module = nn.Sequential([nn.Dense(self.hidden_dim), nn.relu, nn.Dense(1)])
+        self.policy_head: nn.Module = nn.Sequential([nn.Dense(self.hidden_dim), nn.relu, nn.Dense(self.embedding_dim)])
 
     @nn.compact
-    def __call__(self, state: Connect4State, action: Optional[TAction]):
-        # Get state embedding
-        state_embedding = self.state_embedder.embed_state(state)
-        
-        if action is not None:
-            # Get action embedding
-            action_embedding = self.action_embedder(action)
-            # Dynamics model
-            x = jnp.concatenate([state_embedding, action_embedding], axis=-1)
-            x = nn.Dense(128)(x)
-            x = nn.relu(x)
-            next_state_embedding = nn.Dense(self.embedding_dim)(x)
-        else:
-            next_state_embedding = None
+    def __call__(self, state: TGameState, action: TAction) -> tuple[TEmbedding, float, TEmbedding]:
+        state_embedding = self.state_embedder(state)
+        action_embedding = self.action_embedder(action)
+        combined_embedding = jnp.concatenate([state_embedding, action_embedding])
 
-        # Reward model
-        r = nn.Dense(64)(state_embedding)
-        r = nn.relu(r)
-        reward = nn.Dense(1)(r).squeeze()
+        shared_features = self.shared_layer(combined_embedding)
 
-        # Policy model (Two-Tower approach)
-        # Compute dot product between state embedding and all action embeddings
-        all_actions = range(1, 8)  # Actions are columns 1-7
-        all_action_embeddings = jnp.stack([self.action_embedder(a) for a in all_actions])
-        logits = jnp.dot(all_action_embeddings, state_embedding)
+        next_state_embedding = self.dynamics_head(shared_features)
+        reward = self.reward_head(shared_features).squeeze().item()
+        policy_embedding = self.policy_head(shared_features)
 
-        return next_state_embedding, reward, logits
+        return next_state_embedding, reward, policy_embedding
+
+    def compute_action_probabilities(self, policy_embedding: TEmbedding) -> TEmbedding:
+        all_action_embeddings = jnp.array([self.action_embedder(action) for action in self.possible_actions])
+        logits = jnp.dot(all_action_embeddings, policy_embedding)
+        return jax.nn.softmax(logits)
 ```
 
 Testing Criteria:
@@ -282,31 +283,31 @@ Testing Criteria:
 
 Acceptance Criteria:
 
-- MuZeroModel is implemented and tested.
+- ZeroZeroModel is implemented and tested.
 - Code conforms to project conventions.
 
-##### Task 4: Implement the MuZeroPlayer Class
+##### Task 4: Implement the ZeroZeroPlayer Class
 
-Description: Create a Player class that uses the MuZeroModel and MCTS to select actions during gameplay.
+Description: Create a Player class that uses the ZeroZeroModel and MCTS to select actions during gameplay.
 
 Code Entry Points:
 
-File: `rgi/players/muzero_player/muzero_player.py`
+File: `rgi/players/zerozero/zerozero_player.py`
 
 Subtasks:
 
 a. Define the MuZeroPlayer class:
 
 ```python
-class MuZeroPlayer(Player[Connect4State, None, TAction]):
-    def __init__(self, muzero_model: MuZeroModel, params: dict):
-        self.muzero_model = muzero_model
+class ZeroZeroPlayer(Player[Connect4State, None, TAction]):
+    def __init__(self, zerozero_model: ZeroZeroModel, params: dict):
+        self.zerozero_model = zerozero_model
         self.params = params
         # Additional initialization as needed
 
     def select_action(self, game_state: Connect4State, legal_actions: list[TAction]) -> TAction:
         # Get policy logits from the model
-        _, _, logits = self.muzero_model.apply(self.params, game_state, action=None)
+        _, _, logits = self.zerozero_model.apply(self.params, game_state, action=None)
         # Mask illegal actions
         mask = jnp.array([1.0 if a in legal_actions else 0.0 for a in range(1, 8)])
         masked_logits = logits * mask - 1e9 * (1 - mask)
@@ -323,7 +324,7 @@ class MuZeroPlayer(Player[Connect4State, None, TAction]):
 
 b. Explain the Action Selection Process:
 
-The MuZeroPlayer uses the two-tower model approach:
+The ZeroZeroPlayer uses the two-tower model approach:
 - Computes the dot product between the state embedding and all possible action embeddings.
 - Applies a softmax function to obtain action probabilities.
 - Selects the action with the highest probability or samples according to the probabilities.
@@ -335,18 +336,18 @@ Testing Criteria:
 
 Acceptance Criteria:
 
-- MuZeroPlayer is functional and integrates with the game framework.
+- ZeroZeroPlayer is functional and integrates with the game framework.
 - All tests pass.
 
 #### 7.1.3. Collect Training Data via Self-Play
 
 ##### Task 5: Implement Data Collection with Self-Play
 
-Description: Generate training data by having MuZeroPlayer play against itself or a RandomPlayer.
+Description: Generate training data by having ZeroZeroPlayer play against itself or a RandomPlayer.
 
 Code Entry Points:
 
-File: `scripts/collect_muzero_data.py`
+File: `scripts/collect_zerozero_data.py`
 
 Subtasks:
 
@@ -367,7 +368,7 @@ Acceptance Criteria:
 
 ##### Task 6: Implement the Training Pipeline
 
-Description: Set up the training loop to train the MuZeroModel using the collected data.
+Description: Set up the training loop to train the ZeroZeroModel using the collected data.
 
 Subtasks:
 
@@ -381,7 +382,7 @@ b. Implement the training loop using JAX and Optax.
 
 ```python
 def loss_fn(params, batch):
-    next_state_pred, reward_pred, logits = muzero_model.apply(params, batch['state'], batch['action'])
+    next_state_pred, reward_pred, logits = zerozero_model.apply(params, batch['state'], batch['action'])
     dynamics_loss = jnp.mean((next_state_pred - batch['next_state_embedding']) ** 2)
     reward_loss = jnp.mean((reward_pred - batch['reward']) ** 2)
     policy_loss = optax.softmax_cross_entropy_with_integer_labels(logits, batch['action'] - 1)
@@ -405,11 +406,11 @@ Acceptance Criteria:
 
 ##### Task 7: Conduct Performance Evaluation
 
-Description: Assess the performance of MuZeroPlayer by playing it against baseline players.
+Description: Assess the performance of ZeroZeroPlayer by playing it against baseline players.
 
 Subtasks:
 
-a. Set up matches between MuZeroPlayer and RandomPlayer or MinimaxPlayer.
+a. Set up matches between ZeroZeroPlayer and RandomPlayer or MinimaxPlayer.
 b. Record metrics such as win rate, average game length.
 
 Testing Criteria:
@@ -419,7 +420,7 @@ Testing Criteria:
 
 Acceptance Criteria:
 
-- MuZeroPlayer demonstrates improved performance over baseline players.
+- ZeroZeroPlayer demonstrates improved performance over baseline players.
 - Results are documented and analyzed.
 
 ## 7.2. Phase 2: Generalization to Multiple Games
