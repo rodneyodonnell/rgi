@@ -16,6 +16,21 @@
             ],
             "jinja": true,
             "justMyCode": true
+        },
+        {
+            "name": "main.py connect4 --save_trajectories",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/rgi/main.py",
+            "args": [
+                "--game", "connect4",
+                "--player1", "random",
+                "--player2", "random",
+                "--num_games", "1",
+                "--save_trajectories",
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": true
         }
     ]
 }

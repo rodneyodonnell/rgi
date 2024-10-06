@@ -26,6 +26,7 @@ class EncodedTrajectory:
     state_rewards: jnp.ndarray
     player_ids: jnp.ndarray
     final_rewards: jnp.ndarray
+    length: int  # Actual length of the trajectory
 
 
 def encode_trajectory(
@@ -37,24 +38,29 @@ def encode_trajectory(
     encoded_player_ids = jnp.array(trajectory.player_ids)
     encoded_final_rewards = jnp.array(trajectory.final_rewards)
     return EncodedTrajectory(
-        encoded_states, encoded_actions, encoded_state_rewards, encoded_player_ids, encoded_final_rewards
+        encoded_states,
+        encoded_actions,
+        encoded_state_rewards,
+        encoded_player_ids,
+        encoded_final_rewards,
+        len(trajectory.states),
     )
 
 
 def save_trajectories(trajectories: list[EncodedTrajectory], filename: str):
     data = {
-        "states": jnp.stack([t.states for t in trajectories]),
-        "actions": jnp.stack([t.actions for t in trajectories]),
-        "state_rewards": jnp.stack([t.state_rewards for t in trajectories]),
-        "player_ids": jnp.stack([t.player_ids for t in trajectories]),
-        "final_rewards": jnp.stack([t.final_rewards for t in trajectories]),
+        "states": [t.states for t in trajectories],
+        "actions": [t.actions for t in trajectories],
+        "state_rewards": [t.state_rewards for t in trajectories],
+        "player_ids": [t.player_ids for t in trajectories],
+        "final_rewards": [t.final_rewards for t in trajectories],
+        "lengths": [t.length for t in trajectories],
     }
-    jnp.save(filename, data)
+    jnp.save(filename, data, allow_pickle=True)
 
 
 def load_trajectories(filename: str) -> list[EncodedTrajectory]:
-    data_0 = jnp.load(filename, allow_pickle=True)
-    data = data_0.item()
+    data = jnp.load(filename, allow_pickle=True).item()
     return [
         EncodedTrajectory(
             states=data["states"][i],
@@ -62,6 +68,7 @@ def load_trajectories(filename: str) -> list[EncodedTrajectory]:
             state_rewards=data["state_rewards"][i],
             player_ids=data["player_ids"][i],
             final_rewards=data["final_rewards"][i],
+            length=data["lengths"][i],
         )
-        for i in range(len(data["states"]))
+        for i in range(len(data["lengths"]))
     ]

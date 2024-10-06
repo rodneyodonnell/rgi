@@ -1,16 +1,15 @@
 import argparse
 from typing import Literal, Any
 from collections import defaultdict
+import jax.numpy as jnp
 from rgi.core.base import Game, Player, TPlayerId
 from rgi.core import game_registry
-from rgi.players.random_player import RandomPlayer
-from rgi.players.minimax_player import MinimaxPlayer
-from rgi.players.human_player import HumanPlayer
+from rgi.core.trajectory import Trajectory, encode_trajectory, save_trajectories
 
-GAMES: dict[str, type[Game[Any, Any, Any]]] = {name: reg.game_fn for (name, reg) in game_registry.GAME_REGISTRY.items()}
+GAMES: dict[str, game_registry.RegisteredGame[Any, Any, Any]] = game_registry.GAME_REGISTRY
+PLAYERS: dict[str, Any] = game_registry.PLAYER_REGISTRY
 
-
-PlayerType = Literal["random", "human", "minimax"]
+PlayerType = str
 
 
 def parse_args() -> argparse.Namespace:
@@ -26,29 +25,29 @@ def parse_args() -> argparse.Namespace:
         "--player1",
         type=str,
         default="human",
-        choices=["random", "human", "minimax"],
+        choices=list(PLAYERS.keys()),
         help="Type of player 1",
     )
     parser.add_argument(
         "--player2",
         type=str,
         default="random",
-        choices=["random", "human", "minimax"],
+        choices=list(PLAYERS.keys()),
         help="Type of player 2",
     )
     parser.add_argument("--num_games", type=int, default=1, help="Number of games to play")
+    parser.add_argument("--save_trajectories", action="store_true", help="Save game trajectories")
     return parser.parse_args()
 
 
-def create_player(player_type: PlayerType, game: Game[Any, Any, Any], player_id: int) -> Player[Any, Any, Any]:
-    if player_type == "random":
-        return RandomPlayer()
-    if player_type == "minimax":
-        return MinimaxPlayer(game, player_id)
-    if player_type == "human":
-        return HumanPlayer(game)
-
-    raise ValueError(f"Unknown player type: {player_type}")
+def create_player(
+    player_type: PlayerType,
+    game: Game[Any, Any, Any],
+    registered_game: game_registry.RegisteredGame[Any, Any, Any],
+    player_id: int,
+) -> Player[Any, Any, Any]:
+    player_creator = PLAYERS[player_type]
+    return player_creator(game, registered_game, player_id, {})
 
 
 def print_aggregate_stats(stats: list[dict[str, list[int] | int]], num_games: int) -> None:
@@ -74,20 +73,36 @@ def print_aggregate_stats(stats: list[dict[str, list[int] | int]], num_games: in
 
 def run_games(
     game: Game[Any, TPlayerId, Any],
+    registered_game: game_registry.RegisteredGame[Any, Any, Any],
     players: dict[TPlayerId, Player[Any, Any, Any]],
     num_games: int,
+    save_trajectories_path: str | None = None,
 ) -> None:
     stats: list[dict[str, Any]] = []
+    all_trajectories = []
+
+    serializer = registered_game.serializer_fn()
 
     for i in range(num_games):
         print(f"Starting game {i+1}")
 
         move_count = 0
         state = game.initial_state()
+        trajectory_states = [state]
+        trajectory_actions = []
+        trajectory_state_rewards = []
+        trajectory_player_ids = []
+
         while not game.is_terminal(state):
             current_player = game.current_player_id(state)
             action = players[current_player].select_action(state, game.legal_actions(state))
+
+            trajectory_actions.append(action)
+            trajectory_player_ids.append(current_player)
+            trajectory_state_rewards.append(0)  # Assuming no intermediate rewards
+
             state = game.next_state(state, action)
+            trajectory_states.append(state)
             move_count += 1
 
         print(f"Game {i+1} ended")
@@ -112,30 +127,46 @@ def run_games(
         else:
             print("The game ended in an unexpected state")
             winners = []
+            rewards = [0] * len(game.all_player_ids(state))
 
         stats.append({"winners": winners, "moves": move_count})
+
+        # Create and store the trajectory
+        trajectory = Trajectory(
+            states=trajectory_states,
+            actions=trajectory_actions,
+            state_rewards=trajectory_state_rewards,
+            player_ids=trajectory_player_ids,
+            final_rewards=rewards,
+        )
+        all_trajectories.append(encode_trajectory(game, trajectory, serializer))
 
         print()
 
     if num_games > 1:
         print_aggregate_stats(stats, num_games)
 
+    if save_trajectories_path:
+        save_trajectories(all_trajectories, save_trajectories_path)
+        print(f"Trajectories saved to {save_trajectories_path}")
+
 
 def main() -> None:
     args = parse_args()
 
-    game_class = GAMES.get(args.game)
-    if game_class is None:
+    registered_game = GAMES.get(args.game)
+    if registered_game is None:
         print(f"Game {args.game} not implemented yet")
         return
 
-    game = game_class()
+    game = registered_game.game_fn()
     players: dict[int, Player[Any, Any, Any]] = {
-        1: create_player(args.player1, game, player_id=1),
-        2: create_player(args.player2, game, player_id=2),
+        1: create_player(args.player1, game, registered_game, player_id=1),
+        2: create_player(args.player2, game, registered_game, player_id=2),
     }
 
-    run_games(game, players, args.num_games)
+    save_trajectories_path = f"{args.game}_trajectories.npy" if args.save_trajectories else None
+    run_games(game, registered_game, players, args.num_games, save_trajectories_path)
 
 
 if __name__ == "__main__":
