@@ -48,6 +48,10 @@ class Connect4Game(Game[Connect4State, TPlayerId, TAction]):
         return [col for col in self._all_column_ids if (self.height, col) not in state.board]
 
     @override
+    def all_actions(self) -> list[TAction]:
+        return self._all_column_ids
+
+    @override
     def next_state(self, state: Connect4State, action: TAction) -> Connect4State:
         """Find the lowest empty row in the selected column and return the updated game state."""
         if action not in self.legal_actions(state):

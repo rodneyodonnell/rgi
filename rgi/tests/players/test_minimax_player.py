@@ -19,6 +19,9 @@ class MockGame(Game[Any, Any, int]):
     def legal_actions(self, state: int) -> list[int]:
         return [1, 2]  # Two actions
 
+    def all_actions(self) -> list[int]:
+        return [1, 2]
+
     def next_state(self, state: int, action: int) -> int:
         return state + action  # Simplified state progression
 

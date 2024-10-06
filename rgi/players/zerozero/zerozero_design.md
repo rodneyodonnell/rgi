@@ -225,7 +225,7 @@ Acceptance Criteria:
 - All unit tests pass.
 - Code adheres to the Python Style Guide.
 
-#### 7.1.2. Develop the MuZero Model Components
+#### 7.1.2. Develop the MuZero Model Components [completed]
 
 ##### Task 3: Implement the Dynamics, Reward, and Policy Models
 

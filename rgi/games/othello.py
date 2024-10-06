@@ -65,6 +65,10 @@ class OthelloGame(Game[OthelloState, TPlayerId, TAction]):
     def legal_actions(self, state: OthelloState) -> list[TAction]:
         return self._get_legal_moves(state, state.current_player)
 
+    @override
+    def all_actions(self) -> list[TAction]:
+        return self._all_positions
+
     def _get_legal_moves(self, state: OthelloState, player: TPlayerId) -> list[TAction]:
         opponent = self.next_player(player)
         legal_moves = []

@@ -28,6 +28,10 @@ class Game(ABC, Generic[TGameState, TPlayerId, TAction]):
         pass
 
     @abstractmethod
+    def all_actions(self) -> list[TAction] | None:
+        """Optionally return a list of all possible actions in the game."""
+
+    @abstractmethod
     def next_state(self, state: TGameState, action: TAction) -> TGameState:
         pass
 

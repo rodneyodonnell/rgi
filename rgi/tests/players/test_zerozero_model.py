@@ -62,18 +62,31 @@ def test_model_output_shapes(model: ZeroZeroModel[Any, Any, TAction], params: di
     assert policy_embedding.shape == (64,)
 
 
+def test_compute_action_logits(model: ZeroZeroModel[Any, Any, TAction], params: dict[str, Any]) -> None:
+    policy_embedding: jax.Array = jnp.ones(64)
+
+    action_logits = model.apply(
+        params,
+        method=model.compute_action_logits,
+        policy_embedding=policy_embedding,
+    )
+    assert isinstance(action_logits, jax.Array)
+
+    assert action_logits.shape == (7,)
+
+
 def test_compute_action_probabilities(model: ZeroZeroModel[Any, Any, TAction], params: dict[str, Any]) -> None:
     policy_embedding: jax.Array = jnp.ones(64)
 
-    action_probs = model.apply(
+    action_probabilities = model.apply(
         params,
         method=model.compute_action_probabilities,
         policy_embedding=policy_embedding,
     )
-    assert isinstance(action_probs, jax.Array)
+    assert isinstance(action_probabilities, jax.Array)
 
-    assert action_probs.shape == (7,)
-    assert jnp.isclose(jnp.sum(action_probs), 1.0)
+    assert action_probabilities.shape == (7,)
+    assert jnp.allclose(jnp.sum(action_probabilities), 1.0)
 
 
 def test_zerozero_loss(model: ZeroZeroModel[Any, Any, TAction], params: dict[str, Any]) -> None:

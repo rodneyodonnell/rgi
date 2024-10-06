@@ -9,7 +9,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from rgi.core.game_registry import GAME_REGISTRY
+from rgi.core.game_registry import GAME_REGISTRY, PLAYER_REGISTRY, RegisteredGame
 from rgi.players.minimax_player import MinimaxPlayer
 from rgi.players.random_player import RandomPlayer
 from rgi.players.human_player import HumanPlayer
@@ -79,7 +79,9 @@ async def create_game(request: Request) -> dict[str, Any]:
     # Initialize players
     players: dict[int, Player[Any, Any, Any]] = {}
     for player_id, options in player_options.items():
-        players[player_id] = create_player(options.get("player_type", "human"), game, player_id, options)
+        players[player_id] = create_player(
+            options.get("player_type", "human"), game, registry_entry, player_id, options
+        )
     logger.debug("Players initialized: %s", {pid: type(p).__name__ for pid, p in players.items()})
 
     # Store game session
@@ -101,20 +103,21 @@ async def create_game(request: Request) -> dict[str, Any]:
 
 
 def create_player(
-    player_type: str, game: Game[Any, Any, Any], player_id: int, options: dict[str, Any]
+    player_type: str,
+    game: Game[Any, Any, Any],
+    registered_game: RegisteredGame[Any, Any, Any],
+    player_id: int,
+    options: dict[str, Any],
 ) -> Player[Any, Any, Any]:
     # Remove 'player_type' from options to avoid passing it to the constructor
     constructor_options = {k: v for k, v in options.items() if k != "player_type"}
 
-    if player_type == "human":
-        return HumanPlayer(game, **constructor_options)
-    if player_type == "random":
-        return RandomPlayer(**constructor_options)
-    if player_type == "minimax":
-        return MinimaxPlayer(game, player_id, **constructor_options)
+    player_fn = PLAYER_REGISTRY.get(player_type)
+    if player_fn is None:
+        logger.error("Unknown player type: %s", player_type)
+        raise ValueError(f"Unknown player type: {player_type}")
 
-    logger.error("Unknown player type: %s", player_type)
-    raise ValueError(f"Unknown player type: {player_type}")
+    return player_fn(game, registered_game, player_id, constructor_options)
 
 
 @app.get("/games/{game_id}/state")

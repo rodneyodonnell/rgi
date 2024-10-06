@@ -265,6 +265,11 @@ class Infiltr8Game(Game[Infiltr8State, TPlayerId, Action]):
         return self._legal_discard_actions(state)
 
     @override
+    def all_actions(self) -> list[Action] | None:
+        # TODO: Implement this
+        return None
+
+    @override
     def next_state(self, state: Infiltr8State, action: Action) -> Infiltr8State:
         if self.is_terminal(state):
             raise ValueError("No legal actions in terminal state")

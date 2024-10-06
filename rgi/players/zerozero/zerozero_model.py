@@ -63,10 +63,12 @@ class ZeroZeroModel(Generic[TGameState, TPlayerState, TAction], nn.Module):
 
         return next_state_embedding, reward, policy_embedding
 
-    def compute_action_probabilities(self, policy_embedding: TEmbedding) -> TEmbedding:
+    def compute_action_logits(self, policy_embedding: TEmbedding) -> jax.Array:
         all_action_embeddings = jnp.array([self.action_embedder(action) for action in self.possible_actions])
-        logits = jnp.dot(all_action_embeddings, policy_embedding)
-        return jax.nn.softmax(logits)
+        return jnp.dot(all_action_embeddings, policy_embedding)
+
+    def compute_action_probabilities(self, policy_embedding: TEmbedding) -> jax.Array:
+        return jax.nn.softmax(self.compute_action_logits(policy_embedding))
 
 
 def zerozero_loss(

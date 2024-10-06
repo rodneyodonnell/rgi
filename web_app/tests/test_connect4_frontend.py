@@ -106,9 +106,17 @@ def test_human_vs_ai_player_move(page: Page) -> None:
         expect(ai_move).to_be_visible()
 
 
-def test_two_random_bots_play_to_end(page: Page) -> None:
-    # Setup the game with two random AI players
-    page = custom_game_page(page, player1_type="random", player2_type="random")
+@pytest.mark.parametrize(
+    "player1_type, player2_type",
+    [
+        ("random", "random"),
+        ("minimax", "zerozero"),
+        # Add more player type combinations as needed
+    ],
+)
+def test_two_bots_play_to_end(page: Page, player1_type: str, player2_type: str) -> None:
+    # Setup the game with specified AI players
+    page = custom_game_page(page, player1_type=player1_type, player2_type=player2_type)
 
     # Define the maximum time for the game to complete (30 seconds)
     max_game_time_ms = 30_000
