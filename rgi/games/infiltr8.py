@@ -39,6 +39,7 @@ import random
 from enum import Enum
 from immutables import Map
 from typing_extensions import override
+import jax.numpy as jnp
 
 from rgi.core.base import Game, GameSerializer
 
@@ -591,3 +592,19 @@ class Infiltr8Serializer(GameSerializer[Infiltr8Game, Infiltr8State, Action]):
                 None,
             ),
         )
+
+    @override
+    def state_to_jax_array(self, game: Infiltr8Game, state: Infiltr8State) -> jnp.ndarray:
+        raise NotImplementedError("Infiltr8 state to JAX array conversion not implemented")
+
+    @override
+    def action_to_jax_array(self, game: Infiltr8Game, action: Action) -> jnp.ndarray:
+        raise NotImplementedError("Infiltr8 action to JAX array conversion not implemented")
+
+    @override
+    def jax_array_to_action(self, game: Infiltr8Game, action_array: jnp.ndarray) -> Action:
+        raise NotImplementedError("Infiltr8 JAX array to action conversion not implemented")
+
+    @override
+    def jax_array_to_state(self, game: Infiltr8Game, state_array: jnp.ndarray) -> Infiltr8State:
+        raise NotImplementedError("Infiltr8 state to JAX array conversion not implemented")

@@ -3,8 +3,9 @@ import textwrap
 import pytest
 
 from immutables import Map
+import jax.numpy as jnp
 
-from rgi.games.othello import OthelloGame, OthelloState, TAction
+from rgi.games.othello import OthelloGame, OthelloState, OthelloSerializer, TAction
 from rgi.players.random_player import RandomPlayer
 
 # pylint: disable=redefined-outer-name  # pytest fixtures trigger this false positive
@@ -16,6 +17,11 @@ TPosition = tuple[int, int]
 @pytest.fixture
 def game() -> OthelloGame:
     return OthelloGame()
+
+
+@pytest.fixture
+def serializer() -> OthelloSerializer:
+    return OthelloSerializer()
 
 
 def test_initial_state(game: OthelloGame) -> None:
@@ -361,3 +367,36 @@ def test_pretty_str_bottom_left(game: OthelloGame) -> None:
         """
     )
     assert game.pretty_str(state).strip() == expected_output.strip()
+
+
+def test_state_to_jax_array(game: OthelloGame, serializer: OthelloSerializer):
+    state = game.initial_state()
+    jax_array = serializer.state_to_jax_array(game, state)
+    assert jax_array.shape == (65,)  # 8x8 board + 1 for current player
+    assert jax_array[8 * 3 + 3] == 2  # Check (4,4) position
+    assert jax_array[8 * 3 + 4] == 1  # Check (4,5) position
+    assert jax_array[-1] == 1  # Check current player
+
+
+def test_action_to_jax_array(game: OthelloGame, serializer: OthelloSerializer):
+    action = (4, 5)
+    jax_array = serializer.action_to_jax_array(game, action)
+    assert jnp.array_equal(jax_array, jnp.array([4, 5]))  # 1-based indices
+
+
+def test_jax_array_to_action(game: OthelloGame, serializer: OthelloSerializer):
+    jax_array = jnp.array([4, 5])
+    action = serializer.jax_array_to_action(game, jax_array)
+    assert action == (4, 5)  # 1-based indices
+
+
+def test_jax_array_to_state(game: OthelloGame, serializer: OthelloSerializer):
+    jax_array = jnp.zeros(65)
+    jax_array = jax_array.at[8 * 3 + 3].set(2).at[8 * 3 + 4].set(1).at[8 * 4 + 3].set(1).at[8 * 4 + 4].set(2)
+    jax_array = jax_array.at[-1].set(1)  # Set current player to 1
+    state = serializer.jax_array_to_state(game, jax_array)
+    assert state.board.get((4, 4)) == 2
+    assert state.board.get((4, 5)) == 1
+    assert state.board.get((5, 4)) == 1
+    assert state.board.get((5, 5)) == 2
+    assert state.current_player == 1

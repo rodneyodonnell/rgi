@@ -2,8 +2,9 @@ import textwrap
 from typing import Literal
 
 import pytest
+import jax.numpy as jnp
 
-from rgi.games.connect4 import Connect4Game
+from rgi.games.connect4 import Connect4Game, Connect4Serializer
 
 TPlayerId = Literal[1, 2]
 
@@ -13,6 +14,11 @@ TPlayerId = Literal[1, 2]
 @pytest.fixture
 def game() -> Connect4Game:
     return Connect4Game()
+
+
+@pytest.fixture
+def serializer() -> Connect4Serializer:
+    return Connect4Serializer()
 
 
 def test_initial_state(game: Connect4Game) -> None:
@@ -213,3 +219,32 @@ def test_middle_of_row_win() -> None:
 
     new_state = game.next_state(state, 6)
     assert new_state.winner == 1, f"Expected Player 1 to win, but got {state.winner}"
+
+
+def test_state_to_jax_array(game: Connect4Game, serializer: Connect4Serializer):
+    state = game.initial_state()
+    state = game.next_state(state, 4)  # Make a move
+    jax_array = serializer.state_to_jax_array(game, state)
+    assert jax_array.shape == (43,)  # 6*7 + 1 for current player
+    assert jax_array[3] == 1  # Check the move we made
+    assert jax_array[-1] == 2  # Check current player
+
+
+def test_action_to_jax_array(game: Connect4Game, serializer: Connect4Serializer):
+    action = 4
+    jax_array = serializer.action_to_jax_array(game, action)
+    assert jax_array == 4  # 1-based index
+
+
+def test_jax_array_to_action(game: Connect4Game, serializer: Connect4Serializer):
+    jax_array = jnp.array(4)
+    action = serializer.jax_array_to_action(game, jax_array)
+    assert action == 4  # 1-based index
+
+
+def test_jax_array_to_state(game: Connect4Game, serializer: Connect4Serializer):
+    jax_array = jnp.zeros(43)
+    jax_array = jax_array.at[3].set(1).at[-1].set(2)
+    state = serializer.jax_array_to_state(game, jax_array)
+    assert state.board.get((1, 4)) == 1
+    assert state.current_player == 2

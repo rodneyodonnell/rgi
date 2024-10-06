@@ -3,6 +3,7 @@ from typing import Any, Literal
 from typing_extensions import override
 
 from immutables import Map
+import jax.numpy as jnp
 from rgi.core.base import Game, GameSerializer
 
 
@@ -244,3 +245,28 @@ class OthelloSerializer(GameSerializer[OthelloGame, OthelloState, TAction]):
         if row is None or col is None:
             raise ValueError("Action data must include 'row' and 'col'")
         return (int(row), int(col))  # Ensure we're returning integers
+
+    @override
+    def state_to_jax_array(self, game: OthelloGame, state: OthelloState) -> jnp.ndarray:
+        board_array = jnp.array([[state.board.get((row, col), 0) for col in range(1, 9)] for row in range(1, 9)])
+        return jnp.concatenate([board_array.flatten(), jnp.array([state.current_player])])
+
+    @override
+    def action_to_jax_array(self, game: OthelloGame, action: TAction) -> jnp.ndarray:
+        return jnp.array([action[0], action[1]])
+
+    @override
+    def jax_array_to_action(self, game: OthelloGame, action_array: jnp.ndarray) -> TAction:
+        return (int(action_array[0]), int(action_array[1]))
+
+    @override
+    def jax_array_to_state(self, game: OthelloGame, state_array: jnp.ndarray) -> OthelloState:
+        board_array = state_array[:-1].reshape(8, 8)
+        board = {
+            (row + 1, col + 1): int(board_array[row, col])
+            for row in range(8)
+            for col in range(8)
+            if board_array[row, col] != 0
+        }
+        current_player = int(state_array[-1])
+        return OthelloState(board=Map(board), current_player=current_player, is_terminal=False)

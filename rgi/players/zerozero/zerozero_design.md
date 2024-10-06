@@ -225,7 +225,7 @@ Acceptance Criteria:
 - All unit tests pass.
 - Code adheres to the Python Style Guide.
 
-#### 7.1.2. Develop the MuZero Model Components [completed]
+#### 7.1.2. Develop the ZeroZero Model Components [completed]
 
 ##### Task 3: Implement the Dynamics, Reward, and Policy Models
 
@@ -339,36 +339,38 @@ Acceptance Criteria:
 - ZeroZeroPlayer is functional and integrates with the game framework.
 - All tests pass.
 
-#### 7.1.3. Collect Training Data via Self-Play
+#### 7.1.3. Create Artificial Training Data
 
-##### Task 5: Implement Data Collection with Self-Play
+##### Task 5: Generate Synthetic Training Data
 
-Description: Generate training data by having ZeroZeroPlayer play against itself or a RandomPlayer.
+Description: Create a set of artificial training data to test the model training pipeline without relying on self-play.
 
 Code Entry Points:
 
-File: `scripts/collect_zerozero_data.py`
+File: `scripts/generate_synthetic_data.py`
 
 Subtasks:
 
-a. Simulate games and record sequences of (state, action, reward, next_state) tuples.
-b. Store the data in a format suitable for training (e.g., TFRecord, JSONL).
+a. Define a data structure for synthetic samples (state, action, reward, next_state).
+b. Generate random Connect4-like states and actions.
+c. Create a function to produce artificial rewards and next states.
+d. Store the synthetic data in a format suitable for training (e.g., TFRecord, JSONL).
 
 Testing Criteria:
 
-- Ensure that data collection runs without errors.
-- Verify that the collected data is valid and correctly formatted.
+- Ensure that generated data matches the expected format.
+- Verify that the data covers a range of possible game scenarios.
 
 Acceptance Criteria:
 
-- Training dataset is generated and ready for use.
-- Data quality is confirmed.
+- A synthetic dataset is generated and ready for use in training.
+- Data format is consistent with what would be expected from actual gameplay.
 
 #### 7.1.4. Train the Models
 
 ##### Task 6: Implement the Training Pipeline
 
-Description: Set up the training loop to train the ZeroZeroModel using the collected data.
+Description: Set up the training loop to train the ZeroZeroModel using the synthetic data.
 
 Subtasks:
 
@@ -423,13 +425,134 @@ Acceptance Criteria:
 - ZeroZeroPlayer demonstrates improved performance over baseline players.
 - Results are documented and analyzed.
 
-## 7.2. Phase 2: Generalization to Multiple Games
+### 7.2. Phase 2: Implement MCTS Search
 
-In this phase, we aim to generalize the MuZero-like algorithm to handle multiple games using a shared architecture. This involves transitioning to models capable of processing arbitrary game states and actions represented as JSON blobs.
+#### Task 8: Develop MCTS Algorithm
 
-### 7.2.1. Transition to Transformer-Based Models
+Description: Implement a Monte Carlo Tree Search algorithm that integrates with the ZeroZeroModel.
 
-#### Task 8: Implement Transformer-Based State Embedder
+Code Entry Points:
+
+File: `rgi/players/zerozero/mcts.py`
+
+Subtasks:
+
+a. Implement the core MCTS algorithm (selection, expansion, simulation, backpropagation).
+b. Integrate the ZeroZeroModel for action selection and value estimation.
+c. Implement a search function that returns the best action given a game state.
+
+Testing Criteria:
+- Verify that the MCTS algorithm explores the game tree correctly.
+- Ensure that the integration with ZeroZeroModel works as expected.
+
+Acceptance Criteria:
+- MCTS algorithm is implemented and integrated with ZeroZeroModel.
+- Search function returns valid actions and improves play strength.
+
+#### Task 9: Optimize MCTS Performance
+
+Description: Enhance the MCTS algorithm for better performance and efficiency.
+
+Subtasks:
+
+a. Implement parallel tree search to utilize multiple CPU cores.
+b. Optimize the node selection and expansion processes.
+c. Implement pruning techniques to focus on promising branches.
+
+Testing Criteria:
+- Measure the speed improvement of parallel search vs. single-threaded search.
+- Verify that optimizations don't negatively impact play strength.
+
+Acceptance Criteria:
+- MCTS performance is significantly improved in terms of nodes explored per second.
+- Play strength is maintained or improved with the optimizations.
+
+### 7.3. Phase 3: Gather Real Training Data
+
+#### Task 10: Implement Self-Play Data Collection
+
+Description: Create a system for generating training data through self-play using the current best model.
+
+Code Entry Points:
+
+File: `scripts/collect_selfplay_data.py`
+
+Subtasks:
+
+a. Implement a self-play loop that uses the current best model and MCTS.
+b. Record game trajectories, including states, actions, rewards, and game outcomes.
+c. Implement data augmentation techniques (e.g., board rotations/flips for Connect4).
+d. Store trajectories using JAX's built-in save function.
+
+Data Format:
+```python
+trajectory = {
+    'states': jnp.array([...]),  # Shape: (num_steps, 6, 7)
+    'actions': jnp.array([...]),  # Shape: (num_steps,)
+    'rewards': jnp.array([...]),  # Shape: (num_steps,)
+    'game_result': jnp.array([...])  # Final game result
+}
+
+# Save multiple trajectories
+trajectories = [trajectory1, trajectory2, trajectory3]
+jnp.save('multiple_trajectories.npy', trajectories)
+```
+
+Testing Criteria:
+- Verify that the collected data is correctly formatted and diverse.
+- Ensure that data augmentation is applied correctly.
+- Check that saved files can be loaded and contain the expected data.
+
+Acceptance Criteria:
+- Self-play system generates a large dataset of high-quality training examples.
+- Data collection process is efficient and can run continuously.
+- Saved data can be easily loaded and used for training.
+
+#### Task 11: Develop a Training Data Pipeline
+
+Description: Create a pipeline for processing and feeding self-play data into the training loop.
+
+Subtasks:
+
+a. Implement data loading and batching functions.
+b. Create a system for prioritized sampling of training examples.
+c. Implement on-the-fly data preprocessing and augmentation.
+d. Develop utility functions for inspecting saved data.
+
+Example utility function:
+```python
+def examine_trajectory(file_path):
+    trajectory = jnp.load(file_path)
+    print(f"Trajectory length: {len(trajectory['states'])}")
+    print(f"States shape: {trajectory['states'].shape}")
+    print(f"Actions shape: {trajectory['actions'].shape}")
+    print(f"Rewards shape: {trajectory['rewards'].shape}")
+    print("\nFirst state:")
+    print(trajectory['states'][0])
+    print("\nFirst few actions:")
+    print(trajectory['actions'][:5])
+    print("\nFirst few rewards:")
+    print(trajectory['rewards'][:5])
+
+# Usage
+examine_trajectory('game_trajectory.npy')
+```
+
+Testing Criteria:
+- Verify that the pipeline can handle large datasets efficiently.
+- Ensure that batches are correctly formed and preprocessed.
+- Confirm that utility functions correctly display data from saved files.
+
+Acceptance Criteria:
+- Training data pipeline integrates smoothly with the existing training loop.
+- Pipeline demonstrates good performance and memory efficiency.
+- Developers can easily inspect and verify the contents of saved data files.
+
+### 7.4. Phase 4: Generalization to Multiple Games
+
+#### Task 12: Transition to Transformer-Based Models
+
+##### Task 12.1: Implement Transformer-Based State Embedder
 
 Description: Develop a StateEmbedder that uses a Transformer model to embed game states represented as JSON blobs into fixed-dimensional embeddings.
 
@@ -476,7 +599,7 @@ Acceptance Criteria:
 - All unit tests pass.
 - Code adheres to the Python Style Guide.
 
-#### Task 9: Implement Transformer-Based Action Embedder
+##### Task 12.2: Implement Transformer-Based Action Embedder
 
 Description: Develop an ActionEmbedder that uses a Transformer model to embed actions represented as JSON blobs.
 
@@ -519,9 +642,7 @@ Acceptance Criteria:
 - TransformerActionEmbedder functions correctly across multiple games.
 - All tests pass.
 
-### 7.2.2. Expand to Additional Games
-
-#### Task 10: Integrate Additional Games
+#### Task 13: Integrate Additional Games
 
 Description: Add support for new games to test the generalization capabilities of the model.
 
@@ -543,7 +664,7 @@ Acceptance Criteria:
 - New games are fully integrated and operational.
 - All tests pass.
 
-#### Task 11: Collect Multi-Game Training Data
+#### Task 14: Collect Multi-Game Training Data
 
 Description: Generate training data for all supported games using self-play.
 
@@ -561,7 +682,7 @@ Acceptance Criteria:
 - Multi-game dataset is ready for training.
 - Data quality is confirmed.
 
-#### Task 12: Retrain Models on Combined Dataset
+#### Task 15: Retrain Models on Combined Dataset
 
 Description: Train the embedding models and MuZeroModel on the combined dataset from multiple games.
 
@@ -579,7 +700,7 @@ Acceptance Criteria:
 - Models generalize well across multiple games.
 - Training is stable and efficient.
 
-#### Task 13: Evaluate Generalization and Transfer Learning
+#### Task 16: Evaluate Generalization and Transfer Learning
 
 Description: Assess how well the models transfer knowledge between games.
 
@@ -596,13 +717,9 @@ Acceptance Criteria:
 - Insights into transfer learning effects are documented.
 - Recommendations for further improvements are provided.
 
-## 7.3. Phase 3: Optimization and Refinement
+### 7.5. Phase 5: Optimization and Refinement
 
-In this phase, we focus on optimizing the models and training processes, incorporating advanced techniques to improve performance and efficiency.
-
-### 7.3.1. Hyperparameter Optimization
-
-#### Task 14: Set Up Hyperparameter Tuning Framework
+#### Task 17: Set Up Hyperparameter Tuning Framework
 
 Description: Implement tools to automate the tuning of model hyperparameters.
 
@@ -619,7 +736,7 @@ Testing Criteria:
 Acceptance Criteria:
 - Hyperparameter tuning framework is operational and integrated.
 
-#### Task 15: Conduct Hyperparameter Experiments
+#### Task 18: Conduct Hyperparameter Experiments
 
 Description: Perform experiments to find optimal hyperparameter settings for the models.
 
@@ -637,9 +754,7 @@ Acceptance Criteria:
 - Optimal hyperparameters are identified and documented.
 - Models show improved performance with new settings.
 
-### 7.3.2. Implement Efficient Training Techniques
-
-#### Task 16: Incorporate Techniques from "EfficientZero"
+#### Task 19: Incorporate Techniques from "EfficientZero"
 
 Description: Apply methods from the "EfficientZero" paper to improve training efficiency and performance.
 
@@ -658,7 +773,7 @@ Acceptance Criteria:
 - Training becomes more efficient without degrading model performance.
 - Documentation is updated to reflect new methods.
 
-#### Task 17: Enhance MCTS Integration
+#### Task 20: Enhance MCTS Integration
 
 Description: Optimize the MCTS algorithm to work more efficiently with the learned models.
 
@@ -676,9 +791,7 @@ Acceptance Criteria:
 - MCTS is optimized for performance and efficiency.
 - Improvements are validated through testing.
 
-### 7.3.3. Finalize and Document the Models
-
-#### Task 18: Update Documentation and Codebase
+#### Task 21: Update Documentation and Codebase
 
 Description: Ensure that all code and documentation are up-to-date and comprehensive.
 
@@ -696,11 +809,9 @@ Acceptance Criteria:
 - Codebase is clean, well-documented, and ready for deployment or further development.
 - Documentation is sufficient for new contributors to get started.
 
-## 7.4. Phase 4: Deployment and Evaluation (Optional)
+### 7.6. Phase 6: Deployment and Evaluation (Optional)
 
-If applicable, this phase involves deploying the models in a real-world or user-facing environment and conducting comprehensive evaluations.
-
-#### Task 19: Deploy Models to Production Environment
+#### Task 22: Deploy Models to Production Environment
 
 Description: Integrate the trained models into the frontend applications for users to interact with.
 
@@ -718,7 +829,7 @@ Acceptance Criteria:
 - Models are successfully deployed and functional in the production environment.
 - User interactions are smooth and error-free.
 
-#### Task 20: Collect User Feedback and Metrics
+#### Task 23: Collect User Feedback and Metrics
 
 Description: Gather data on model performance in the real world and user satisfaction.
 
@@ -771,15 +882,15 @@ Week 3:
 ### 9.2. Phase 2 Milestones
 
 Week 4-5:
-- Complete Tasks 8-11 (Implement transformer-based embedders and integrate additional games).
+- Complete Tasks 8-11 (Implement MCTS search and gather real training data).
 
 Week 6:
-- Retrain models on multi-game data and evaluate generalization.
+- Complete Tasks 12-16 (Implement transformer-based embedders, integrate additional games, and evaluate generalization).
 
 ### 9.3. Phase 3 Milestones
 
 Week 7-8:
-- Complete Tasks 14-17 (Hyperparameter optimization and efficiency improvements).
+- Complete Tasks 17-20 (Hyperparameter optimization and efficiency improvements).
 
 Week 9:
 - Finalize documentation and prepare for potential deployment.

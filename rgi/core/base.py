@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Generic, TypeVar, Any
+import jax.numpy as jnp
 
 TGame = TypeVar("TGame", bound="Game[Any, Any, Any]")  # pylint: disable=invalid-name
 TGameState = TypeVar("TGameState")  # pylint: disable=invalid-name
@@ -52,7 +53,7 @@ class Game(ABC, Generic[TGameState, TPlayerId, TAction]):
 
 
 class GameSerializer(ABC, Generic[TGame, TGameState, TAction]):
-    """Companion class to Game that serializes game states for frontend consumption."""
+    """Companion class to Game that serializes game states for various purposes."""
 
     @abstractmethod
     def serialize_state(self, game: TGame, state: TGameState) -> dict[str, Any]:
@@ -61,6 +62,22 @@ class GameSerializer(ABC, Generic[TGame, TGameState, TAction]):
     @abstractmethod
     def parse_action(self, game: TGame, action_data: dict[str, Any]) -> TAction:
         """Parse an action from frontend data."""
+
+    @abstractmethod
+    def state_to_jax_array(self, game: TGame, state: TGameState) -> jnp.ndarray:
+        """Convert a game state to a JAX array for ML model input."""
+
+    @abstractmethod
+    def action_to_jax_array(self, game: TGame, action: TAction) -> jnp.ndarray:
+        """Convert an action to a JAX array for ML model input."""
+
+    @abstractmethod
+    def jax_array_to_action(self, game: TGame, action_array: jnp.ndarray) -> TAction:
+        """Convert a JAX array output from an ML model to a game action."""
+
+    @abstractmethod
+    def jax_array_to_state(self, game: TGame, state_array: jnp.ndarray) -> TGameState:
+        """Convert a JAX array to a game state."""
 
 
 class Player(ABC, Generic[TGameState, TPlayerState, TAction]):

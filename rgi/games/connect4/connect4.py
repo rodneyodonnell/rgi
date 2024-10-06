@@ -3,6 +3,8 @@ from typing import Literal, Optional, Any
 from typing_extensions import override
 
 from immutables import Map
+import jax.numpy as jnp
+
 from rgi.core.base import Game, GameSerializer
 
 TPlayerId = Literal[1, 2]
@@ -162,3 +164,28 @@ class Connect4Serializer(GameSerializer[Connect4Game, Connect4State, TAction]):
         if not isinstance(column, int):
             raise ValueError("Column must be an integer")
         return column
+
+    @override
+    def state_to_jax_array(self, game: Connect4Game, state: Connect4State) -> jnp.ndarray:
+        board_array = jnp.array([[state.board.get((row, col), 0) for col in range(1, 8)] for row in range(1, 7)])
+        return jnp.concatenate([board_array.flatten(), jnp.array([state.current_player])])
+
+    @override
+    def action_to_jax_array(self, game: Connect4Game, action: TAction) -> jnp.ndarray:
+        return jnp.array(action)
+
+    @override
+    def jax_array_to_action(self, game: Connect4Game, action_array: jnp.ndarray) -> TAction:
+        return int(action_array)
+
+    @override
+    def jax_array_to_state(self, game: Connect4Game, state_array: jnp.ndarray) -> Connect4State:
+        board_array = state_array[:-1].reshape(6, 7)
+        board = {
+            (row + 1, col + 1): int(board_array[row, col])
+            for row in range(6)
+            for col in range(7)
+            if board_array[row, col] != 0
+        }
+        current_player = int(state_array[-1])
+        return Connect4State(board=Map(board), current_player=current_player)
