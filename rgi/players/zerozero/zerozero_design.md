@@ -339,70 +339,57 @@ Acceptance Criteria:
 - ZeroZeroPlayer is functional and integrates with the game framework.
 - All tests pass.
 
-#### 7.1.3. Create Artificial Training Data
+#### 7.1.3. Create Artificial Training Data [completed]
 
-##### Task 5: Generate Synthetic Training Data
+##### Task 5: Implement Data Collection with Self-Play
 
-Description: Create a set of artificial training data to test the model training pipeline without relying on self-play.
+Description: Generate training data by having players play against each other and record the game trajectories.
 
 Code Entry Points:
-
-File: `scripts/generate_synthetic_data.py`
-
-Subtasks:
-
-a. Define a data structure for synthetic samples (state, action, reward, next_state).
-b. Generate random Connect4-like states and actions.
-c. Create a function to produce artificial rewards and next states.
-d. Store the synthetic data in a format suitable for training (e.g., TFRecord, JSONL).
-
-Testing Criteria:
-
-- Ensure that generated data matches the expected format.
-- Verify that the data covers a range of possible game scenarios.
-
-Acceptance Criteria:
-
-- A synthetic dataset is generated and ready for use in training.
-- Data format is consistent with what would be expected from actual gameplay.
-
-#### 7.1.4. Train the Models
-
-##### Task 6: Implement the Training Pipeline
-
-Description: Set up the training loop to train the ZeroZeroModel using the synthetic data.
+- File: `rgi/main.py`
+- File: `rgi/core/trajectory.py`
 
 Subtasks:
-
-a. Define loss functions:
-
-- Dynamics Loss: MSE between predicted and target next state embeddings.
-- Reward Loss: MSE between predicted and target rewards.
-- Policy Loss: Cross-entropy loss between predicted logits and actual actions.
-
-b. Implement the training loop using JAX and Optax.
-
-```python
-def loss_fn(params, batch):
-    next_state_pred, reward_pred, logits = zerozero_model.apply(params, batch['state'], batch['action'])
-    dynamics_loss = jnp.mean((next_state_pred - batch['next_state_embedding']) ** 2)
-    reward_loss = jnp.mean((reward_pred - batch['reward']) ** 2)
-    policy_loss = optax.softmax_cross_entropy_with_integer_labels(logits, batch['action'] - 1)
-    total_loss = dynamics_loss + reward_loss + policy_loss
-    return total_loss
-```
-
-c. Use an optimizer (e.g., Adam) and update parameters.
+a. Implement trajectory collection during gameplay (completed)
+b. Implement functions to save and load trajectories (completed)
+c. Update the main game loop to save trajectories (completed)
 
 Testing Criteria:
-
-- Run the training loop and monitor loss values.
-- Ensure that gradients are computed correctly.
+- Verify that trajectories are correctly saved and loaded (completed)
+- Ensure that the saved trajectories contain all necessary information (completed)
 
 Acceptance Criteria:
+- Trajectories are successfully collected during gameplay
+- Trajectories can be saved to and loaded from files
+- The main game loop saves trajectories when requested
+- All tests related to trajectory collection and storage pass
 
-- Models are trained without errors.
-- Loss decreases over time, indicating learning.
+#### 7.1.4. Train ZeroZero Model
+
+##### Task 6: Implement Model Training
+
+Description: Develop the training loop for the ZeroZero model using the collected trajectories.
+
+Code Entry Points:
+- File: `rgi/players/zerozero/zerozero_model.py` (to be created)
+- File: `rgi/players/zerozero/zerozero_trainer.py` (to be created)
+
+Subtasks:
+a. Implement a data loader for the saved trajectories
+b. Define the loss functions for the dynamics, reward, and policy heads
+c. Implement the training loop, including gradient computation and parameter updates
+d. Add functionality to save and load model checkpoints
+
+Testing Criteria:
+- Write unit tests for the data loader
+- Implement integration tests for the training loop
+- Verify that the model parameters are updated during training
+
+Acceptance Criteria:
+- The ZeroZero model can be trained on the collected trajectories
+- Training progress can be monitored (e.g., loss values, accuracy metrics)
+- Trained models can be saved and loaded
+- All tests related to model training pass
 
 #### 7.1.5. Evaluate the MuZeroPlayer Performance
 
