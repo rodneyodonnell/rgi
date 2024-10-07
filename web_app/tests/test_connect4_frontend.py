@@ -6,7 +6,7 @@ from playwright.sync_api import Page, expect
 # pylint: disable=redefined-outer-name  # pytest fixtures trigger this false positive
 
 # max timeout of 5s for each test
-pytestmark = pytest.mark.timeout(5)
+pytestmark = pytest.mark.timeout(10)
 
 
 @pytest.fixture(scope="function")

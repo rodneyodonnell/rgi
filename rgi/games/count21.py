@@ -41,7 +41,7 @@ class Count21Game(Game[Tuple[int, ...], int, int]):
     def reward(self, state: Tuple[int, ...], player_id: int) -> float:
         if not self.is_terminal(state):
             return 0.0
-        return 1.0 if self.current_player_id(state) != player_id else -1.0
+        return 1.0 if self.current_player_id(state) == player_id else -1.0
 
     @override
     def pretty_str(self, state: Tuple[int, ...]) -> str:
