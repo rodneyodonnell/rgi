@@ -4,6 +4,7 @@
 # To update dependencies:
 # 1. Edit this file to add, remove, or update dependencies.
 # 2. Run: python3 -m piptools compile requirements.in
+# 4. Run: pip install -r requirements.txt
 #
 # To upgrade all packages to their latest versions:
 # Run: python3 -m piptools compile --upgrade requirements.in
@@ -37,3 +38,4 @@ webdriver-manager==4.0.2
 pip-tools
 pylint
 mypy
+tqdm

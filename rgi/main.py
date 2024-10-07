@@ -2,6 +2,7 @@ import argparse
 from typing import Literal, Any
 from collections import defaultdict
 import jax.numpy as jnp
+from tqdm import tqdm
 from rgi.core.base import Game, Player, TPlayerId
 from rgi.core import game_registry
 from rgi.core.trajectory import Trajectory, encode_trajectory, save_trajectories
@@ -37,6 +38,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--num_games", type=int, default=1, help="Number of games to play")
     parser.add_argument("--save_trajectories", action="store_true", help="Save game trajectories")
+    parser.add_argument("-v", "--verbose", action="store_true", help="Increase output verbosity")
     return parser.parse_args()
 
 
@@ -77,14 +79,19 @@ def run_games(
     players: dict[TPlayerId, Player[Any, Any, Any]],
     num_games: int,
     save_trajectories_path: str | None = None,
+    verbose: bool = False,
 ) -> None:
     stats: list[dict[str, Any]] = []
     all_trajectories = []
 
     serializer = registered_game.serializer_fn()
 
+    # Create a progress bar
+    pbar = tqdm(total=num_games, disable=verbose or num_games == 1)
+
     for i in range(num_games):
-        print(f"Starting game {i+1}")
+        if verbose or num_games == 1:
+            print(f"Starting game {i+1}")
 
         move_count = 0
         state = game.initial_state()
@@ -105,8 +112,9 @@ def run_games(
             trajectory_states.append(state)
             move_count += 1
 
-        print(f"Game {i+1} ended")
-        print(game.pretty_str(state))
+        if verbose or num_games == 1:
+            print(f"Game {i+1} ended")
+            print(game.pretty_str(state))
 
         if game.is_terminal(state):
             all_players_ids = game.all_player_ids(state)
@@ -114,18 +122,20 @@ def run_games(
             max_reward = max(rewards)
             winners = [player_id for player_id, reward in zip(all_players_ids, rewards) if reward == max_reward]
 
-            print("Final rewards:")
-            for player_id, reward in zip(all_players_ids, rewards):
-                print(f"Player {player_id}: {reward}")
+            if verbose or num_games == 1:
+                print("Final rewards:")
+                for player_id, reward in zip(all_players_ids, rewards):
+                    print(f"Player {player_id}: {reward}")
 
-            if len(winners) == 1:
-                print(f"Player {winners[0]} wins")
-            elif len(winners) == len(all_players_ids):
-                print("The game ended in a draw")
-            else:
-                print(f"Players {', '.join(map(str, winners))} tied for the win")
+                if len(winners) == 1:
+                    print(f"Player {winners[0]} wins")
+                elif len(winners) == len(all_players_ids):
+                    print("The game ended in a draw")
+                else:
+                    print(f"Players {', '.join(map(str, winners))} tied for the win")
         else:
-            print("The game ended in an unexpected state")
+            if verbose or num_games == 1:
+                print("The game ended in an unexpected state")
             winners = []
             rewards = [0] * len(game.all_player_ids(state))
 
@@ -141,7 +151,14 @@ def run_games(
         )
         all_trajectories.append(encode_trajectory(game, trajectory, serializer))
 
-        print()
+        if verbose or num_games == 1:
+            print()
+
+        # Update the progress bar
+        pbar.update(1)
+
+    # Close the progress bar
+    pbar.close()
 
     if num_games > 1:
         print_aggregate_stats(stats, num_games)
@@ -166,7 +183,7 @@ def main() -> None:
     }
 
     save_trajectories_path = f"{args.game}_trajectories.npy" if args.save_trajectories else None
-    run_games(game, registered_game, players, args.num_games, save_trajectories_path)
+    run_games(game, registered_game, players, args.num_games, save_trajectories_path, args.verbose)
 
 
 if __name__ == "__main__":

@@ -28,6 +28,7 @@
                 "--player2", "random",
                 "--num_games", "1",
                 "--save_trajectories",
+                "--verbose"
             ],
             "console": "integratedTerminal",
             "justMyCode": true
