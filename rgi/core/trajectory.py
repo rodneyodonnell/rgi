@@ -1,9 +1,11 @@
 # rgi/core/trajectory.py
 
 from dataclasses import dataclass
-from typing import Generic, TypeVar
+from typing import Generic, TypeVar, List
 import jax
 import jax.numpy as jnp
+import glob
+import numpy as np
 
 from rgi.core.base import Game, TGameState, TAction, TPlayerId
 
@@ -59,8 +61,7 @@ def save_trajectories(trajectories: list[EncodedTrajectory], filename: str):
     jnp.save(filename, data, allow_pickle=True)
 
 
-def load_trajectories(filename: str) -> list[EncodedTrajectory]:
-    data = jnp.load(filename, allow_pickle=True).item()
+def load_trajectories(trajectories_glob: str) -> list[EncodedTrajectory]:
     return [
         EncodedTrajectory(
             states=data["states"][i],
@@ -70,5 +71,7 @@ def load_trajectories(filename: str) -> list[EncodedTrajectory]:
             final_rewards=data["final_rewards"][i],
             length=data["lengths"][i],
         )
+        for file_path in glob.glob(trajectories_glob)
+        for data in [jnp.load(file_path, allow_pickle=True).item()]
         for i in range(len(data["lengths"]))
     ]

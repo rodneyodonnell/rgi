@@ -32,6 +32,19 @@
             ],
             "console": "integratedTerminal",
             "justMyCode": true
+        },
+        {
+            "name": "main.py train",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/rgi/main.py",
+            "args": [
+                "--train",
+                "--game","connect4",
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": true
         }
+
     ]
 }

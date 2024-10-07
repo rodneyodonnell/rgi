@@ -14,7 +14,13 @@ from rgi.players.zerozero.zerozero_model import ZeroZeroModel, zerozero_loss
 
 
 class ZeroZeroTrainer:
-    def __init__(self, model: ZeroZeroModel, serializer: GameSerializer, game: Game, learning_rate: float = 1e-4):
+    def __init__(
+        self,
+        model: ZeroZeroModel,
+        serializer: GameSerializer,
+        game: Game,
+        learning_rate: float = 1e-4,
+    ):
         self.model = model
         self.serializer = serializer
         self.game = game
@@ -30,7 +36,15 @@ class ZeroZeroTrainer:
         def loss_fn(params):
             state_input, action, next_state, reward, policy_target = batch
             reward = jnp.asarray(reward)  # Ensure reward is a jax.Array
-            loss, loss_dict = zerozero_loss(self.model, params, state_input, action, next_state, reward, policy_target)
+            loss, loss_dict = zerozero_loss(
+                self.model,
+                params,
+                state_input,
+                action,
+                next_state,
+                reward,
+                policy_target,
+            )
             return loss, loss_dict
 
         grad_fn = jax.value_and_grad(loss_fn, has_aux=True)
@@ -47,7 +61,10 @@ class ZeroZeroTrainer:
                 next_states.append(self.serializer.jax_array_to_state(self.game, trajectory.states[i + 1]))
                 rewards.append(trajectory.state_rewards[i])
                 policy_targets.append(
-                    jax.nn.one_hot(trajectory.actions[i], num_classes=len(self.model.possible_actions))
+                    jax.nn.one_hot(
+                        trajectory.actions[i],
+                        num_classes=len(self.model.possible_actions),
+                    )
                 )
 
         dataset = list(zip(states, actions, next_states, rewards, policy_targets))
@@ -56,9 +73,7 @@ class ZeroZeroTrainer:
         for i in range(0, len(dataset), batch_size):
             yield tuple(map(np.array, zip(*dataset[i : i + batch_size])))
 
-    def train(self, trajectories_file: str, num_epochs: int, batch_size: int):
-        trajectories = load_trajectories(trajectories_file)
-
+    def train(self, trajectories: List[EncodedTrajectory], num_epochs: int, batch_size: int):
         if self.state is None:
             rng = jax.random.PRNGKey(0)
             self.state = self.create_train_state(rng)
@@ -82,10 +97,9 @@ class ZeroZeroTrainer:
         checkpoints.save_checkpoint(checkpoint_dir, self.state, step=self.state.step, keep=3)
 
     def load_checkpoint(self, checkpoint_dir: str):
+        """Load checkpoint from directory. If no checkpoint is found, create a new state."""
         if self.state is None:
             # We need a state of the correct type to restore from a checkpoint.
             rng = jax.random.PRNGKey(0)
             self.state = self.create_train_state(rng)
         self.state = checkpoints.restore_checkpoint(checkpoint_dir, target=self.state)
-        if self.state is None:
-            raise ValueError("No checkpoint found.")

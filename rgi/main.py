@@ -1,3 +1,30 @@
+"""
+RGI Main Script
+
+This script provides a command-line interface for various operations in the RGI project,
+including playing games, generating trajectories, and training AI models.
+
+Usage examples:
+
+1. Play a game of Connect4 with a human player against a random AI:
+   python rgi/main.py --game connect4 --player1 human --player2 random
+
+2. Generate trajectories by playing 100 games of Connect4 with two random AIs:
+   python rgi/main.py --game connect4 --player1 random --player2 random --num_games 100 --save_trajectories
+
+3. Train the ZeroZero model on Connect4 trajectories:
+   python rgi/main.py --train --game connect4 --trajectories_dir data/trajectories/connect4 --checkpoint_dir data/checkpoints/zerozero_connect4
+
+4. Play a game of Connect4 using a trained ZeroZero model:
+   python rgi/main.py --game connect4 --player1 zerozero --player2 human --checkpoint_dir checkpoints/zerozero_connect4
+
+5. Generate trajectories using a trained ZeroZero model:
+   python rgi/main.py --game connect4 --player1 zerozero --player2 random --num_games 100 --save_trajectories --checkpoint_dir data/checkpoints/zerozero_connect4
+
+For more information on available options, run:
+python rgi/main.py --help
+"""
+
 import argparse
 from typing import Literal, Any
 from collections import defaultdict
@@ -7,7 +34,9 @@ import os
 from datetime import datetime
 from rgi.core.base import Game, Player, TPlayerId
 from rgi.core import game_registry
-from rgi.core.trajectory import Trajectory, encode_trajectory, save_trajectories
+from rgi.core.trajectory import Trajectory, encode_trajectory, save_trajectories, load_trajectories
+from rgi.players.zerozero.zerozero_trainer import ZeroZeroTrainer
+from rgi.players.zerozero.zerozero_model import ZeroZeroModel
 
 GAMES: dict[str, game_registry.RegisteredGame[Any, Any, Any]] = game_registry.GAME_REGISTRY
 PLAYERS: dict[str, Any] = game_registry.PLAYER_REGISTRY
@@ -16,7 +45,7 @@ PlayerType = str
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run RGI games")
+    parser = argparse.ArgumentParser(description="Run RGI games or train the ZeroZero model")
     parser.add_argument(
         "--game",
         type=str,
@@ -47,6 +76,10 @@ def parse_args() -> argparse.Namespace:
         help="Directory to save trajectories",
     )
     parser.add_argument("-v", "--verbose", action="store_true", help="Increase output verbosity")
+    parser.add_argument("--train", action="store_true", help="Train the ZeroZero model")
+    parser.add_argument(
+        "--checkpoint_dir", type=str, default="data/checkpoints", help="Directory to save/load model checkpoints"
+    )
     return parser.parse_args()
 
 
@@ -176,15 +209,10 @@ def run_games(
         print(f"Trajectories saved to {save_trajectories_path}")
 
 
-def main() -> None:
-    args = parse_args()
+def play_game(
+    args: argparse.Namespace, registered_game: game_registry.RegisteredGame[Any, Any, Any], game: Game[Any, Any, Any]
+) -> None:
 
-    registered_game = GAMES.get(args.game)
-    if registered_game is None:
-        print(f"Game {args.game} not implemented yet")
-        return
-
-    game = registered_game.game_fn()
     players: dict[int, Player[Any, Any, Any]] = {
         1: create_player(args.player1, game, registered_game, player_id=1),
         2: create_player(args.player2, game, registered_game, player_id=2),
@@ -199,6 +227,56 @@ def main() -> None:
         save_trajectories_path = None
 
     run_games(game, registered_game, players, args.num_games, save_trajectories_path, args.verbose)
+
+
+def train_zerozero_model(
+    args: argparse.Namespace, registered_game: game_registry.RegisteredGame[Any, Any, Any], game: Game[Any, Any, Any]
+) -> None:
+
+    serializer = registered_game.serializer_fn()
+    state_embedder = registered_game.state_embedder_fn()
+    action_embedder = registered_game.action_embedder_fn()
+
+    model = ZeroZeroModel(
+        state_embedder=state_embedder,
+        action_embedder=action_embedder,
+        possible_actions=game.all_actions(),
+        embedding_dim=64,
+        hidden_dim=128,
+        shared_dim=256,
+    )
+
+    trainer = ZeroZeroTrainer(model, serializer, game)
+
+    trainer.load_checkpoint(args.checkpoint_dir)
+
+    trajectories_glob = os.path.join(args.trajectories_dir, args.game, "*.trajectory.npy")
+    trajectories = load_trajectories(trajectories_glob)
+
+    if not trajectories:
+        raise ValueError(f"No trajectory files found matching pattern: {trajectories_glob}")
+
+    trainer.train(trajectories, num_epochs=10, batch_size=32)
+
+    # Save the trained model
+    trainer.save_checkpoint(args.checkpoint_dir)
+    print(f"Model training completed. Checkpoint saved to {args.checkpoint_dir}")
+
+
+def main() -> None:
+    args = parse_args()
+
+    registered_game = GAMES.get(args.game)
+    if registered_game is None:
+        print(f"Game {args.game} not implemented yet")
+        return
+
+    game = registered_game.game_fn()
+
+    if args.train:
+        train_zerozero_model(args, registered_game, game)
+    else:
+        play_game(args, registered_game, game)
 
 
 if __name__ == "__main__":
