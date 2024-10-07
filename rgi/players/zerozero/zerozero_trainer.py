@@ -7,15 +7,17 @@ from typing import Any, Tuple, List
 import numpy as np
 from tqdm import tqdm
 import jax.tree_util as jtu
-import pickle
+from rgi.core.base import GameSerializer, Game
 
 from rgi.core.trajectory import load_trajectories, EncodedTrajectory
 from rgi.players.zerozero.zerozero_model import ZeroZeroModel, zerozero_loss
 
 
 class ZeroZeroTrainer:
-    def __init__(self, model: ZeroZeroModel, learning_rate: float = 1e-4):
+    def __init__(self, model: ZeroZeroModel, serializer: GameSerializer, game: Game, learning_rate: float = 1e-4):
         self.model = model
+        self.serializer = serializer
+        self.game = game
         self.optimizer = optax.adam(learning_rate)
         self.state = None
 
@@ -40,9 +42,9 @@ class ZeroZeroTrainer:
 
         for trajectory in trajectories:
             for i in range(trajectory.length - 1):
-                states.append(trajectory.states[i])
-                actions.append(trajectory.actions[i])
-                next_states.append(trajectory.states[i + 1])
+                states.append(self.serializer.jax_array_to_state(self.game, trajectory.states[i]))
+                actions.append(self.serializer.jax_array_to_action(self.game, trajectory.actions[i]))
+                next_states.append(self.serializer.jax_array_to_state(self.game, trajectory.states[i + 1]))
                 rewards.append(trajectory.state_rewards[i])
                 policy_targets.append(
                     jax.nn.one_hot(trajectory.actions[i], num_classes=len(self.model.possible_actions))

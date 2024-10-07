@@ -1,3 +1,4 @@
+from typing_extensions import override
 import pytest
 import jax
 import jax.numpy as jnp
@@ -7,6 +8,21 @@ from rgi.players.zerozero.zerozero_trainer import ZeroZeroTrainer
 from rgi.core.trajectory import EncodedTrajectory
 from rgi.tests.players.test_zerozero_model import DummyStateEmbedder, DummyActionEmbedder
 from rgi.core.trajectory import save_trajectories
+from rgi.core.base import GameSerializer, Game
+
+from typing import Any, List
+from rgi.core.base import Game, GameSerializer, TGameState, TPlayerId, TAction
+from rgi.games.count21 import Count21Game, Count21Serializer
+
+
+@pytest.fixture
+def dummy_game():
+    return Count21Game()
+
+
+@pytest.fixture
+def dummy_serializer():
+    return Count21Serializer()
 
 
 @pytest.fixture
@@ -22,8 +38,8 @@ def dummy_model():
 
 
 @pytest.fixture
-def dummy_trainer(dummy_model):
-    return ZeroZeroTrainer(dummy_model)
+def dummy_trainer(dummy_model, dummy_serializer, dummy_game):
+    return ZeroZeroTrainer(dummy_model, dummy_serializer, dummy_game)
 
 
 @pytest.fixture
@@ -84,7 +100,7 @@ def test_train(dummy_trainer, dummy_trajectories, tmp_path):
     assert dummy_trainer.state is not None
 
 
-def test_save_load_checkpoint(dummy_trainer, dummy_trajectories, tmp_path):
+def test_save_load_checkpoint(dummy_trainer, dummy_trajectories, dummy_serializer, dummy_game, tmp_path):
     trajectories_file = tmp_path / "test_trajectories.npy"
     save_trajectories(dummy_trajectories, str(trajectories_file))
 
@@ -94,7 +110,7 @@ def test_save_load_checkpoint(dummy_trainer, dummy_trajectories, tmp_path):
     checkpoint_dir.mkdir(exist_ok=True)
 
     dummy_trainer.save_checkpoint(str(checkpoint_dir))
-    new_trainer = ZeroZeroTrainer(dummy_trainer.model)
+    new_trainer = ZeroZeroTrainer(dummy_trainer.model, dummy_serializer, dummy_game)
     new_trainer.load_checkpoint(str(checkpoint_dir))
 
     assert new_trainer.state is not None

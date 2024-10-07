@@ -38,7 +38,7 @@ class Connect4ActionEmbedder(ActionEmbedder[TAction], nn.Module):
     num_actions: int = 7
 
     @nn.compact
-    def __call__(self, action: jax.Array) -> jax.Array:
+    def __call__(self, action: TAction) -> jax.Array:
         if not 1 <= action <= self.num_actions:
             raise ValueError(f"Action must be between 1 and {self.num_actions}")
         action_embeddings = self.param(

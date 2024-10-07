@@ -79,7 +79,7 @@ def zerozero_loss(
     state: TGameState,
     action: TAction,
     next_state: TGameState,
-    reward: jax.Array,  # Change this from float to jax.Array
+    reward: jax.Array,
     policy_target: jax.Array,
 ) -> tuple[float, dict[str, float]]:
     next_state_pred: jax.Array
