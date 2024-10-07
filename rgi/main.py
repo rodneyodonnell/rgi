@@ -3,6 +3,8 @@ from typing import Literal, Any
 from collections import defaultdict
 import jax.numpy as jnp
 from tqdm import tqdm
+import os
+from datetime import datetime
 from rgi.core.base import Game, Player, TPlayerId
 from rgi.core import game_registry
 from rgi.core.trajectory import Trajectory, encode_trajectory, save_trajectories
@@ -38,6 +40,12 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--num_games", type=int, default=1, help="Number of games to play")
     parser.add_argument("--save_trajectories", action="store_true", help="Save game trajectories")
+    parser.add_argument(
+        "--trajectories_dir",
+        type=str,
+        default="data/trajectories",
+        help="Directory to save trajectories",
+    )
     parser.add_argument("-v", "--verbose", action="store_true", help="Increase output verbosity")
     return parser.parse_args()
 
@@ -182,7 +190,14 @@ def main() -> None:
         2: create_player(args.player2, game, registered_game, player_id=2),
     }
 
-    save_trajectories_path = f"{args.game}_trajectories.npy" if args.save_trajectories else None
+    if args.save_trajectories:
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        filename = f"{args.game}.n_{args.num_games}.{timestamp}.trajectory.npy"
+        save_trajectories_path = os.path.join(args.trajectories_dir, args.game, filename)
+        os.makedirs(os.path.dirname(save_trajectories_path), exist_ok=True)
+    else:
+        save_trajectories_path = None
+
     run_games(game, registered_game, players, args.num_games, save_trajectories_path, args.verbose)
 
 
