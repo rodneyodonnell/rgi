@@ -366,19 +366,33 @@ Acceptance Criteria:
 
 #### 7.1.4. Train ZeroZero Model
 
-##### Task 6: Implement Model Training
+##### Task 6: Implement Model Training [in progress]
 
 Description: Develop the training loop for the ZeroZero model using the collected trajectories.
 
 Code Entry Points:
-- File: `rgi/players/zerozero/zerozero_model.py` (to be created)
-- File: `rgi/players/zerozero/zerozero_trainer.py` (to be created)
+- File: `rgi/players/zerozero/zerozero_model.py` (completed)
+- File: `rgi/players/zerozero/zerozero_trainer.py` (in progress)
 
 Subtasks:
-a. Implement a data loader for the saved trajectories
-b. Define the loss functions for the dynamics, reward, and policy heads
-c. Implement the training loop, including gradient computation and parameter updates
-d. Add functionality to save and load model checkpoints
+a. Implement a data loader for the saved trajectories (completed)
+b. Define the loss functions for the dynamics, reward, and policy heads (completed in zerozero_model.py)
+c. Implement the training loop, including gradient computation and parameter updates (in progress)
+d. Add functionality to save and load model checkpoints (to be implemented)
+
+Current Status:
+- The `ZeroZeroModel` class has been implemented in `zerozero_model.py`.
+- The `ZeroZeroTrainer` class has been created in `zerozero_trainer.py` with the basic structure.
+- The `train_step` method has been implemented and jit-compiled for efficient training.
+
+Next Steps:
+1. Complete the `train` method in `ZeroZeroTrainer`:
+   - Implement batch creation from trajectories
+   - Create the main training loop
+   - Add logging for loss values and training progress
+2. Implement the `save_checkpoint` and `load_checkpoint` methods
+3. Write unit tests for the `ZeroZeroTrainer` class
+4. Integrate the trainer with the main game loop for continuous learning
 
 Testing Criteria:
 - Write unit tests for the data loader
@@ -391,25 +405,24 @@ Acceptance Criteria:
 - Trained models can be saved and loaded
 - All tests related to model training pass
 
-#### 7.1.5. Evaluate the MuZeroPlayer Performance
+#### 7.1.5. Evaluate the ZeroZeroPlayer Performance
 
 ##### Task 7: Conduct Performance Evaluation
 
 Description: Assess the performance of ZeroZeroPlayer by playing it against baseline players.
 
 Subtasks:
-
 a. Set up matches between ZeroZeroPlayer and RandomPlayer or MinimaxPlayer.
 b. Record metrics such as win rate, average game length.
+c. Implement a system for tracking and visualizing performance improvements over time.
 
 Testing Criteria:
-
 - Ensure that a sufficient number of games are played for statistical significance.
-- Verify that the data collected is accurate.
+- Verify that the data collected is accurate and properly stored.
 
 Acceptance Criteria:
-
 - ZeroZeroPlayer demonstrates improved performance over baseline players.
+- Performance metrics are tracked and can be easily visualized.
 - Results are documented and analyzed.
 
 ### 7.2. Phase 2: Implement MCTS Search

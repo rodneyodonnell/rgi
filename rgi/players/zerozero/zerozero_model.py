@@ -48,8 +48,10 @@ class ZeroZeroModel(Generic[TGameState, TPlayerState, TAction], nn.Module):
         self.policy_head: nn.Module = nn.Sequential([nn.Dense(self.hidden_dim), nn.relu, nn.Dense(self.embedding_dim)])
 
     @nn.compact
-    def __call__(self, state: TGameState, action: TAction | None) -> tuple[TEmbedding, float, TEmbedding]:
-        state_embedding = self.state_embedder(state)
+    def __call__(self, state: TGameState, action: TAction | None) -> tuple[TEmbedding, jax.Array, TEmbedding]:
+        state_embedding = (
+            self.state_embedder(state) if state is not None else jnp.zeros(self.state_embedder.embedding_dim)
+        )
         action_embedding = (
             self.action_embedder(action) if action is not None else jnp.zeros(self.action_embedder.embedding_dim)
         )
@@ -58,7 +60,7 @@ class ZeroZeroModel(Generic[TGameState, TPlayerState, TAction], nn.Module):
         shared_features = self.shared_layer(combined_embedding)
 
         next_state_embedding = self.dynamics_head(shared_features)
-        reward = self.reward_head(shared_features).squeeze().item()
+        reward = self.reward_head(shared_features).squeeze()  # Remove .item()
         policy_embedding = self.policy_head(shared_features)
 
         return next_state_embedding, reward, policy_embedding
@@ -77,12 +79,13 @@ def zerozero_loss(
     state: TGameState,
     action: TAction,
     next_state: TGameState,
-    reward: float,
+    reward: jax.Array,  # Change this from float to jax.Array
     policy_target: jax.Array,
 ) -> tuple[float, dict[str, float]]:
     next_state_pred: jax.Array
     reward_pred: float
     policy_embedding: jax.Array
+    # next_state_pred, reward_pred, policy_embedding = model.apply(params, state, action)  # type: ignore
     next_state_pred, reward_pred, policy_embedding = model.apply(params, state, action)  # type: ignore
     next_state_true = model.state_embedder.apply(params, next_state)
     assert isinstance(next_state_true, jax.Array)

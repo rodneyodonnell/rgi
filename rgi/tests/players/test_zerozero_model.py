@@ -58,7 +58,7 @@ def test_model_output_shapes(model: ZeroZeroModel[Any, Any, TAction], params: di
     next_state, reward, policy_embedding = output  # type: ignore
 
     assert next_state.shape == (64,)
-    assert isinstance(reward, float)
+    assert reward.shape == ()  # Changed: reward is now a scalar jax.Array
     assert policy_embedding.shape == (64,)
 
 
@@ -93,7 +93,7 @@ def test_zerozero_loss(model: ZeroZeroModel[Any, Any, TAction], params: dict[str
     state: TGameState = (1, 2)
     action: TAction = 5
     next_state: TGameState = (1, 3)
-    reward: float = 1.0
+    reward: jax.Array = jnp.array(1.0)  # Changed: reward is now a jax.Array
     policy_target: jax.Array = jnp.array([0.1, 0.2, 0.3, 0.1, 0.1, 0.1, 0.1])
 
     total_loss, loss_dict = zerozero_loss(model, params, state, action, next_state, reward, policy_target)
