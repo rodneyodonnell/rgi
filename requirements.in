@@ -15,6 +15,7 @@ tensorflow
 numpy
 jupyter
 immutables
+jax[cuda]
 flax
 
 # Frontend

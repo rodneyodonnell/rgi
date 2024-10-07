@@ -152,12 +152,17 @@ isoduration==20.11.0
     # via jsonschema
 isort==5.13.2
     # via pylint
-jax==0.4.33
+jax[cuda]==0.4.33
     # via
+    #   -r requirements.in
     #   chex
     #   flax
     #   optax
     #   orbax-checkpoint
+jax-cuda12-pjrt==0.4.33
+    # via jax-cuda12-plugin
+jax-cuda12-plugin[with-cuda]==0.4.33
+    # via jax
 jaxlib==0.4.33
     # via
     #   chex
@@ -307,6 +312,35 @@ numpy==1.26.4
     #   tensorboard
     #   tensorflow
     #   tensorstore
+nvidia-cublas-cu12==12.6.3.3
+    # via
+    #   jax-cuda12-plugin
+    #   nvidia-cudnn-cu12
+    #   nvidia-cusolver-cu12
+nvidia-cuda-cupti-cu12==12.6.80
+    # via jax-cuda12-plugin
+nvidia-cuda-nvcc-cu12==12.6.77
+    # via jax-cuda12-plugin
+nvidia-cuda-runtime-cu12==12.6.77
+    # via jax-cuda12-plugin
+nvidia-cudnn-cu12==9.4.0.58
+    # via jax-cuda12-plugin
+nvidia-cufft-cu12==11.3.0.4
+    # via jax-cuda12-plugin
+nvidia-cusolver-cu12==11.7.1.2
+    # via jax-cuda12-plugin
+nvidia-cusparse-cu12==12.5.4.2
+    # via
+    #   jax-cuda12-plugin
+    #   nvidia-cusolver-cu12
+nvidia-nccl-cu12==2.23.4
+    # via jax-cuda12-plugin
+nvidia-nvjitlink-cu12==12.6.77
+    # via
+    #   jax-cuda12-plugin
+    #   nvidia-cufft-cu12
+    #   nvidia-cusolver-cu12
+    #   nvidia-cusparse-cu12
 opt-einsum==3.3.0
     # via
     #   jax

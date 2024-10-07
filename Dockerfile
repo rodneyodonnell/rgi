@@ -1,4 +1,5 @@
-FROM tensorflow/tensorflow:2.17.0-gpu-jupyter
+FROM tensorflow/tensorflow:2.18.0rc0-gpu-jupyter
+# FROM tensorflow/tensorflow:2.17.0-gpu-jupyter
 
 # Create a non-root user with sudo privileges
 ARG USERNAME=dockeruser
