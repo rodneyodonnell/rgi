@@ -29,10 +29,14 @@ class ZeroZeroTrainer:
 
     def create_train_state(self, rng: jax.random.PRNGKey) -> train_state.TrainState:
         params = self.model.init(rng, None, None)
-        return train_state.TrainState.create(apply_fn=self.model.apply, params=params, tx=self.optimizer)
+        return train_state.TrainState.create(
+            apply_fn=self.model.apply, params=params, tx=self.optimizer
+        )
 
     @functools.partial(jax.jit, static_argnums=0)
-    def train_step(self, state: train_state.TrainState, batch: Tuple[Any, ...]) -> Tuple[train_state.TrainState, dict]:
+    def train_step(
+        self, state: train_state.TrainState, batch: Tuple[Any, ...]
+    ) -> Tuple[train_state.TrainState, dict]:
         def loss_fn(params):
             state_input, action, next_state, reward, policy_target = batch
             reward = jnp.asarray(reward)  # Ensure reward is a jax.Array
@@ -54,15 +58,34 @@ class ZeroZeroTrainer:
     def create_batches(self, trajectories: List[EncodedTrajectory], batch_size: int):
         states, actions, next_states, rewards, policy_targets = [], [], [], [], []
 
+        # for trajectory in trajectories:
+        #     for i in range(trajectory.length - 1):
+        #         states.append(self.serializer.jax_array_to_state(self.game, trajectory.states[i]))
+        #         actions.append(self.serializer.jax_array_to_action(self.game, trajectory.actions[i]))
+        #         next_states.append(self.serializer.jax_array_to_state(self.game, trajectory.states[i + 1]))
+        #         rewards.append(trajectory.state_rewards[i])
+        #         policy_targets.append(
+        #             jax.nn.one_hot(
+        #                 trajectory.actions[i],
+        #                 num_classes=len(self.model.possible_actions),
+        #             )
+        #         )
+
+        possible_actions = self.model.possible_actions
         for trajectory in trajectories:
             for i in range(trajectory.length - 1):
-                states.append(self.serializer.jax_array_to_state(self.game, trajectory.states[i]))
-                actions.append(self.serializer.jax_array_to_action(self.game, trajectory.actions[i]))
-                next_states.append(self.serializer.jax_array_to_state(self.game, trajectory.states[i + 1]))
+                states.append(trajectory.states[i])
+                actions.append(trajectory.actions[i])
+                next_states.append(trajectory.states[i + 1])
                 rewards.append(trajectory.state_rewards[i])
+
+                decoded_action = self.serializer.jax_array_to_action(
+                    self.game, trajectory.actions[i]
+                )
+                decoded_action_index = possible_actions.index(decoded_action)
                 policy_targets.append(
                     jax.nn.one_hot(
-                        trajectory.actions[i],
+                        decoded_action_index,
                         num_classes=len(self.model.possible_actions),
                     )
                 )
@@ -73,7 +96,9 @@ class ZeroZeroTrainer:
         for i in range(0, len(dataset), batch_size):
             yield tuple(map(np.array, zip(*dataset[i : i + batch_size])))
 
-    def train(self, trajectories: List[EncodedTrajectory], num_epochs: int, batch_size: int):
+    def train(
+        self, trajectories: List[EncodedTrajectory], num_epochs: int, batch_size: int
+    ):
         if self.state is None:
             rng = jax.random.PRNGKey(0)
             self.state = self.create_train_state(rng)
@@ -82,7 +107,9 @@ class ZeroZeroTrainer:
             epoch_losses = []
             batches = self.create_batches(trajectories, batch_size)
 
-            with tqdm(total=len(trajectories), desc=f"Epoch {epoch + 1}/{num_epochs}") as pbar:
+            with tqdm(
+                total=len(trajectories), desc=f"Epoch {epoch + 1}/{num_epochs}"
+            ) as pbar:
                 for batch in batches:
                     self.state, loss_dict = self.train_step(self.state, batch)
                     epoch_losses.append(loss_dict["total_loss"])
@@ -94,7 +121,9 @@ class ZeroZeroTrainer:
     def save_checkpoint(self, checkpoint_dir: str):
         if self.state is None:
             raise ValueError("No state to save. Please train the model first.")
-        checkpoints.save_checkpoint(checkpoint_dir, self.state, step=self.state.step, keep=3)
+        checkpoints.save_checkpoint(
+            checkpoint_dir, self.state, step=self.state.step, keep=3
+        )
 
     def load_checkpoint(self, checkpoint_dir: str):
         """Load checkpoint from directory. If no checkpoint is found, create a new state."""
