@@ -37,6 +37,7 @@ from rgi.core import game_registry
 from rgi.core.trajectory import Trajectory, encode_trajectory, save_trajectories, load_trajectories
 from rgi.players.zerozero.zerozero_trainer import ZeroZeroTrainer
 from rgi.players.zerozero.zerozero_model import ZeroZeroModel
+import jax
 
 GAMES: dict[str, game_registry.RegisteredGame[Any, Any, Any]] = game_registry.GAME_REGISTRY
 PLAYERS: dict[str, Any] = game_registry.PLAYER_REGISTRY
@@ -77,20 +78,20 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("-v", "--verbose", action="store_true", help="Increase output verbosity")
     parser.add_argument("--train", action="store_true", help="Train the ZeroZero model")
-    parser.add_argument(
-        "--checkpoint_dir", type=str, default="data/checkpoints", help="Directory to save/load model checkpoints"
-    )
+    parser.add_argument("--checkpoint_dir", type=str, default="", help="Directory to save/load model checkpoints")
     return parser.parse_args()
 
 
 def create_player(
+    args: argparse.Namespace,
     player_type: PlayerType,
     game: Game[Any, Any, Any],
     registered_game: game_registry.RegisteredGame[Any, Any, Any],
     player_id: int,
+    params: dict | None = None,
 ) -> Player[Any, Any, Any]:
     player_creator = PLAYERS[player_type]
-    return player_creator(game, registered_game, player_id, {})
+    return player_creator(args, game, registered_game, player_id, params or {})
 
 
 def print_aggregate_stats(stats: list[dict[str, list[int] | int]], num_games: int) -> None:
@@ -214,8 +215,8 @@ def play_game(
 ) -> None:
 
     players: dict[int, Player[Any, Any, Any]] = {
-        1: create_player(args.player1, game, registered_game, player_id=1),
-        2: create_player(args.player2, game, registered_game, player_id=2),
+        1: create_player(args, args.player1, game, registered_game, player_id=1),
+        2: create_player(args, args.player2, game, registered_game, player_id=2),
     }
 
     if args.save_trajectories:
@@ -248,7 +249,12 @@ def train_zerozero_model(
 
     trainer = ZeroZeroTrainer(model, serializer, game)
 
-    trainer.load_checkpoint(args.checkpoint_dir)
+    # TODO: Does this work? Do we need to do something with the params?
+    if args.checkpoint_dir:
+        absolute_checkpoint_dir = os.path.abspath(args.checkpoint_dir)
+    else:
+        absolute_checkpoint_dir = os.path.abspath(os.path.join("data", "checkpoints", args.game))
+    trainer.load_checkpoint(absolute_checkpoint_dir)
 
     trajectories_glob = os.path.join(args.trajectories_dir, args.game, "*.trajectory.npy")
     trajectories = load_trajectories(trajectories_glob)
@@ -259,7 +265,7 @@ def train_zerozero_model(
     trainer.train(trajectories, num_epochs=10, batch_size=32)
 
     # Save the trained model
-    trainer.save_checkpoint(args.checkpoint_dir)
+    trainer.save_checkpoint(absolute_checkpoint_dir)
     print(f"Model training completed. Checkpoint saved to {args.checkpoint_dir}")
 
 

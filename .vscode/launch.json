@@ -24,8 +24,8 @@
             "program": "${workspaceFolder}/rgi/main.py",
             "args": [
                 "--game", "connect4",
-                "--player1", "random",
-                "--player2", "random",
+                "--player1", "zerozero",
+                "--player2", "zerozero",
                 "--num_games", "1",
                 "--save_trajectories",
                 "--verbose"

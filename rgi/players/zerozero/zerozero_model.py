@@ -50,12 +50,12 @@ class ZeroZeroModel(Generic[TGameState, TPlayerState, TAction], nn.Module):
     @nn.compact
     def __call__(self, state: TGameState, action: TAction | None) -> tuple[TEmbedding, jax.Array, TEmbedding]:
         state_embedding = (
-            self.state_embedder(state) if state is not None else jnp.zeros(self.state_embedder.embedding_dim)
+            self.state_embedder(state) if state is not None else jnp.zeros([1, self.state_embedder.embedding_dim])
         )
         action_embedding = (
-            self.action_embedder(action) if action is not None else jnp.zeros(self.action_embedder.embedding_dim)
+            self.action_embedder(action) if action is not None else jnp.zeros([1, self.action_embedder.embedding_dim])
         )
-        combined_embedding = jnp.concatenate([state_embedding, action_embedding])
+        combined_embedding = jnp.concatenate([state_embedding, action_embedding], axis=1)
 
         shared_features = self.shared_layer(combined_embedding)
 
@@ -67,10 +67,16 @@ class ZeroZeroModel(Generic[TGameState, TPlayerState, TAction], nn.Module):
 
     def compute_action_logits(self, policy_embedding: TEmbedding) -> jax.Array:
         all_action_embeddings = jnp.array([self.action_embedder(action) for action in self.possible_actions])
-        return jnp.dot(all_action_embeddings, policy_embedding)
+        return jnp.dot(policy_embedding, jnp.transpose(all_action_embeddings))
 
     def compute_action_probabilities(self, policy_embedding: TEmbedding) -> jax.Array:
         return jax.nn.softmax(self.compute_action_logits(policy_embedding))
+    
+    def get_state_embedding(self, state: jax.Array) -> TEmbedding:
+        return self.state_embedder(state)
+    
+    def get_action_embedding(self, action: jax.Array) -> TEmbedding:
+        return self.action_embedder(action)
 
 
 def zerozero_loss(
@@ -87,12 +93,13 @@ def zerozero_loss(
     policy_embedding: jax.Array
     # next_state_pred, reward_pred, policy_embedding = model.apply(params, state, action)  # type: ignore
     next_state_pred, reward_pred, policy_embedding = model.apply(params, state, action)  # type: ignore
-    next_state_true = model.state_embedder.apply(params, next_state)
+    # next_state_true = model.state_embedder.apply(params, next_state)
+    next_state_true = model.apply(params, next_state, method=model.get_state_embedding)
     assert isinstance(next_state_true, jax.Array)
 
     # Dynamics loss (cosine similarity)
-    dynamics_loss = 1 - jnp.dot(next_state_pred, next_state_true) / (
-        jnp.linalg.norm(next_state_pred) * jnp.linalg.norm(next_state_true)
+    dynamics_loss = 1 - jnp.sum(next_state_pred * next_state_true, axis=1) / (
+        jnp.linalg.norm(next_state_pred, axis=1) * jnp.linalg.norm(next_state_true, axis=1)
     )
 
     # Reward loss (MSE)
@@ -108,12 +115,12 @@ def zerozero_loss(
     assert isinstance(action_probs, jax.Array)
     policy_loss = -jnp.sum(policy_target * jnp.log(action_probs + 1e-8))
 
-    total_loss = dynamics_loss + reward_loss + policy_loss
+    total_loss = jnp.mean(dynamics_loss + reward_loss + policy_loss)
     loss_dict = {
         "total_loss": total_loss,
-        "dynamics_loss": dynamics_loss,
-        "reward_loss": reward_loss,
-        "policy_loss": policy_loss,
+        "dynamics_loss": jnp.mean(dynamics_loss),
+        "reward_loss": jnp.mean(reward_loss),
+        "policy_loss": jnp.mean(policy_loss),
     }
 
     return total_loss, loss_dict

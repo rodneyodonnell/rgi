@@ -27,8 +27,29 @@ class ZeroZeroTrainer:
         self.optimizer = optax.adam(learning_rate)
         self.state = None
 
+        print("Model structure:")
+        print(
+            self.model.tabulate(
+                jax.random.PRNGKey(0),
+                jnp.ones((1, 43), dtype=jnp.int32),
+                jnp.ones((1,), dtype=jnp.int32),
+            )
+        )
+        print("Model structure end")
+
+    # TODO: Rename
     def create_train_state(self, rng: jax.random.PRNGKey) -> train_state.TrainState:
-        params = self.model.init(rng, None, None)
+        dummy_state = self.serializer.state_to_jax_array(
+            self.game, self.game.initial_state()
+        )
+        dummy_action = self.serializer.action_to_jax_array(
+            self.game, self.game.all_actions()[0]
+        )
+        # Add batch dimension to dummy inputs
+        dummy_state_batch = jnp.expand_dims(dummy_state, axis=0)
+        dummy_action_batch = jnp.expand_dims(dummy_action, axis=0)
+
+        params = self.model.init(rng, dummy_state_batch, dummy_action_batch)
         return train_state.TrainState.create(
             apply_fn=self.model.apply, params=params, tx=self.optimizer
         )
@@ -58,19 +79,6 @@ class ZeroZeroTrainer:
     def create_batches(self, trajectories: List[EncodedTrajectory], batch_size: int):
         states, actions, next_states, rewards, policy_targets = [], [], [], [], []
 
-        # for trajectory in trajectories:
-        #     for i in range(trajectory.length - 1):
-        #         states.append(self.serializer.jax_array_to_state(self.game, trajectory.states[i]))
-        #         actions.append(self.serializer.jax_array_to_action(self.game, trajectory.actions[i]))
-        #         next_states.append(self.serializer.jax_array_to_state(self.game, trajectory.states[i + 1]))
-        #         rewards.append(trajectory.state_rewards[i])
-        #         policy_targets.append(
-        #             jax.nn.one_hot(
-        #                 trajectory.actions[i],
-        #                 num_classes=len(self.model.possible_actions),
-        #             )
-        #         )
-
         possible_actions = self.model.possible_actions
         for trajectory in trajectories:
             for i in range(trajectory.length - 1):
@@ -83,12 +91,10 @@ class ZeroZeroTrainer:
                     self.game, trajectory.actions[i]
                 )
                 decoded_action_index = possible_actions.index(decoded_action)
-                policy_targets.append(
-                    jax.nn.one_hot(
-                        decoded_action_index,
-                        num_classes=len(self.model.possible_actions),
-                    )
+                one_hot_action = jax.nn.one_hot(
+                    decoded_action_index, num_classes=len(possible_actions)
                 )
+                policy_targets.append(one_hot_action)
 
         dataset = list(zip(states, actions, next_states, rewards, policy_targets))
         np.random.shuffle(dataset)
@@ -100,8 +106,9 @@ class ZeroZeroTrainer:
         self, trajectories: List[EncodedTrajectory], num_epochs: int, batch_size: int
     ):
         if self.state is None:
-            rng = jax.random.PRNGKey(0)
-            self.state = self.create_train_state(rng)
+            raise ValueError(
+                "TrainState is not initialized. Call create_train_state first."
+            )
 
         for epoch in range(num_epochs):
             epoch_losses = []
