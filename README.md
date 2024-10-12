@@ -108,3 +108,9 @@ yarn tsc --watch
 # Load multiple files into VSCode
 Open-matching-files (alt-f)
 *infiltr8*.{ts,py,html}
+
+
+# Create training data
+```
+time python rgi/main.py --player1=random --player2=random --num_games=1000 --save_trajectories
+```

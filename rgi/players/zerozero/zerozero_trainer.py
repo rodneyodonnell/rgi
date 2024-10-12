@@ -27,15 +27,15 @@ class ZeroZeroTrainer:
         self.optimizer = optax.adam(learning_rate)
         self.state = None
 
-        print("Model structure:")
-        print(
-            self.model.tabulate(
-                jax.random.PRNGKey(0),
-                jnp.ones((1, 43), dtype=jnp.int32),
-                jnp.ones((1,), dtype=jnp.int32),
-            )
-        )
-        print("Model structure end")
+        # print("Model structure:")
+        # print(
+        #     self.model.tabulate(
+        #         jax.random.PRNGKey(0),
+        #         jnp.ones((1, 43), dtype=jnp.int32),
+        #         jnp.ones((1,), dtype=jnp.int32),
+        #     )
+        # )
+        # print("Model structure end")
 
     # TODO: Rename
     def create_train_state(self, rng: jax.random.PRNGKey) -> train_state.TrainState:
@@ -49,11 +49,17 @@ class ZeroZeroTrainer:
         dummy_state_batch = jnp.expand_dims(dummy_state, axis=0)
         dummy_action_batch = jnp.expand_dims(dummy_action, axis=0)
 
-        params = self.model.init(rng, dummy_state_batch, dummy_action_batch)
+        params = self.model.init(
+            rng,
+            dummy_state_batch,
+            dummy_action_batch,
+            method=self.model.compute_next_state,
+        )
         return train_state.TrainState.create(
             apply_fn=self.model.apply, params=params, tx=self.optimizer
         )
 
+    @jax.disable_jit()  # TODO: Remove this
     @functools.partial(jax.jit, static_argnums=0)
     def train_step(
         self, state: train_state.TrainState, batch: Tuple[Any, ...]

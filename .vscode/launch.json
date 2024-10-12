@@ -18,7 +18,7 @@
             "justMyCode": true
         },
         {
-            "name": "main.py connect4 --save_trajectories",
+            "name": "main.py connect4",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/rgi/main.py",
@@ -27,7 +27,7 @@
                 "--player1", "zerozero",
                 "--player2", "zerozero",
                 "--num_games", "1",
-                "--save_trajectories",
+                // "--save_trajectories",
                 "--verbose"
             ],
             "console": "integratedTerminal",
