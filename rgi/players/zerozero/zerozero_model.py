@@ -40,30 +40,18 @@ class ZeroZeroModel(Generic[TGameState, TPlayerState, TAction], nn.Module):
     shared_dim: int = 256
 
     def setup(self) -> None:
-        self.shared_state_layer: nn.Module = nn.Sequential(
-            [nn.Dense(self.shared_dim), nn.relu]
-        )
-        self.shared_action_layer: nn.Module = nn.Sequential(
-            [nn.Dense(self.shared_dim), nn.relu]
-        )
+        self.shared_state_layer: nn.Module = nn.Sequential([nn.Dense(self.shared_dim), nn.relu])
+        self.shared_action_layer: nn.Module = nn.Sequential([nn.Dense(self.shared_dim), nn.relu])
 
         self.dynamics_head: nn.Module = nn.Sequential(
             [nn.Dense(self.hidden_dim), nn.relu, nn.Dense(self.embedding_dim)]
         )
-        self.reward_head: nn.Module = nn.Sequential(
-            [nn.Dense(self.hidden_dim), nn.relu, nn.Dense(1)]
-        )
-        self.policy_head: nn.Module = nn.Sequential(
-            [nn.Dense(self.hidden_dim), nn.relu, nn.Dense(self.embedding_dim)]
-        )
+        self.reward_head: nn.Module = nn.Sequential([nn.Dense(self.hidden_dim), nn.relu, nn.Dense(1)])
+        self.policy_head: nn.Module = nn.Sequential([nn.Dense(self.hidden_dim), nn.relu, nn.Dense(self.embedding_dim)])
 
     @nn.compact
-    def __call__(
-        self, state: TGameState, action: TAction | None
-    ) -> tuple[TEmbedding, jax.Array, TEmbedding]:
-        raise NotImplementedError(
-            "call compute_next_state or predict_action_policy_and_reward directly."
-        )
+    def __call__(self, state: TGameState, action: TAction | None) -> tuple[TEmbedding, jax.Array, TEmbedding]:
+        raise NotImplementedError("call compute_next_state or predict_action_policy_and_reward directly.")
         # next_state, reward, policy_embedding = None, None, None
         # if action is None:
         #     next_state = self.compute_next_state(state)
@@ -73,21 +61,20 @@ class ZeroZeroModel(Generic[TGameState, TPlayerState, TAction], nn.Module):
         #     )
         # return next_state, reward, policy_embedding
 
-    @nn.compact
-    def compute_next_state(self, state: TEmbedding, action: TEmbedding) -> TEmbedding:
-        state_embedding = self.state_embedder(state)
-        state_layer = self.shared_state_layer(state_embedding)
-        action_embedding = self.action_embedder(action)
-        action_layer = self.shared_action_layer(action_embedding)
+    # @nn.compact
+    # def compute_next_state(self, state: TEmbedding, action: TEmbedding) -> TEmbedding:
+    #     raise NotImplementedError("call compute_next_state or predict_action_policy_and_reward directly.")
+    #     state_embedding = self.state_embedder(state)
+    #     state_layer = self.shared_state_layer(state_embedding)
+    #     action_embedding = self.action_embedder(action)
+    #     action_layer = self.shared_action_layer(action_embedding)
 
-        combined_layer = jnp.concatenate([state_layer, action_layer], axis=1)
-        next_state_embedding = self.dynamics_head(combined_layer)
-        return next_state_embedding
+    #     combined_layer = jnp.concatenate([state_layer, action_layer], axis=1)
+    #     next_state_embedding = self.dynamics_head(combined_layer)
+    #     return next_state_embedding
 
     @nn.compact
-    def predict_action_policy_and_reward(
-        self, state: TGameState
-    ) -> tuple[TEmbedding, jax.Array]:
+    def predict_action_policy_and_reward(self, state: TGameState) -> tuple[TEmbedding, jax.Array]:
         state_embedding = self.state_embedder(state)
         shared_features = self.shared_state_layer(state_embedding)
 
@@ -99,20 +86,18 @@ class ZeroZeroModel(Generic[TGameState, TPlayerState, TAction], nn.Module):
 
         return policy_embedding, reward
 
-    def compute_action_logits(self, policy_embedding: TEmbedding) -> jax.Array:
-        all_action_embeddings = jnp.array(
-            [self.action_embedder(action) for action in self.possible_actions]
-        )
-        return jnp.dot(policy_embedding, jnp.transpose(all_action_embeddings))
+    # def compute_action_logits(self, policy_embedding: TEmbedding) -> jax.Array:
+    #     all_action_embeddings = jnp.array([self.action_embedder(action) for action in self.possible_actions])
+    #     return jnp.dot(policy_embedding, jnp.transpose(all_action_embeddings))
 
-    def compute_action_probabilities(self, policy_embedding: TEmbedding) -> jax.Array:
-        return jax.nn.softmax(self.compute_action_logits(policy_embedding))
+    # def compute_action_probabilities(self, policy_embedding: TEmbedding) -> jax.Array:
+    #     return jax.nn.softmax(self.compute_action_logits(policy_embedding))
 
-    def get_state_embedding(self, state: jax.Array) -> TEmbedding:
-        return self.state_embedder(state)
+    # def get_state_embedding(self, state: jax.Array) -> TEmbedding:
+    #     return self.state_embedder(state)
 
-    def get_action_embedding(self, action: jax.Array) -> TEmbedding:
-        return self.action_embedder(action)
+    # def get_action_embedding(self, action: jax.Array) -> TEmbedding:
+    #     return self.action_embedder(action)
 
 
 def zerozero_loss(
@@ -141,8 +126,7 @@ def zerozero_loss(
 
     # Dynamics loss (cosine similarity)
     dynamics_loss = 1 - jnp.sum(next_state_pred * next_state_true, axis=1) / (
-        jnp.linalg.norm(next_state_pred, axis=1)
-        * jnp.linalg.norm(next_state_true, axis=1)
+        jnp.linalg.norm(next_state_pred, axis=1) * jnp.linalg.norm(next_state_true, axis=1)
     )
 
     # Reward loss (MSE)

@@ -14,14 +14,13 @@ class Connect4StateEmbedder(StateEmbedder[Connect4State]):
     # serializer = Connect4Serializer()
     # game = Connect4Game()
 
-
     def _state_to_array(self, encoded_state_batch: jax.Array) -> jax.Array:
         # state_array = [self.serializer.jax_array_to_state(self.game, encoded_state) for encoded_state in encoded_state_batch]
-        #if not isinstance(state, Connect4State):
+        # if not isinstance(state, Connect4State):
         #    raise ValueError("Invalid state type")
         # board_array = jnp.zeros((6, 7), dtype=jnp.float32)
-        board_array = encoded_state_batch[:,:-1].reshape([-1,6,7])
-        #for (row, col), value in state.board.items():
+        board_array = encoded_state_batch[:, :-1].reshape([-1, 6, 7])
+        # for (row, col), value in state.board.items():
         #    board_array = board_array.at[row - 1, col - 1].set(1.0 if value == 1 else -1.0)
         return board_array
 
@@ -37,13 +36,14 @@ class Connect4StateEmbedder(StateEmbedder[Connect4State]):
         x = nn.Dense(features=self.embedding_dim)(x)
         return x
 
+
 class Connect4ActionEmbedder(ActionEmbedder[TAction], nn.Module):
     embedding_dim: int = 64
     num_actions: int = 7
 
     @nn.compact
     def __call__(self, action: jax.Array) -> jax.Array:
-        #if not 1 <= action <= self.num_actions:
+        # if not 1 <= action <= self.num_actions:
         #    raise ValueError(f"Action must be between 1 and {self.num_actions}")
         action_embeddings = self.param(
             "action_embeddings",
