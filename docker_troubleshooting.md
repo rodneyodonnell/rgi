@@ -2,6 +2,16 @@
 
 ## Quick Fix Steps (Try these first)
 
+1. Restart the Docker service:
+   ```bash
+   sudo systemctl restart docker
+   ```
+
+2. Rebuild the Docker image:
+   ```... from cursor/vscode```
+
+## Other suggested fixes that don't work?
+
 1. Restart the NVIDIA driver:
    ```bash
    sudo systemctl restart nvidia-persistenced
@@ -11,11 +21,6 @@
    ```bash
    sudo rmmod nvidia_uvm nvidia_drm nvidia_modeset nvidia
    sudo modprobe nvidia
-   ```
-
-3. Restart the Docker service:
-   ```bash
-   sudo systemctl restart docker
    ```
 
 4. If using nvidia-docker2, restart the NVIDIA Docker runtime:
