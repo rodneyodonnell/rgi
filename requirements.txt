@@ -573,11 +573,11 @@ starlette==0.38.6
     # via fastapi
 sympy==1.13.3
     # via torch
-tensorboard==2.17.1
+tensorboard==2.18.0
     # via tensorflow
 tensorboard-data-server==0.7.2
     # via tensorboard
-tensorflow==2.17.0
+tensorflow==2.18.0rc2
     # via -r requirements.in
 tensorflow-io-gcs-filesystem==0.37.1
     # via tensorflow

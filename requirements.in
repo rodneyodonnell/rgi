@@ -11,7 +11,7 @@
 
 
 # Core
-tensorflow
+tensorflow==2.18.0rc2
 numpy
 jupyter
 immutables
