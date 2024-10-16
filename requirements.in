@@ -17,6 +17,7 @@ jupyter
 immutables
 jax[cuda]
 flax
+torch
 
 # Frontend
 fastapi==0.114.1
