@@ -9,7 +9,6 @@ rgi_source.tar
 !.vscode/tasks.json
 !.vscode/extensions.json
 
-
 # Ignore build artifacts (compiled JavaScript files)
 web_app/static/**/*.js
 web_app/static/**/*.js.map
@@ -17,3 +16,5 @@ node_modules/
 
 # Ignore data output (trajectories, etc)
 data/
+
+.venv

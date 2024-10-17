@@ -1,7 +1,8 @@
 # FROM tensorflow/tensorflow:2.18.0rc0-gpu-jupyter
 # FROM tensorflow/tensorflow:2.17.0-gpu-jupyter
 # FROM nvidia/cuda:12.6.1-cudnn-runtime-ubuntu24.04
-FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
+# FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
+FROM nvidia/cuda:12.6.2-cudnn-runtime-ubuntu24.04
 
 # Install basic utilities and Python
 RUN apt-get update && apt-get install -y \
@@ -12,7 +13,8 @@ RUN apt-get update && apt-get install -y \
     less \
     python3 \
     python3-pip \
-    python-is-python3
+    python-is-python3 \
+    python3-venv
 
 # Install Node.js and Yarn
 RUN curl -sL https://deb.nodesource.com/setup_20.x | bash - && \
@@ -21,22 +23,19 @@ RUN curl -sL https://deb.nodesource.com/setup_20.x | bash - && \
     echo "deb https://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.list.d/yarn.list && \
     apt-get update && apt-get install -y yarn
 
-
-# Create a non-root user with sudo privileges
-ARG USERNAME=dockeruser
-ARG USER_UID=1000
-ARG USER_GID=$USER_UID
-
-RUN groupadd --gid $USER_GID $USERNAME \
-    && useradd --uid $USER_UID --gid $USER_GID -m $USERNAME \
-    && echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME \
-    && chmod 0440 /etc/sudoers.d/$USERNAME
+ARG USERNAME=ubuntu
+RUN echo "$USERNAME ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers && \
+    chmod 0440 /etc/sudoers
 
 # Switch to the non-root user
 USER $USERNAME
 WORKDIR /app
 RUN chown -R $USERNAME:$USERNAME /app
 ENV PYTHONPATH="/app"
+
+# Create a virtual environment
+RUN python3 -m venv .venv
+ENV PATH="/app/.venv/bin:$PATH"
 
 # Upgrade pip
 RUN python3 -m pip install --upgrade pip
@@ -50,9 +49,6 @@ RUN python -m playwright install
 RUN python -m playwright install-deps
 RUN python -m playwright install chromium
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
 # Install TypeScript and related tools
 RUN yarn add typescript@5.5 --dev
 RUN yarn add eslint @typescript-eslint/parser @typescript-eslint/eslint-plugin --dev
@@ -61,6 +57,9 @@ RUN yarn add husky lint-staged --dev
 
 # Install Bootstrap type definitions
 RUN yarn add @types/bootstrap --dev
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
 COPY rgi rgi
 COPY scripts scripts

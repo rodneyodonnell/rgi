@@ -10,6 +10,13 @@
 2. Rebuild the Docker image:
    ```... from cursor/vscode```
 
+3. Confirm that GPU support is enabled:
+```
+nvidia-smi
+python -c 'import jax; jax.devices()'
+python -c 'import torch; print(torch.cuda.is_available())'
+```
+
 ## Other suggested fixes that don't work?
 
 1. Restart the NVIDIA driver:
