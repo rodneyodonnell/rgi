@@ -4,9 +4,27 @@ docker build -t rgi-gpu .  && \
 docker run -it --gpus all -v $(pwd)/logs:/app/logs rgi-gpu
 ```
 
+docker run -it --gpus all \
+  -v $(pwd)/logs:/app/logs \
+  -v /usr/lib/x86_64-linux-gnu/libcuda.so:/usr/lib/x86_64-linux-gnu/libcuda.so \
+  -v /usr/lib/x86_64-linux-gnu/libcuda.so.1:/usr/lib/x86_64-linux-gnu/libcuda.so.1 \
+  -v /usr/lib/x86_64-linux-gnu/libcuda.so.560.35.03:/usr/lib/x86_64-linux-gnu/libcuda.so.560.35.03 \
+  rgi-gpu
+
+docker run -it --rm --gpus all \
+  --device=/dev/nvidiactl \
+  --device=/dev/nvidia-uvm \
+  --device=/dev/nvidia-uvm-tools \
+  --device=/dev/nvidia0 \
+  --cap-add=SYS_ADMIN \
+  rgi-gpu
+
+
 # Run using existing image, but updated /rgi
 docker run -it --gpus all -v $(pwd)/rgi:/app/rgi -v $(pwd)/logs:/app/logs rgi-gpu
 
+# Check GPU is working properly in docker image.
+python -c 'import torch; print(torch.cuda.is_available())'
 
 # Launch tensorboard to https://localhost:6006
 ```

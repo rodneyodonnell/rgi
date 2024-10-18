@@ -10,6 +10,13 @@
 2. Rebuild the Docker image:
    ```... from cursor/vscode```
 
+3. Run this after suspend/resume
+https://discuss.pytorch.org/t/userwarning-cuda-initialization-cuda-unknown-error-this-may-be-due-to-an-incorrectly-set-up-environment-e-g-changing-env-variable-cuda-visible-devices-after-program-start-setting-the-available-devices-to-be-zero/129335/4
+```
+sudo rmmod nvidia_uvm
+sudo modprobe nvidia_uvm
+```
+
 3. Confirm that GPU support is enabled:
 ```
 nvidia-smi

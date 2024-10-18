@@ -49,3 +49,5 @@ pip-tools
 pylint
 mypy
 tqdm
+line_profiler
+memory_profiler

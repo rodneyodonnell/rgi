@@ -100,7 +100,7 @@ flax==0.10.0
     # via -r requirements.in
 fqdn==1.5.1
     # via jsonschema
-fsspec==2024.9.0
+fsspec==2024.10.0
     # via
     #   etils
     #   torch
@@ -160,16 +160,16 @@ isoduration==20.11.0
     # via jsonschema
 isort==5.13.2
     # via pylint
-jax[cuda]==0.4.34
+jax[cuda]==0.4.35
     # via
     #   -r requirements.in
     #   chex
     #   flax
     #   optax
     #   orbax-checkpoint
-jax-cuda12-pjrt==0.4.34
+jax-cuda12-pjrt==0.4.35
     # via jax-cuda12-plugin
-jax-cuda12-plugin[with-cuda]==0.4.34
+jax-cuda12-plugin[with-cuda]==0.4.35
     # via jax
 jaxlib==0.4.34
     # via
@@ -246,11 +246,13 @@ keras==3.6.0
     # via tensorflow
 libclang==18.1.1
     # via tensorflow
+line-profiler==4.1.3
+    # via -r requirements.in
 markdown==3.7
     # via tensorboard
 markdown-it-py==3.0.0
     # via rich
-markupsafe==3.0.1
+markupsafe==3.0.2
     # via
     #   jinja2
     #   nbconvert
@@ -263,6 +265,8 @@ mccabe==0.7.0
     # via pylint
 mdurl==0.1.2
     # via markdown-it-py
+memory-profiler==0.61.0
+    # via -r requirements.in
 mistune==3.0.2
     # via nbconvert
 ml-dtypes==0.4.1
@@ -278,7 +282,7 @@ msgpack==1.1.0
     # via
     #   flax
     #   orbax-checkpoint
-mypy==1.12.0
+mypy==1.13.0
     # via -r requirements.in
 mypy-extensions==1.0.0
     # via mypy
@@ -299,7 +303,7 @@ nest-asyncio==1.6.0
     # via
     #   ipykernel
     #   orbax-checkpoint
-networkx==3.4.1
+networkx==3.4.2
     # via torch
 notebook==7.2.2
     # via jupyter
@@ -426,13 +430,15 @@ prompt-toolkit==3.0.48
     # via
     #   ipython
     #   jupyter-console
-protobuf==5.28.2
+protobuf==5.28.3
     # via
     #   orbax-checkpoint
     #   tensorboard
     #   tensorflow
-psutil==6.0.0
-    # via ipykernel
+psutil==6.1.0
+    # via
+    #   ipykernel
+    #   memory-profiler
 ptyprocess==0.7.0
     # via
     #   pexpect
@@ -522,7 +528,7 @@ rfc3986-validator==0.1.1
     # via
     #   jsonschema
     #   jupyter-events
-rich==13.9.2
+rich==13.9.3
     # via
     #   flax
     #   keras
