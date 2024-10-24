@@ -3,7 +3,7 @@ from typing import Any, Literal
 from typing_extensions import override
 
 from immutables import Map
-import jax.numpy as jnp
+import torch
 from rgi.core.base import Game, GameSerializer
 
 
@@ -247,26 +247,26 @@ class OthelloSerializer(GameSerializer[OthelloGame, OthelloState, TAction]):
         return (int(row), int(col))  # Ensure we're returning integers
 
     @override
-    def state_to_jax_array(self, game: OthelloGame, state: OthelloState) -> jnp.ndarray:
-        board_array = jnp.array([[state.board.get((row, col), 0) for col in range(1, 9)] for row in range(1, 9)])
-        return jnp.concatenate([board_array.flatten(), jnp.array([state.current_player])])
+    def state_to_tensor(self, game: OthelloGame, state: OthelloState) -> torch.Tensor:
+        board_array = torch.tensor([[state.board.get((row, col), 0) for col in range(1, 9)] for row in range(1, 9)])
+        return torch.cat([board_array.flatten(), torch.tensor([state.current_player])])
 
     @override
-    def action_to_jax_array(self, game: OthelloGame, action: TAction) -> jnp.ndarray:
-        return jnp.array([action[0], action[1]])
+    def action_to_tensor(self, game: OthelloGame, action: TAction) -> torch.Tensor:
+        return torch.tensor(action)
 
     @override
-    def jax_array_to_action(self, game: OthelloGame, action_array: jnp.ndarray) -> TAction:
-        return (int(action_array[0]), int(action_array[1]))
+    def tensor_to_action(self, game: OthelloGame, action_tensor: torch.Tensor) -> TAction:
+        return (int(action_tensor[0].item()), int(action_tensor[1].item()))
 
     @override
-    def jax_array_to_state(self, game: OthelloGame, state_array: jnp.ndarray) -> OthelloState:
-        board_array = state_array[:-1].reshape(8, 8)
+    def tensor_to_state(self, game: OthelloGame, state_tensor: torch.Tensor) -> OthelloState:
+        board_array = state_tensor[:-1].reshape(8, 8)
         board = {
-            (row + 1, col + 1): int(board_array[row, col])
+            (row + 1, col + 1): int(board_array[row, col].item())
             for row in range(8)
             for col in range(8)
             if board_array[row, col] != 0
         }
-        current_player = int(state_array[-1])
+        current_player = int(state_tensor[-1].item())
         return OthelloState(board=Map(board), current_player=current_player, is_terminal=False)
