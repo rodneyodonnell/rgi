@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Generic, TypeVar, Any
-import jax.numpy as jnp
+import torch
 
 TGame = TypeVar("TGame", bound="Game[Any, Any, Any]")  # pylint: disable=invalid-name
 TGameState = TypeVar("TGameState")  # pylint: disable=invalid-name
@@ -64,20 +64,20 @@ class GameSerializer(ABC, Generic[TGame, TGameState, TAction]):
         """Parse an action from frontend data."""
 
     @abstractmethod
-    def state_to_jax_array(self, game: TGame, state: TGameState) -> jnp.ndarray:
-        """Convert a game state to a JAX array for ML model input."""
+    def state_to_tensor(self, game: TGame, state: TGameState) -> torch.Tensor:
+        """Convert a game state to a PyTorch tensor for ML model input."""
 
     @abstractmethod
-    def action_to_jax_array(self, game: TGame, action: TAction) -> jnp.ndarray:
-        """Convert an action to a JAX array for ML model input."""
+    def action_to_tensor(self, game: TGame, action: TAction) -> torch.Tensor:
+        """Convert an action to a PyTorch tensor for ML model input."""
 
     @abstractmethod
-    def jax_array_to_action(self, game: TGame, action_array: jnp.ndarray) -> TAction:
-        """Convert a JAX array output from an ML model to a game action."""
+    def tensor_to_action(self, game: TGame, action_tensor: torch.Tensor) -> TAction:
+        """Convert a PyTorch tensor output from an ML model to a game action."""
 
     @abstractmethod
-    def jax_array_to_state(self, game: TGame, state_array: jnp.ndarray) -> TGameState:
-        """Convert a JAX array to a game state."""
+    def tensor_to_state(self, game: TGame, state_tensor: torch.Tensor) -> TGameState:
+        """Convert a PyTorch tensor to a game state."""
 
 
 class Player(ABC, Generic[TGameState, TPlayerState, TAction]):

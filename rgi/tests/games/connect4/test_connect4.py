@@ -2,9 +2,9 @@ import textwrap
 from typing import Literal
 
 import pytest
-import jax.numpy as jnp
+import torch
 
-from rgi.games.connect4 import Connect4Game, Connect4Serializer
+from rgi.games.connect4 import Connect4Game, Connect4Serializer, Connect4State
 
 TPlayerId = Literal[1, 2]
 
@@ -220,31 +220,26 @@ def test_middle_of_row_win() -> None:
     new_state = game.next_state(state, 6)
     assert new_state.winner == 1, f"Expected Player 1 to win, but got {state.winner}"
 
+    def state_to_tensor(self, game: Connect4Game, state: Connect4State) -> torch.Tensor:
+        tensor = torch.zeros(game.height * game.width + 1, dtype=torch.float32)
+        for (row, col), player in state.board.items():
+            index = (row - 1) * game.width + (col - 1)
+            tensor[index] = player
+        tensor[-1] = state.current_player
+        return tensor
 
-def test_state_to_jax_array(game: Connect4Game, serializer: Connect4Serializer):
-    state = game.initial_state()
-    state = game.next_state(state, 4)  # Make a move
-    jax_array = serializer.state_to_jax_array(game, state)
-    assert jax_array.shape == (43,)  # 6*7 + 1 for current player
-    assert jax_array[3] == 1  # Check the move we made
-    assert jax_array[-1] == 2  # Check current player
+    def action_to_tensor(self, game: Connect4Game, action: int) -> torch.Tensor:
+        return torch.tensor(action - 1, dtype=torch.long)
 
+    def tensor_to_action(self, game: Connect4Game, action_tensor: torch.Tensor) -> int:
+        return action_tensor.item() + 1
 
-def test_action_to_jax_array(game: Connect4Game, serializer: Connect4Serializer):
-    action = 4
-    jax_array = serializer.action_to_jax_array(game, action)
-    assert jax_array == 4  # 1-based index
-
-
-def test_jax_array_to_action(game: Connect4Game, serializer: Connect4Serializer):
-    jax_array = jnp.array(4)
-    action = serializer.jax_array_to_action(game, jax_array)
-    assert action == 4  # 1-based index
-
-
-def test_jax_array_to_state(game: Connect4Game, serializer: Connect4Serializer):
-    jax_array = jnp.zeros(43)
-    jax_array = jax_array.at[3].set(1).at[-1].set(2)
-    state = serializer.jax_array_to_state(game, jax_array)
-    assert state.board.get((1, 4)) == 1
-    assert state.current_player == 2
+    def tensor_to_state(self, game: Connect4Game, state_tensor: torch.Tensor) -> Connect4State:
+        board = {}
+        for i in range(game.height * game.width):
+            if state_tensor[i] != 0:
+                row = i // game.width + 1
+                col = i % game.width + 1
+                board[(row, col)] = int(state_tensor[i].item())
+        current_player = int(state_tensor[-1].item())
+        return Connect4State(board=board, current_player=current_player)
