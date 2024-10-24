@@ -1,6 +1,6 @@
 from typing import Any, List, Tuple
 from typing_extensions import override
-import jax.numpy as jnp
+import torch
 
 from rgi.core.base import Game, GameSerializer, TGameState, TPlayerId, TAction
 
@@ -58,17 +58,17 @@ class Count21Serializer(GameSerializer[Count21Game, Tuple[int, ...], int]):
         return action_data["action"]
 
     @override
-    def state_to_jax_array(self, game: Count21Game, state: Tuple[int, ...]) -> jnp.ndarray:
-        return jnp.array(state)
+    def state_to_tensor(self, game: Count21Game, state: Tuple[int, ...]) -> torch.Tensor:
+        return torch.tensor(state, dtype=torch.long)
 
     @override
-    def action_to_jax_array(self, game: Count21Game, action: int) -> jnp.ndarray:
-        return jnp.array(action)
+    def action_to_tensor(self, game: Count21Game, action: int) -> torch.Tensor:
+        return torch.tensor(action, dtype=torch.long)
 
     @override
-    def jax_array_to_action(self, game: Count21Game, action_array: jnp.ndarray) -> int:
-        return int(action_array)
+    def tensor_to_action(self, game: Count21Game, action_tensor: torch.Tensor) -> int:
+        return int(action_tensor.item())
 
     @override
-    def jax_array_to_state(self, game: Count21Game, state_array: jnp.ndarray) -> Tuple[int, ...]:
-        return tuple(state_array.tolist())
+    def tensor_to_state(self, game: Count21Game, state_tensor: torch.Tensor) -> Tuple[int, ...]:
+        return tuple(state_tensor.tolist())

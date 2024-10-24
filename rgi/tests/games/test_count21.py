@@ -1,5 +1,5 @@
 import pytest
-import jax.numpy as jnp
+import torch
 from rgi.games.count21 import Count21Game, Count21Serializer
 
 
@@ -61,14 +61,14 @@ def test_serializer(game, serializer):
     parsed_action = serializer.parse_action(game, action_data)
     assert parsed_action == 2
 
-    state_array = serializer.state_to_jax_array(game, state)
-    assert jnp.array_equal(state_array, jnp.array([0, 2, 3, 4]))
+    state_tensor = serializer.state_to_tensor(game, state)
+    assert torch.equal(state_tensor, torch.tensor([0, 2, 3, 4], dtype=torch.long))
 
-    action_array = serializer.action_to_jax_array(game, 2)
-    assert jnp.array_equal(action_array, jnp.array(2))
+    action_tensor = serializer.action_to_tensor(game, 2)
+    assert torch.equal(action_tensor, torch.tensor(2, dtype=torch.long))
 
-    deserialized_action = serializer.jax_array_to_action(game, jnp.array(2))
+    deserialized_action = serializer.tensor_to_action(game, torch.tensor(2))
     assert deserialized_action == 2
 
-    deserialized_state = serializer.jax_array_to_state(game, jnp.array([0, 2, 3, 4]))
+    deserialized_state = serializer.tensor_to_state(game, torch.tensor([0, 2, 3, 4]))
     assert deserialized_state == (0, 2, 3, 4)
