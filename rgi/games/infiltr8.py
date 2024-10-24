@@ -34,16 +34,16 @@
 """
 
 from dataclasses import dataclass, replace
-from typing import Optional, Any, Iterable, TypeVar, Hashable
+from typing import Optional, Any, Iterable, TypeVar, Hashable, Literal, Tuple
 import random
 from enum import Enum
 from immutables import Map
 from typing_extensions import override
-import jax.numpy as jnp
-
+import torch
 from rgi.core.base import Game, GameSerializer
 
 TPlayerId = int
+TAction = "Action"
 
 
 class ActionType(Enum):
@@ -132,7 +132,7 @@ def distinct_list(items: Iterable[T]) -> list[T]:
     return [x for x in items if x not in seen and not seen.add(x)]  # type: ignore
 
 
-class Infiltr8Game(Game[Infiltr8State, TPlayerId, Action]):
+class Infiltr8Game(Game[Infiltr8State, TPlayerId, TAction]):
 
     def __init__(self, num_players: int = 4):
         if num_players < 2 or num_players > 4:
@@ -538,7 +538,7 @@ class Infiltr8Game(Game[Infiltr8State, TPlayerId, Action]):
         )
 
 
-class Infiltr8Serializer(GameSerializer[Infiltr8Game, Infiltr8State, Action]):
+class Infiltr8Serializer(GameSerializer[Infiltr8Game, Infiltr8State, TAction]):
     @override
     def serialize_state(self, game: Infiltr8Game, state: Infiltr8State) -> dict[str, Any]:
         return {
@@ -579,32 +579,32 @@ class Infiltr8Serializer(GameSerializer[Infiltr8Game, Infiltr8State, Action]):
         }
 
     @override
-    def parse_action(self, game: Infiltr8Game, action_data: dict[str, Any]) -> Action:
+    def parse_action(self, game: Infiltr8Game, action_data: dict[str, Any]) -> TAction:
         return Action(
-            action_type=ActionType[action_data["action_type"]],
-            card=next(
+            ActionType[action_data["action_type"]],
+            next(
                 (effect for effect, name in CARD_NAMES.items() if name == action_data["card"]),
                 None,
             ),
-            player_id=action_data["player_id"],
-            guess_card=next(
+            action_data["player_id"],
+            next(
                 (effect for effect, name in CARD_NAMES.items() if name == action_data["guess_card"]),
                 None,
             ),
         )
 
     @override
-    def state_to_jax_array(self, game: Infiltr8Game, state: Infiltr8State) -> jnp.ndarray:
-        raise NotImplementedError("Infiltr8 state to JAX array conversion not implemented")
+    def state_to_tensor(self, game: Infiltr8Game, state: Infiltr8State) -> torch.Tensor:
+        raise NotImplementedError("Infiltr8 state to tensor conversion not implemented")
 
     @override
-    def action_to_jax_array(self, game: Infiltr8Game, action: Action) -> jnp.ndarray:
-        raise NotImplementedError("Infiltr8 action to JAX array conversion not implemented")
+    def action_to_tensor(self, game: Infiltr8Game, action: TAction) -> torch.Tensor:
+        raise NotImplementedError("Infiltr8 action to tensor conversion not implemented")
 
     @override
-    def jax_array_to_action(self, game: Infiltr8Game, action_array: jnp.ndarray) -> Action:
-        raise NotImplementedError("Infiltr8 JAX array to action conversion not implemented")
+    def tensor_to_action(self, game: Infiltr8Game, action_tensor: torch.Tensor) -> TAction:
+        raise NotImplementedError("Infiltr8 tensor to action conversion not implemented")
 
     @override
-    def jax_array_to_state(self, game: Infiltr8Game, state_array: jnp.ndarray) -> Infiltr8State:
-        raise NotImplementedError("Infiltr8 state to JAX array conversion not implemented")
+    def tensor_to_state(self, game: Infiltr8Game, state_tensor: torch.Tensor) -> Infiltr8State:
+        raise NotImplementedError("Infiltr8 tensor to state conversion not implemented")
