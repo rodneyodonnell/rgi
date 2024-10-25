@@ -10,7 +10,8 @@ RUN apt-get update && apt-get install -y \
     python3 \
     python3-pip \
     python-is-python3 \
-    python3-venv
+    python3-venv \
+    git
 
 # Install Node.js and Yarn
 RUN curl -sL https://deb.nodesource.com/setup_20.x | bash - && \
