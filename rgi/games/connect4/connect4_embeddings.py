@@ -1,49 +1,41 @@
-from typing import Any
-from typing_extensions import override
-
-import jax
-import jax.numpy as jnp
-from flax import linen as nn
-
-from rgi.players.zerozero.zerozero_model import StateEmbedder, ActionEmbedder
-from rgi.games.connect4.connect4 import Connect4State, TAction
+import torch
+import torch.nn as nn
 
 
-class Connect4StateEmbedder(StateEmbedder[Connect4State]):
-    embedding_dim: int = 64
+class Connect4StateEmbedder(nn.Module):
+    def __init__(self, embedding_dim: int = 64, hidden_dim: int = 256) -> None:
+        super().__init__()
+        self.embedding_dim = embedding_dim
+        self.hidden_dim = hidden_dim
 
-    def _state_to_array(self, state: Connect4State) -> jax.Array:
-        if not isinstance(state, Connect4State):
-            raise ValueError("Invalid state type")
-        board_array = jnp.zeros((6, 7), dtype=jnp.float32)
-        for (row, col), value in state.board.items():
-            board_array = board_array.at[row - 1, col - 1].set(1.0 if value == 1 else -1.0)
-        return board_array
+        self.conv1 = nn.Conv2d(1, 32, kernel_size=3, padding=1)
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
+        self.flatten = nn.Flatten()
+        self.linear1 = nn.Linear(64 * 6 * 7, self.hidden_dim)
+        self.linear2 = nn.Linear(self.hidden_dim, self.embedding_dim)
 
-    @nn.compact
-    def __call__(self, state: Connect4State) -> jax.Array:
-        x = self._state_to_array(state)
-        x = x[..., None]  # Add channel dimensions
-        x = nn.Conv(features=32, kernel_size=(4, 4))(x)
-        x = nn.relu(x)
-        x = nn.Conv(features=64, kernel_size=(3, 3))(x)
-        x = nn.relu(x)
-        x = x.reshape(-1)  # Flatten the output
-        x = nn.Dense(features=self.embedding_dim)(x)
+    def _state_to_array(self, encoded_state_batch: torch.Tensor) -> torch.Tensor:
+        return encoded_state_batch[:, :-1].reshape(-1, 1, 6, 7)
+
+    def forward(self, encoded_state_batch: torch.Tensor) -> torch.Tensor:
+        x = self._state_to_array(encoded_state_batch)
+        x = torch.relu(self.conv1(x))
+        x = torch.relu(self.conv2(x))
+        x = self.flatten(x)
+        x = torch.relu(self.linear1(x))
+        x = self.linear2(x)
         return x
 
 
-class Connect4ActionEmbedder(ActionEmbedder[TAction], nn.Module):
-    embedding_dim: int = 64
-    num_actions: int = 7
+class Connect4ActionEmbedder(nn.Module):
+    def __init__(self, embedding_dim: int = 64, num_actions: int = 7) -> None:
+        super().__init__()
+        self.embedding_dim = embedding_dim
+        self.num_actions = num_actions
+        self.embedding = nn.Embedding(num_actions, embedding_dim)
 
-    @nn.compact
-    def __call__(self, action: TAction) -> jax.Array:
-        if not 1 <= action <= self.num_actions:
-            raise ValueError(f"Action must be between 1 and {self.num_actions}")
-        action_embeddings = self.param(
-            "action_embeddings",
-            nn.initializers.normal(stddev=0.02),
-            (self.num_actions, self.embedding_dim),
-        )
-        return action_embeddings[action - 1]
+    def forward(self, action: int) -> torch.Tensor:
+        return self.embedding(action - 1)
+
+    def all_action_embeddings(self) -> torch.Tensor:
+        return self.embedding.weight

@@ -1,14 +1,12 @@
 from typing import Any
-import jax
-import jax.numpy as jnp
+import torch
 import pytest
-from flax.typing import FrozenVariableDict
 from rgi.games.connect4.connect4_embeddings import Connect4StateEmbedder, Connect4ActionEmbedder
-from rgi.games.connect4 import Connect4Game
+from rgi.games.connect4 import Connect4Game, Connect4Serializer
 
 # pylint: disable=redefined-outer-name  # pytest fixtures trigger this false positive
 
-TJaxParams = dict[str, Any]
+TParams = dict[str, Any]
 
 
 @pytest.fixture
@@ -16,45 +14,72 @@ def game() -> Connect4Game:
     return Connect4Game()
 
 
-def test_connect4_state_embedder(game: Connect4Game) -> None:
+@pytest.fixture
+def serializer() -> Connect4Serializer:
+    return Connect4Serializer()
+
+
+def test_connect4_state_embedder(game: Connect4Game, serializer: Connect4Serializer) -> None:
     init_state = game.initial_state()
 
     state_embedder = Connect4StateEmbedder()
-    params = state_embedder.init(jax.random.PRNGKey(0), init_state)
+    state_embedder.eval()  # Set to evaluation mode
 
     state = game.next_state(init_state, 1)
-    embedding = state_embedder.apply(params, state)
-    assert isinstance(embedding, jax.Array)
-    assert embedding.shape == (64,)
+    encoded_state = serializer.state_to_tensor(game, state)
+    # Add batch dimension
+    encoded_state_batch = encoded_state.unsqueeze(0)
+    embedding = state_embedder(encoded_state_batch)
+    assert isinstance(embedding, torch.Tensor)
+    assert embedding.shape == (1, 64)  # Now we have a batch dimension
 
 
 def test_connect4_action_embedder() -> None:
-    init_action = 1
+    action_embedder = Connect4ActionEmbedder()
+    action_embedder.eval()  # Set to evaluation mode
+
+    # Create a batch of actions
+    actions = torch.tensor([1, 2, 3, 4, 5, 6, 7])
+    embeddings = action_embedder(actions)
+    assert isinstance(embeddings, torch.Tensor)
+    assert embeddings.shape == (7, 64)  # 7 actions, each embedded to 64 dimensions
+
+
+def test_invalid_inputs(game: Connect4Game, serializer: Connect4Serializer) -> None:
+    state_embedder = Connect4StateEmbedder()
+    state_embedder.eval()  # Set to evaluation mode
 
     action_embedder = Connect4ActionEmbedder()
-    params = action_embedder.init(jax.random.PRNGKey(0), init_action)
+    action_embedder.eval()  # Set to evaluation mode
 
-    for action in range(1, 8):
-        embedding = action_embedder.apply(params, action)
-        assert isinstance(embedding, jax.Array)
-        assert embedding.shape == (64,)
+    with pytest.raises(TypeError):
+        state_embedder("not a tensor")
+
+    with pytest.raises(IndexError):  # or ValueError, depending on how you implement error checking
+        action_embedder(torch.tensor([0]))
+
+    with pytest.raises(IndexError):  # or ValueError, depending on how you implement error checking
+        action_embedder(torch.tensor([8]))
 
 
-def test_invalid_inputs(game: Connect4Game) -> None:
-    init_state = game.initial_state()
-    init_action = 1
+def test_deterministic_output(game: Connect4Game, serializer: Connect4Serializer) -> None:
+    state = game.initial_state()
+    encoded_state = serializer.state_to_tensor(game, state)
+    encoded_state_batch = encoded_state.unsqueeze(0)
+
+    action = torch.tensor([1])
 
     state_embedder = Connect4StateEmbedder()
-    state_params = state_embedder.init(jax.random.PRNGKey(0), init_state)
-
     action_embedder = Connect4ActionEmbedder()
-    action_params = action_embedder.init(jax.random.PRNGKey(0), init_action)
 
-    with pytest.raises(ValueError):
-        state_embedder.apply(state_params, "not a Connect4State")  # type: ignore
+    state_embedder.eval()
+    action_embedder.eval()
 
-    with pytest.raises(ValueError):
-        action_embedder.apply(action_params, 0)
+    # Run embeddings twice and check if they're the same
+    state_emb1 = state_embedder(encoded_state_batch)
+    state_emb2 = state_embedder(encoded_state_batch)
+    assert torch.allclose(state_emb1, state_emb2)
 
-    with pytest.raises(ValueError):
-        action_embedder.apply(action_params, 8)
+    action_emb1 = action_embedder(action)
+    action_emb2 = action_embedder(action)
+    assert torch.allclose(action_emb1, action_emb2)

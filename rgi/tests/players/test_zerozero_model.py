@@ -1,11 +1,9 @@
-from typing import Any
 from typing_extensions import override
-import jax
-import jax.numpy as jnp
+
+import torch
 import pytest
 from rgi.players.zerozero.zerozero_model import ZeroZeroModel, zerozero_loss
 from rgi.players.zerozero.zerozero_model import StateEmbedder, ActionEmbedder
-from flax import linen as nn
 
 # pylint: disable=redefined-outer-name  # pytest fixtures trigger this false positive
 
@@ -13,101 +11,62 @@ TAction = int
 TGameState = tuple[int, int]
 
 
-# Dummy embedders for testing
 class DummyStateEmbedder(StateEmbedder[TGameState]):
-    embedding_dim: int = 64
+    def __init__(self, embedding_dim: int = 64):
+        super().__init__(embedding_dim)
+        self.vocabulary = torch.randn(10, embedding_dim)  # Random embeddings for 10 integers
 
-    @nn.compact
-    def __call__(self, state: TGameState) -> jax.Array:
-        return jnp.zeros(64).at[state[0]].set(10).at[state[1]].set(20)
+    @override
+    def forward(self, state: TGameState) -> torch.Tensor:
+        return (self.vocabulary[state[0]] + self.vocabulary[state[1]]) / 2
 
 
 class DummyActionEmbedder(ActionEmbedder[TAction]):
-    embedding_dim: int = 64
+    def __init__(self, embedding_dim: int = 64):
+        super().__init__(embedding_dim)
+        self.vocabulary = torch.randn(10, embedding_dim)  # Random embeddings for 10 integers
 
-    @nn.compact
-    def __call__(self, action: TAction) -> jax.Array:
-        return jnp.zeros(64).at[action].set(1)
+    @override
+    def forward(self, action: TAction) -> torch.Tensor:
+        return self.vocabulary[action]
+
+    @override
+    def all_action_embeddings(self) -> torch.Tensor:
+        return self.vocabulary
 
 
 @pytest.fixture
-def model() -> ZeroZeroModel[Any, Any, TAction]:
+def model() -> ZeroZeroModel[TGameState, TAction]:
     return ZeroZeroModel(
         state_embedder=DummyStateEmbedder(),
         action_embedder=DummyActionEmbedder(),
         possible_actions=[0, 1, 2, 3, 4, 5, 6],
         embedding_dim=64,
         hidden_dim=128,
+        shared_dim=256,
     )
 
 
-@pytest.fixture
-def params(model: ZeroZeroModel[Any, Any, TAction]) -> dict[str, Any]:
-    key = jax.random.PRNGKey(0)
-    dummy_state: TGameState = (1, 5)
-    dummy_action: TAction = 2
-    init_params = model.init(key, dummy_state, dummy_action)
-    return dict(init_params)
+def test_zerozero_model(model: ZeroZeroModel[TGameState, TAction]):
+    state = (1, 5)
+    value, policy_logits = model(state)
+
+    assert isinstance(value, torch.Tensor)
+    assert isinstance(policy_logits, torch.Tensor)
+    assert value.shape == (1,)
+    assert policy_logits.shape == (1, 7)  # 7 possible actions
 
 
-def test_model_output_shapes(model: ZeroZeroModel[Any, Any, TAction], params: dict[str, Any]) -> None:
-    state: TGameState = (1, 2)
-    action: TAction = 5
+def test_zerozero_loss(model: ZeroZeroModel[TGameState, TAction]):
+    states = torch.tensor([(1, 5), (2, 3)], dtype=torch.float32)
+    actions = torch.tensor([3, 1], dtype=torch.long)
+    rewards = torch.tensor([0.5, -0.5], dtype=torch.float32)
+    policy_targets = torch.tensor([[0, 0, 0, 1, 0, 0, 0], [0, 1, 0, 0, 0, 0, 0]], dtype=torch.float32)
 
-    output = model.apply(params, state, action)
-    next_state, reward, policy_embedding = output  # type: ignore
+    loss, loss_dict = zerozero_loss(model, states, actions, rewards, policy_targets)
 
-    assert next_state.shape == (64,)
-    assert reward.shape == ()  # Changed: reward is now a scalar jax.Array
-    assert policy_embedding.shape == (64,)
-
-
-def test_compute_action_logits(model: ZeroZeroModel[Any, Any, TAction], params: dict[str, Any]) -> None:
-    policy_embedding: jax.Array = jnp.ones(64)
-
-    action_logits = model.apply(
-        params,
-        method=model.compute_action_logits,
-        policy_embedding=policy_embedding,
-    )
-    assert isinstance(action_logits, jax.Array)
-
-    assert action_logits.shape == (7,)
-
-
-def test_compute_action_probabilities(model: ZeroZeroModel[Any, Any, TAction], params: dict[str, Any]) -> None:
-    policy_embedding: jax.Array = jnp.ones(64)
-
-    action_probabilities = model.apply(
-        params,
-        method=model.compute_action_probabilities,
-        policy_embedding=policy_embedding,
-    )
-    assert isinstance(action_probabilities, jax.Array)
-
-    assert action_probabilities.shape == (7,)
-    assert jnp.allclose(jnp.sum(action_probabilities), 1.0)
-
-
-def test_zerozero_loss(model: ZeroZeroModel[Any, Any, TAction], params: dict[str, Any]) -> None:
-    state: TGameState = (1, 2)
-    action: TAction = 5
-    next_state: TGameState = (1, 3)
-    reward: jax.Array = jnp.array(1.0)  # Changed: reward is now a jax.Array
-    policy_target: jax.Array = jnp.array([0.1, 0.2, 0.3, 0.1, 0.1, 0.1, 0.1])
-
-    total_loss, loss_dict = zerozero_loss(model, params, state, action, next_state, reward, policy_target)
-
-    assert isinstance(total_loss, jax.Array)
-    assert total_loss.shape == ()
-    assert set(loss_dict.keys()) == {
-        "total_loss",
-        "dynamics_loss",
-        "reward_loss",
-        "policy_loss",
-    }
-    assert all(isinstance(v, jax.Array) and (v.shape == ()) for v in loss_dict.values())
-
-
-if __name__ == "__main__":
-    pytest.main([__file__])
+    assert isinstance(loss, torch.Tensor)
+    assert isinstance(loss_dict, dict)
+    assert "total_loss" in loss_dict
+    assert "value_loss" in loss_dict
+    assert "policy_loss" in loss_dict

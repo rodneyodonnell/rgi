@@ -3,7 +3,7 @@ import textwrap
 import pytest
 
 from immutables import Map
-import jax.numpy as jnp
+import torch
 
 from rgi.games.othello import OthelloGame, OthelloState, OthelloSerializer, TAction
 from rgi.players.random_player import RandomPlayer
@@ -369,32 +369,35 @@ def test_pretty_str_bottom_left(game: OthelloGame) -> None:
     assert game.pretty_str(state).strip() == expected_output.strip()
 
 
-def test_state_to_jax_array(game: OthelloGame, serializer: OthelloSerializer):
+def test_state_to_tensor(game: OthelloGame, serializer: OthelloSerializer):
     state = game.initial_state()
-    jax_array = serializer.state_to_jax_array(game, state)
-    assert jax_array.shape == (65,)  # 8x8 board + 1 for current player
-    assert jax_array[8 * 3 + 3] == 2  # Check (4,4) position
-    assert jax_array[8 * 3 + 4] == 1  # Check (4,5) position
-    assert jax_array[-1] == 1  # Check current player
+    tensor = serializer.state_to_tensor(game, state)
+    assert tensor.shape == torch.Size([65])  # 8x8 board + 1 for current player
+    assert tensor[8 * 3 + 3] == 2  # Check (4,4) position
+    assert tensor[8 * 3 + 4] == 1  # Check (4,5) position
+    assert tensor[-1] == 1  # Check current player
 
 
-def test_action_to_jax_array(game: OthelloGame, serializer: OthelloSerializer):
+def test_action_to_tensor(game: OthelloGame, serializer: OthelloSerializer):
     action = (4, 5)
-    jax_array = serializer.action_to_jax_array(game, action)
-    assert jnp.array_equal(jax_array, jnp.array([4, 5]))  # 1-based indices
+    tensor = serializer.action_to_tensor(game, action)
+    assert torch.equal(tensor, torch.tensor([4, 5]))  # 1-based indices
 
 
-def test_jax_array_to_action(game: OthelloGame, serializer: OthelloSerializer):
-    jax_array = jnp.array([4, 5])
-    action = serializer.jax_array_to_action(game, jax_array)
+def test_tensor_to_action(game: OthelloGame, serializer: OthelloSerializer):
+    tensor = torch.tensor([4, 5])
+    action = serializer.tensor_to_action(game, tensor)
     assert action == (4, 5)  # 1-based indices
 
 
-def test_jax_array_to_state(game: OthelloGame, serializer: OthelloSerializer):
-    jax_array = jnp.zeros(65)
-    jax_array = jax_array.at[8 * 3 + 3].set(2).at[8 * 3 + 4].set(1).at[8 * 4 + 3].set(1).at[8 * 4 + 4].set(2)
-    jax_array = jax_array.at[-1].set(1)  # Set current player to 1
-    state = serializer.jax_array_to_state(game, jax_array)
+def test_tensor_to_state(game: OthelloGame, serializer: OthelloSerializer):
+    tensor = torch.zeros(65)
+    tensor[8 * 3 + 3] = 2
+    tensor[8 * 3 + 4] = 1
+    tensor[8 * 4 + 3] = 1
+    tensor[8 * 4 + 4] = 2
+    tensor[-1] = 1  # Set current player to 1
+    state = serializer.tensor_to_state(game, tensor)
     assert state.board.get((4, 4)) == 2
     assert state.board.get((4, 5)) == 1
     assert state.board.get((5, 4)) == 1

@@ -3,7 +3,7 @@ from typing import Literal, Optional, Any
 from typing_extensions import override
 
 from immutables import Map
-import jax.numpy as jnp
+import torch
 
 from rgi.core.base import Game, GameSerializer
 
@@ -14,7 +14,9 @@ TPosition = tuple[int, int]
 
 @dataclass(frozen=True)
 class Connect4State:
-    board: Map[tuple[int, int], int]  # Indexed by (row,column). board[(1,1)] is bottom left corner.
+    board: Map[
+        tuple[int, int], int
+    ]  # Indexed by (row,column). board[(1,1)] is bottom left corner.
     current_player: TPlayerId  # The current player
     winner: Optional[TPlayerId] = None  # The winner, if the game has ended
 
@@ -47,7 +49,9 @@ class Connect4Game(Game[Connect4State, TPlayerId, TAction]):
 
     @override
     def legal_actions(self, state: Connect4State) -> list[TAction]:
-        return [col for col in self._all_column_ids if (self.height, col) not in state.board]
+        return [
+            col for col in self._all_column_ids if (self.height, col) not in state.board
+        ]
 
     @override
     def all_actions(self) -> list[TAction]:
@@ -57,14 +61,20 @@ class Connect4Game(Game[Connect4State, TPlayerId, TAction]):
     def next_state(self, state: Connect4State, action: TAction) -> Connect4State:
         """Find the lowest empty row in the selected column and return the updated game state."""
         if action not in self.legal_actions(state):
-            raise ValueError(f"Invalid move: Invalid column '{action}' no in {self._all_column_ids}")
+            raise ValueError(
+                f"Invalid move: Invalid column '{action}' no in {self._all_column_ids}"
+            )
 
         for row in range(1, self.height + 1):
             if (row, action) not in state.board:
                 new_board = state.board.set((row, action), state.current_player)
-                winner = self._calculate_winner(new_board, action, row, state.current_player)
+                winner = self._calculate_winner(
+                    new_board, action, row, state.current_player
+                )
                 next_player: TPlayerId = 2 if state.current_player == 1 else 1
-                return Connect4State(board=new_board, current_player=next_player, winner=winner)
+                return Connect4State(
+                    board=new_board, current_player=next_player, winner=winner
+                )
 
         raise ValueError("Invalid move: column is full")
 
@@ -121,8 +131,15 @@ class Connect4Game(Game[Connect4State, TPlayerId, TAction]):
     def pretty_str(self, state: Connect4State) -> str:
         return (
             "\n".join(
-                "|" + "|".join(" ●○"[state.board.get((row, col), 0)] for col in self._all_column_ids) + "|"
-                for row in reversed(self._all_row_ids)  # Start from the top row and work down
+                "|"
+                + "|".join(
+                    " ●○"[state.board.get((row, col), 0)]
+                    for col in self._all_column_ids
+                )
+                + "|"
+                for row in reversed(
+                    self._all_row_ids
+                )  # Start from the top row and work down
             )
             + "\n+"
             + "-+" * self.width
@@ -144,9 +161,14 @@ class Connect4Game(Game[Connect4State, TPlayerId, TAction]):
 
 class Connect4Serializer(GameSerializer[Connect4Game, Connect4State, TAction]):
     @override
-    def serialize_state(self, game: Connect4Game, state: Connect4State) -> dict[str, Any]:
+    def serialize_state(
+        self, game: Connect4Game, state: Connect4State
+    ) -> dict[str, Any]:
         """Serialize the game state to a dictionary for frontend consumption."""
-        board = [[state.board.get((row + 1, col + 1), 0) for col in range(game.width)] for row in range(game.height)]
+        board = [
+            [state.board.get((row + 1, col + 1), 0) for col in range(game.width)]
+            for row in range(game.height)
+        ]
         return {
             "rows": game.height,
             "columns": game.width,
@@ -166,26 +188,31 @@ class Connect4Serializer(GameSerializer[Connect4Game, Connect4State, TAction]):
         return column
 
     @override
-    def state_to_jax_array(self, game: Connect4Game, state: Connect4State) -> jnp.ndarray:
-        board_array = jnp.array([[state.board.get((row, col), 0) for col in range(1, 8)] for row in range(1, 7)])
-        return jnp.concatenate([board_array.flatten(), jnp.array([state.current_player])])
+    def state_to_tensor(self, game: Connect4Game, state: Connect4State) -> torch.Tensor:
+        tensor = torch.zeros(game.height * game.width + 1, dtype=torch.float32)
+        for (row, col), player in state.board.items():
+            index = (row - 1) * game.width + (col - 1)
+            tensor[index] = player
+        tensor[-1] = state.current_player
+        return tensor
 
     @override
-    def action_to_jax_array(self, game: Connect4Game, action: TAction) -> jnp.ndarray:
-        return jnp.array(action)
+    def action_to_tensor(self, game: Connect4Game, action: int) -> torch.Tensor:
+        return torch.tensor(action - 1, dtype=torch.long)
 
     @override
-    def jax_array_to_action(self, game: Connect4Game, action_array: jnp.ndarray) -> TAction:
-        return int(action_array)
+    def tensor_to_action(self, game: Connect4Game, action_tensor: torch.Tensor) -> int:
+        return action_tensor.item() + 1
 
     @override
-    def jax_array_to_state(self, game: Connect4Game, state_array: jnp.ndarray) -> Connect4State:
-        board_array = state_array[:-1].reshape(6, 7)
-        board = {
-            (row + 1, col + 1): int(board_array[row, col])
-            for row in range(6)
-            for col in range(7)
-            if board_array[row, col] != 0
-        }
-        current_player = int(state_array[-1])
-        return Connect4State(board=Map(board), current_player=current_player)
+    def tensor_to_state(
+        self, game: Connect4Game, state_tensor: torch.Tensor
+    ) -> Connect4State:
+        board = {}
+        for i in range(game.height * game.width):
+            if state_tensor[i] != 0:
+                row = i // game.width + 1
+                col = i % game.width + 1
+                board[(row, col)] = int(state_tensor[i].item())
+        current_player = int(state_tensor[-1].item())
+        return Connect4State(board=board, current_player=current_player)
