@@ -7,7 +7,7 @@ TGameState = TypeVar("TGameState")  # pylint: disable=invalid-name
 TPlayerState = TypeVar("TPlayerState")  # pylint: disable=invalid-name
 TPlayerId = TypeVar("TPlayerId")  # pylint: disable=invalid-name
 TAction = TypeVar("TAction")  # pylint: disable=invalid-name
-TEmbedding = TypeVar("TEmbedding")  # pylint: disable=invalid-name
+TEmbedding = TypeVar("TEmbedding", bound=torch.Tensor)  # pylint: disable=invalid-name
 TParams = TypeVar("TParams")  # pylint: disable=invalid-name
 
 
@@ -37,11 +37,11 @@ class Game(ABC, Generic[TGameState, TPlayerId, TAction]):
         pass
 
     @abstractmethod
-    def is_terminal(self, state: TGameState) -> bool:
-        pass
+    def is_terminal(self, state: TGameState) -> torch.Tensor:
+        """Return a boolean tensor indicating if the state is terminal."""
 
     @abstractmethod
-    def reward(self, state: TGameState, player_id: TPlayerId) -> float:
+    def reward(self, state: TGameState, player_id: TPlayerId) -> torch.Tensor:
         """Return the reward for the given player in the given state.
 
         This is typically 0 for non-terminal states, and -1, 0, or 1 for terminal states,
@@ -63,22 +63,6 @@ class GameSerializer(ABC, Generic[TGame, TGameState, TAction]):
     def parse_action(self, game: TGame, action_data: dict[str, Any]) -> TAction:
         """Parse an action from frontend data."""
 
-    @abstractmethod
-    def state_to_tensor(self, game: TGame, state: TGameState) -> torch.Tensor:
-        """Convert a game state to a PyTorch tensor for ML model input."""
-
-    @abstractmethod
-    def action_to_tensor(self, game: TGame, action: TAction) -> torch.Tensor:
-        """Convert an action to a PyTorch tensor for ML model input."""
-
-    @abstractmethod
-    def tensor_to_action(self, game: TGame, action_tensor: torch.Tensor) -> TAction:
-        """Convert a PyTorch tensor output from an ML model to a game action."""
-
-    @abstractmethod
-    def tensor_to_state(self, game: TGame, state_tensor: torch.Tensor) -> TGameState:
-        """Convert a PyTorch tensor to a game state."""
-
 
 class Player(ABC, Generic[TGameState, TPlayerState, TAction]):
     @abstractmethod
@@ -91,21 +75,3 @@ class Player(ABC, Generic[TGameState, TPlayerState, TAction]):
 
         This method is called after each action, allowing the player to update any
         internal state or learning parameters based on the game progression."""
-
-
-class GameObserver(ABC, Generic[TGameState, TPlayerId, TAction]):
-    @abstractmethod
-    def observe_initial_state(self, state: TGameState) -> None:
-        pass
-
-    @abstractmethod
-    def observe_action(self, state: TGameState, player: TPlayerId, action: TAction) -> None:
-        pass
-
-    @abstractmethod
-    def observe_state_transition(self, old_state: TGameState, new_state: TGameState) -> None:
-        pass
-
-    @abstractmethod
-    def observe_game_end(self, final_state: TGameState) -> None:
-        pass
