@@ -1,15 +1,21 @@
 from abc import ABC, abstractmethod
-from typing import Generic, TypeVar, Sequence, Any
+from typing import Generic, Protocol, TypeVar, Sequence, Type, Any
+from dataclasses import fields
+
 import torch
-import torch.nn as nn
+from torch import nn
 
 TGame = TypeVar("TGame", bound="Game[Any, Any, Any]")  # pylint: disable=invalid-name
 TGameState = TypeVar("TGameState")  # pylint: disable=invalid-name
 TPlayerState = TypeVar("TPlayerState")  # pylint: disable=invalid-name
 TPlayerId = TypeVar("TPlayerId")  # pylint: disable=invalid-name
 TAction = TypeVar("TAction")  # pylint: disable=invalid-name
+
+TBatchGameState = TypeVar("TBatchGameState", bound="Batchable[Any]")  # pylint: disable=invalid-name
+TBatchAction = TypeVar("TBatchAction", bound="Batchable[Any]")  # pylint: disable=invalid-name
 TEmbedding = TypeVar("TEmbedding", bound=torch.Tensor)  # pylint: disable=invalid-name
-TParams = TypeVar("TParams")  # pylint: disable=invalid-name
+
+T = TypeVar("T")
 
 
 class Game(ABC, Generic[TGameState, TPlayerId, TAction]):
@@ -53,6 +59,19 @@ class Game(ABC, Generic[TGameState, TPlayerId, TAction]):
         """Return a human-readable string representation of the game state."""
 
 
+class Player(ABC, Generic[TGameState, TPlayerState, TAction]):
+    @abstractmethod
+    def select_action(self, game_state: TGameState, legal_actions: Sequence[TAction]) -> TAction:
+        pass
+
+    @abstractmethod
+    def update_state(self, game_state: TGameState, action: TAction) -> None:
+        """Update the player's internal state based on the game state and action.
+
+        This method is called after each action, allowing the player to update any
+        internal state or learning parameters based on the game progression."""
+
+
 class GameSerializer(ABC, Generic[TGame, TGameState, TAction]):
     """Companion class to Game that serializes game states for various purposes."""
 
@@ -65,35 +84,83 @@ class GameSerializer(ABC, Generic[TGame, TGameState, TAction]):
         """Parse an action from frontend data."""
 
 
-class StateEmbedder(nn.Module, Generic[TGameState]):
+class Batchable(Protocol[T]):
+    """Protocol to convert single states & actions into torch.Tensor for batching."""
+
+    @staticmethod
+    def from_sequence(items: Sequence[T]) -> "Batchable[T]": ...
+
+    def __getitem__(self, index: int) -> T: ...
+
+    def __len__(self) -> int: ...
+
+
+class Batch(Generic[T]):
+    """Convenience class to convert a sequence of states & actions into a batch.
+
+    >>> from dataclasses import dataclass
+    >>> import torch
+    >>> @dataclass
+    ... class Count21State:
+    ...     score: int
+    ...     current_player: int
+    >>> @dataclass
+    ... class Count21StateBatch(Batch[Count21State]):
+    ...     score: torch.Tensor
+    ...     current_player: torch.Tensor
+    >>> states = [Count21State(5, 1), Count21State(7, 2)]
+    >>> batch = Count21StateBatch.from_sequence(states)
+    >>> len(batch)
+    2
+    >>> batch
+    Count21StateBatch(score=tensor([5, 7]), current_player=tensor([1, 2]))
+    >>> batch[0]
+    Count21State(score=5, current_player=1)
+    """
+
+    _unbatch_class: Type[T]
+
+    @classmethod
+    def from_sequence(cls: Type["Batch[T]"], items: Sequence[T]) -> "Batch[T]":
+        if not items:
+            raise ValueError("Cannot create a batch from an empty sequence")
+
+        batch_dict = {}
+        for field in fields(items[0]):  # type: ignore
+            values = [getattr(item, field.name) for item in items]
+            batch_dict[field.name] = torch.tensor(values)
+
+        batch = cls(**batch_dict)
+        batch._unbatch_class = type(items[0])
+        return batch
+
+    def __getitem__(self, index: int) -> T:
+        item_dict = {field.name: getattr(self, field.name)[index].item() for field in fields(self)}  # type: ignore
+        return self._unbatch_class(**item_dict)
+
+    def __len__(self) -> int:
+        return len(getattr(self, fields(self)[0].name))  # type: ignore
+
+
+class StateEmbedder(ABC, nn.Module, Generic[TBatchGameState]):
     def __init__(self, embedding_dim: int):
         super().__init__()
         self.embedding_dim = embedding_dim
 
-    def forward(self, game_states: TGameState) -> torch.Tensor:
-        raise NotImplementedError
-
-
-class ActionEmbedder(nn.Module, Generic[TAction]):
-    def __init__(self, embedding_dim: int):
-        super().__init__()
-        self.embedding_dim = embedding_dim
-
-    def forward(self, game_actions: TAction) -> torch.Tensor:
-        raise NotImplementedError
-
-    def all_action_embeddings(self) -> torch.Tensor:
-        raise NotImplementedError
-
-
-class Player(ABC, Generic[TGameState, TPlayerState, TAction]):
     @abstractmethod
-    def select_action(self, game_state: TGameState, legal_actions: Sequence[TAction]) -> TAction:
+    def forward(self, game_states: TBatchGameState) -> torch.Tensor:
+        pass
+
+
+class ActionEmbedder(ABC, nn.Module, Generic[TBatchAction]):
+    def __init__(self, embedding_dim: int):
+        super().__init__()
+        self.embedding_dim = embedding_dim
+
+    @abstractmethod
+    def forward(self, game_actions: TBatchAction) -> torch.Tensor:
         pass
 
     @abstractmethod
-    def update_state(self, game_state: TGameState, action: TAction) -> None:
-        """Update the player's internal state based on the game state and action.
-
-        This method is called after each action, allowing the player to update any
-        internal state or learning parameters based on the game progression."""
+    def all_action_embeddings(self) -> torch.Tensor:
+        pass
