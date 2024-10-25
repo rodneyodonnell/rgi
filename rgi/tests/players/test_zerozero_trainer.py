@@ -1,32 +1,25 @@
-from typing_extensions import override
+import torch
 import pytest
-import jax
-import jax.numpy as jnp
-from flax.training import train_state
-from rgi.players.zerozero.zerozero_model import ZeroZeroModel
+from typing import Any, List
 from rgi.players.zerozero.zerozero_trainer import ZeroZeroTrainer
+from rgi.players.zerozero.zerozero_model import ZeroZeroModel
+from rgi.core.base import GameSerializer, Game
 from rgi.core.trajectory import EncodedTrajectory
 from rgi.tests.players.test_zerozero_model import DummyStateEmbedder, DummyActionEmbedder
-from rgi.core.trajectory import save_trajectories
-from rgi.core.base import GameSerializer, Game
-
-from typing import Any, List
-from rgi.core.base import Game, GameSerializer, TGameState, TPlayerId, TAction
-from rgi.games.count21 import Count21Game, Count21Serializer
 
 
-@pytest.fixture
-def dummy_game():
-    return Count21Game()
+class DummyGame(Game[tuple[int, int], int]):
+    def all_actions(self) -> List[int]:
+        return [0, 1, 2]
 
 
-@pytest.fixture
-def dummy_serializer():
-    return Count21Serializer()
+class DummySerializer(GameSerializer[tuple[int, int], int]):
+    def state_to_tensor(self, game: Game[tuple[int, int], int], state: tuple[int, int]) -> torch.Tensor:
+        return torch.tensor([state[0], state[1], 0, 0], dtype=torch.float32)
 
 
 @pytest.fixture
-def dummy_model():
+def dummy_model() -> ZeroZeroModel[Any, Any, int]:
     return ZeroZeroModel(
         state_embedder=DummyStateEmbedder(),
         action_embedder=DummyActionEmbedder(),
@@ -38,97 +31,61 @@ def dummy_model():
 
 
 @pytest.fixture
-def dummy_trainer(dummy_model, dummy_serializer, dummy_game):
-    return ZeroZeroTrainer(dummy_model, dummy_serializer, dummy_game)
+def dummy_trainer(dummy_model: ZeroZeroModel[Any, Any, int]) -> ZeroZeroTrainer:
+    return ZeroZeroTrainer(dummy_model, DummySerializer(), DummyGame())
 
 
 @pytest.fixture
-def dummy_trajectories():
+def dummy_trajectories() -> List[EncodedTrajectory]:
     return [
         EncodedTrajectory(
-            states=jnp.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0]]),
-            actions=jnp.array([1, 2, 0]),
-            state_rewards=jnp.array([0, 0, 1]),
-            player_ids=jnp.array([1, 2, 1]),
-            final_rewards=jnp.array([1, -1]),
+            states=torch.tensor([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0]], dtype=torch.float32),
+            actions=torch.tensor([1, 2, 0], dtype=torch.long),
+            state_rewards=torch.tensor([0.0, 0.0, 1.0], dtype=torch.float32),
+            player_ids=torch.tensor([1, 2, 1], dtype=torch.long),
+            final_rewards=torch.tensor([1.0, -1.0], dtype=torch.float32),
             length=3,
         )
     ]
 
 
-def test_create_train_state(dummy_trainer):
-    rng = jax.random.PRNGKey(0)
-    train_state = dummy_trainer.create_train_state(rng)
-    assert train_state is not None
-    assert train_state.params is not None
-    assert train_state.opt_state is not None
+def test_create_batches(dummy_trainer: ZeroZeroTrainer, dummy_trajectories: List[EncodedTrajectory]):
+    dataloader = dummy_trainer.create_batches(dummy_trajectories, batch_size=2)
+    assert isinstance(dataloader, torch.utils.data.DataLoader)
+    for batch in dataloader:
+        assert len(batch) == 4
+        states, actions, rewards, policy_targets = batch
+        assert states.shape == (2, 4)
+        assert actions.shape == (2,)
+        assert rewards.shape == (2,)
+        assert policy_targets.shape == (2, 3)
 
 
-def test_train_step(dummy_trainer):
-    rng = jax.random.PRNGKey(0)
-    train_state = dummy_trainer.create_train_state(rng)
-    batch = (
-        jnp.array([[1, 0, 0, 0]]),
-        jnp.array([1]),
-        jnp.array([[0, 1, 0, 0]]),
-        jnp.array([0.0]),
-        jnp.array([[0, 1, 0]]),
-    )
-    new_train_state, loss_dict = dummy_trainer.train_step(train_state, batch)
-    assert new_train_state is not None
-    assert loss_dict is not None
-    assert "total_loss" in loss_dict
+def test_train_step(dummy_trainer: ZeroZeroTrainer, dummy_trajectories: List[EncodedTrajectory]):
+    dataloader = dummy_trainer.create_batches(dummy_trajectories, batch_size=2)
+    for batch in dataloader:
+        loss, loss_dict = dummy_trainer.train_step(batch)
+        assert isinstance(loss, float)
+        assert isinstance(loss_dict, dict)
+        assert "total_loss" in loss_dict
+        assert "value_loss" in loss_dict
+        assert "policy_loss" in loss_dict
+        break
 
 
-def test_create_batches(dummy_trainer, dummy_trajectories):
-    batches = list(dummy_trainer.create_batches(dummy_trajectories, batch_size=2))
-    assert len(batches) == 1
-    batch = batches[0]
-    assert len(batch) == 5
-    assert batch[0].shape == (2, 4)  # states
-    assert batch[1].shape == (2,)  # actions
-    assert batch[2].shape == (2, 4)  # next_states
-    assert batch[3].shape == (2,)  # rewards
-    assert batch[4].shape == (2, 3)  # policy_targets
+def test_train(dummy_trainer: ZeroZeroTrainer, dummy_trajectories: List[EncodedTrajectory]):
+    dummy_trainer.train(dummy_trajectories, num_epochs=1, batch_size=2)
 
 
-def test_train(dummy_trainer, dummy_trajectories, tmp_path):
-    trajectories_file = tmp_path / "test_trajectories.npy"
-    save_trajectories(dummy_trajectories, str(trajectories_file))
-
-    dummy_trainer.train(str(trajectories_file), num_epochs=1, batch_size=2)
-    assert dummy_trainer.state is not None
-
-
-def test_save_load_checkpoint(dummy_trainer, dummy_trajectories, dummy_serializer, dummy_game, tmp_path):
-    trajectories_file = tmp_path / "test_trajectories.npy"
-    save_trajectories(dummy_trajectories, str(trajectories_file))
-
-    dummy_trainer.train(str(trajectories_file), num_epochs=1, batch_size=2)
-
+def test_save_load_checkpoint(dummy_trainer: ZeroZeroTrainer, tmp_path):
     checkpoint_dir = tmp_path / "checkpoints"
-    checkpoint_dir.mkdir(exist_ok=True)
+    checkpoint_dir.mkdir()
 
     dummy_trainer.save_checkpoint(str(checkpoint_dir))
-    new_trainer = ZeroZeroTrainer(dummy_trainer.model, dummy_serializer, dummy_game)
+    assert (checkpoint_dir / "zerozero_model.pth").exists()
+    assert (checkpoint_dir / "zerozero_optimizer.pth").exists()
+
+    new_trainer = ZeroZeroTrainer(dummy_trainer.model, DummySerializer(), DummyGame())
     new_trainer.load_checkpoint(str(checkpoint_dir))
 
-    assert new_trainer.state is not None
-    assert isinstance(new_trainer.state, train_state.TrainState)
-    assert jax.tree_util.tree_all(
-        jax.tree_util.tree_map(lambda x, y: jnp.allclose(x, y), dummy_trainer.state.params, new_trainer.state.params)
-    )
-
-    # Check that the optimizer states have the same structure
-    assert jax.tree_util.tree_structure(dummy_trainer.state.opt_state) == jax.tree_util.tree_structure(
-        new_trainer.state.opt_state
-    )
-
-    # Check that the optimizer states have similar values
-    assert jax.tree_util.tree_all(
-        jax.tree_util.tree_map(
-            lambda x, y: jnp.allclose(x, y) if isinstance(x, jnp.ndarray) else x == y,
-            dummy_trainer.state.opt_state,
-            new_trainer.state.opt_state,
-        )
-    )
+    assert torch.allclose(next(dummy_trainer.model.parameters()), next(new_trainer.model.parameters()))
