@@ -9,14 +9,23 @@
 # To upgrade all packages to their latest versions:
 # Run: python3 -m piptools compile --upgrade requirements.in
 
+# Use the extra index URL for PyTorch (for CUDA 12.4)
+--extra-index-url https://download.pytorch.org/whl/cu124
 
 # Core
-tensorflow
+tensorflow==2.18.0rc2
 numpy
 jupyter
 immutables
+
+# JAX/flax
 jax[cuda]
 flax
+
+# Pytorch
+torch
+torchvision
+torchaudio
 
 # Frontend
 fastapi==0.114.1
@@ -40,3 +49,5 @@ pip-tools
 pylint
 mypy
 tqdm
+line_profiler
+memory_profiler

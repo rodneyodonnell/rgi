@@ -4,7 +4,7 @@
         "context": "..",
         "dockerfile": "../Dockerfile",
         "args": {
-            "USERNAME": "vscode"
+            "USERNAME": "ubuntu"
         }
     },
     // Launch jupyter on localhost:8888 during dev.
@@ -23,7 +23,7 @@
         "source=${localWorkspaceFolder}/scripts,target=/app/scripts,type=bind",
         "source=${localWorkspaceFolder}/notebooks,target=/app/notebooks,type=bind"
     ],
-    "remoteUser": "vscode",
+    "remoteUser": "ubuntu",
     "updateRemoteUserUID": true,
     "customizations": {
         "vscode": {

@@ -324,6 +324,13 @@ Claude's observations and thoughts:
   1. We need to ensure the modal HTML is present in the template
   2. We should verify that Bootstrap JS is properly loaded
   3. We should consider if a modal is really needed for game end, or if we should use a different UI element
+- The project is transitioning to use PyTorch tensors for state and action representations.
+- This change will affect the `GameSerializer` class, which now needs methods to convert between game states/actions and PyTorch tensors.
+- The `StateEmbedder` and `ActionEmbedder` classes should be updated to work with PyTorch tensors.
+- Consider updating the `Player` class to potentially work with batched inputs for more efficient processing.
+- The `Game` class methods may need to be adapted to handle tensor inputs and outputs where appropriate.
+- Remember to update any existing game implementations to conform to these changes.
+- When implementing these changes, consider backwards compatibility or provide clear migration instructions for existing code.
 
 GPT-4's observations and thoughts:
 - When making changes, ensure to follow the existing conventions and style guides provided.
