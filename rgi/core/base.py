@@ -1,13 +1,14 @@
 from abc import ABC, abstractmethod
-from typing import Generic, TypeVar, Any
-import jax.numpy as jnp
+from typing import Generic, TypeVar, Sequence, Any
+import torch
+import torch.nn as nn
 
 TGame = TypeVar("TGame", bound="Game[Any, Any, Any]")  # pylint: disable=invalid-name
 TGameState = TypeVar("TGameState")  # pylint: disable=invalid-name
 TPlayerState = TypeVar("TPlayerState")  # pylint: disable=invalid-name
 TPlayerId = TypeVar("TPlayerId")  # pylint: disable=invalid-name
 TAction = TypeVar("TAction")  # pylint: disable=invalid-name
-TEmbedding = TypeVar("TEmbedding")  # pylint: disable=invalid-name
+TEmbedding = TypeVar("TEmbedding", bound=torch.Tensor)  # pylint: disable=invalid-name
 TParams = TypeVar("TParams")  # pylint: disable=invalid-name
 
 
@@ -17,38 +18,38 @@ class Game(ABC, Generic[TGameState, TPlayerId, TAction]):
         pass
 
     @abstractmethod
-    def current_player_id(self, state: TGameState) -> TPlayerId:
+    def current_player_id(self, game_state: TGameState) -> TPlayerId:
         pass
 
     @abstractmethod
-    def all_player_ids(self, state: TGameState) -> list[TPlayerId]:
+    def all_player_ids(self, game_state: TGameState) -> Sequence[TPlayerId]:
         """Return a sequence of all player IDs in the game."""
 
     @abstractmethod
-    def legal_actions(self, state: TGameState) -> list[TAction]:
+    def legal_actions(self, game_state: TGameState) -> Sequence[TAction]:
         pass
 
     @abstractmethod
-    def all_actions(self) -> list[TAction] | None:
-        """Optionally return a list of all possible actions in the game."""
+    def all_actions(self) -> Sequence[TAction] | None:
+        """Optionally return a sequence of all possible actions in the game."""
 
     @abstractmethod
-    def next_state(self, state: TGameState, action: TAction) -> TGameState:
+    def next_state(self, game_state: TGameState, action: TAction) -> TGameState:
         pass
 
     @abstractmethod
-    def is_terminal(self, state: TGameState) -> bool:
+    def is_terminal(self, game_state: TGameState) -> bool:
         pass
 
     @abstractmethod
-    def reward(self, state: TGameState, player_id: TPlayerId) -> float:
+    def reward(self, game_state: TGameState, player_id: TPlayerId) -> float:
         """Return the reward for the given player in the given state.
 
         This is typically 0 for non-terminal states, and -1, 0, or 1 for terminal states,
         depending on whether the player lost, drew, or won respectively."""
 
     @abstractmethod
-    def pretty_str(self, state: TGameState) -> str:
+    def pretty_str(self, game_state: TGameState) -> str:
         """Return a human-readable string representation of the game state."""
 
 
@@ -56,33 +57,38 @@ class GameSerializer(ABC, Generic[TGame, TGameState, TAction]):
     """Companion class to Game that serializes game states for various purposes."""
 
     @abstractmethod
-    def serialize_state(self, game: TGame, state: TGameState) -> dict[str, Any]:
+    def serialize_state(self, game: TGame, game_state: TGameState) -> dict[str, Any]:
         """Serialize the game state to a dictionary for frontend consumption."""
 
     @abstractmethod
     def parse_action(self, game: TGame, action_data: dict[str, Any]) -> TAction:
         """Parse an action from frontend data."""
 
-    @abstractmethod
-    def state_to_jax_array(self, game: TGame, state: TGameState) -> jnp.ndarray:
-        """Convert a game state to a JAX array for ML model input."""
 
-    @abstractmethod
-    def action_to_jax_array(self, game: TGame, action: TAction) -> jnp.ndarray:
-        """Convert an action to a JAX array for ML model input."""
+class StateEmbedder(nn.Module, Generic[TGameState]):
+    def __init__(self, embedding_dim: int):
+        super().__init__()
+        self.embedding_dim = embedding_dim
 
-    @abstractmethod
-    def jax_array_to_action(self, game: TGame, action_array: jnp.ndarray) -> TAction:
-        """Convert a JAX array output from an ML model to a game action."""
+    def forward(self, game_states: TGameState) -> torch.Tensor:
+        raise NotImplementedError
 
-    @abstractmethod
-    def jax_array_to_state(self, game: TGame, state_array: jnp.ndarray) -> TGameState:
-        """Convert a JAX array to a game state."""
+
+class ActionEmbedder(nn.Module, Generic[TAction]):
+    def __init__(self, embedding_dim: int):
+        super().__init__()
+        self.embedding_dim = embedding_dim
+
+    def forward(self, game_actions: TAction) -> torch.Tensor:
+        raise NotImplementedError
+
+    def all_action_embeddings(self) -> torch.Tensor:
+        raise NotImplementedError
 
 
 class Player(ABC, Generic[TGameState, TPlayerState, TAction]):
     @abstractmethod
-    def select_action(self, game_state: TGameState, legal_actions: list[TAction]) -> TAction:
+    def select_action(self, game_state: TGameState, legal_actions: Sequence[TAction]) -> TAction:
         pass
 
     @abstractmethod
@@ -91,21 +97,3 @@ class Player(ABC, Generic[TGameState, TPlayerState, TAction]):
 
         This method is called after each action, allowing the player to update any
         internal state or learning parameters based on the game progression."""
-
-
-class GameObserver(ABC, Generic[TGameState, TPlayerId, TAction]):
-    @abstractmethod
-    def observe_initial_state(self, state: TGameState) -> None:
-        pass
-
-    @abstractmethod
-    def observe_action(self, state: TGameState, player: TPlayerId, action: TAction) -> None:
-        pass
-
-    @abstractmethod
-    def observe_state_transition(self, old_state: TGameState, new_state: TGameState) -> None:
-        pass
-
-    @abstractmethod
-    def observe_game_end(self, final_state: TGameState) -> None:
-        pass
