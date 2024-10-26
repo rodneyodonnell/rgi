@@ -2,9 +2,9 @@ import textwrap
 from typing import Literal
 
 import pytest
-import jax.numpy as jnp
+import torch
 
-from rgi.games.connect4 import Connect4Game, Connect4Serializer
+from rgi.games.connect4 import Connect4Game, Connect4Serializer, GameState, BatchGameState
 
 TPlayerId = Literal[1, 2]
 
@@ -24,24 +24,24 @@ def serializer() -> Connect4Serializer:
 def test_initial_state(game: Connect4Game) -> None:
     state = game.initial_state()
     assert state.current_player == 1
-    assert all(state.board.get((row, col)) is None for row in range(1, 6 + 1) for col in range(1, 7 + 1))
+    assert torch.all(state.board == 0)
 
 
 def test_legal_actions(game: Connect4Game) -> None:
     state = game.initial_state()
-    assert game.legal_actions(state) == list(range(1, 7 + 1))
+    assert game.legal_actions(state) == tuple(range(1, 8))
 
     # Fill up a column
-    for _ in range(1, 6 + 1):
+    for _ in range(6):
         state = game.next_state(state, action=1)
-    assert game.legal_actions(state) == list(range(2, 7 + 1))
+    assert game.legal_actions(state) == tuple(range(2, 8))
 
 
 def test_next_state(game: Connect4Game) -> None:
     state = game.initial_state()
     next_state = game.next_state(state, action=3)
     assert next_state.current_player == 2
-    assert next_state.board.get((1, 3)) == 1
+    assert next_state.board[5, 2] == 1  # Remember, it's zero-indexed now
 
 
 def test_is_terminal(game: Connect4Game) -> None:
@@ -49,7 +49,7 @@ def test_is_terminal(game: Connect4Game) -> None:
     assert not game.is_terminal(state)
 
     # Create a winning state
-    for i in range(1, 3 + 1):
+    for i in range(1, 4):
         state = game.next_state(state, action=i)
         assert not game.is_terminal(state)
         state = game.next_state(state, action=i)
@@ -109,12 +109,33 @@ def test_invalid_move(game: Connect4Game) -> None:
 
 
 def test_custom_board_size() -> None:
-    game = Connect4Game(width=8, height=7, connect=5)
+    game = Connect4Game(width=8, height=7, connect_length=5)
     state = game.initial_state()
     assert len(game.legal_actions(state)) == 8
     for _ in range(7):
         state = game.next_state(state, 1)
     assert len(game.legal_actions(state)) == 7
+
+
+def test_pretty_str(game: Connect4Game) -> None:
+    state = game.initial_state()
+    for action in [1, 2, 2, 3, 3, 3, 4, 4, 5, 6, 7, 7, 7]:
+        state = game.next_state(state, action)
+
+    assert (
+        game.pretty_str(state).strip()
+        == textwrap.dedent(
+            """
+            | | | | | | | |
+            | | | | | | | |
+            | | | | | | | |
+            | | |○| | | |●|
+            | |●|●|○| | |○|
+            |●|○|○|●|●|○|●|
+            +-+-+-+-+-+-+-+
+            """
+        ).strip()
+    )
 
 
 @pytest.mark.parametrize("verbose", [True, False])
@@ -221,30 +242,29 @@ def test_middle_of_row_win() -> None:
     assert new_state.winner == 1, f"Expected Player 1 to win, but got {state.winner}"
 
 
-def test_state_to_jax_array(game: Connect4Game, serializer: Connect4Serializer):
+def test_state_immutability(game: Connect4Game) -> None:
+    initial_state = game.initial_state()
+    assert torch.all(initial_state.board == 0)
+
+    updated_state = game.next_state(initial_state, 3)
+    assert torch.all(initial_state.board == 0)
+    assert initial_state.current_player == 1
+    assert not torch.all(updated_state.board == 0)
+    assert updated_state.current_player == 2
+
+
+def test_serializer(game: Connect4Game, serializer: Connect4Serializer) -> None:
     state = game.initial_state()
-    state = game.next_state(state, 4)  # Make a move
-    jax_array = serializer.state_to_jax_array(game, state)
-    assert jax_array.shape == (43,)  # 6*7 + 1 for current player
-    assert jax_array[3] == 1  # Check the move we made
-    assert jax_array[-1] == 2  # Check current player
+    state = game.next_state(state, 3)
+    state = game.next_state(state, 4)
 
+    serialized = serializer.serialize_state(game, state)
+    assert serialized["rows"] == game.height
+    assert serialized["columns"] == game.width
+    assert serialized["current_player"] == 1
+    assert not serialized["is_terminal"]
+    assert serialized["state"][5][2] == 1
+    assert serialized["state"][5][3] == 2
 
-def test_action_to_jax_array(game: Connect4Game, serializer: Connect4Serializer):
-    action = 4
-    jax_array = serializer.action_to_jax_array(game, action)
-    assert jax_array == 4  # 1-based index
-
-
-def test_jax_array_to_action(game: Connect4Game, serializer: Connect4Serializer):
-    jax_array = jnp.array(4)
-    action = serializer.jax_array_to_action(game, jax_array)
-    assert action == 4  # 1-based index
-
-
-def test_jax_array_to_state(game: Connect4Game, serializer: Connect4Serializer):
-    jax_array = jnp.zeros(43)
-    jax_array = jax_array.at[3].set(1).at[-1].set(2)
-    state = serializer.jax_array_to_state(game, jax_array)
-    assert state.board.get((1, 4)) == 1
-    assert state.current_player == 2
+    action = serializer.parse_action(game, {"column": 5})
+    assert action == 5

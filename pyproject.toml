@@ -6,6 +6,8 @@ disable = [
     "R1723",  # no-else-break
     "R1705",  # no-else-return
     "R0801",  # duplicate-code (we see this in tests)
+    "C0115",  # missing-class-docstring
+    "C0114",  # missing-module-docstring
 ]
 
 [tool.mypy]

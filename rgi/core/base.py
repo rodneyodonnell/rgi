@@ -102,21 +102,21 @@ class Batch(Generic[T]):
     >>> from dataclasses import dataclass
     >>> import torch
     >>> @dataclass
-    ... class Count21State:
+    ... class GameState:
     ...     score: int
     ...     current_player: int
     >>> @dataclass
-    ... class Count21StateBatch(Batch[Count21State]):
+    ... class BatchGameState(Batch[GameState]):
     ...     score: torch.Tensor
     ...     current_player: torch.Tensor
-    >>> states = [Count21State(5, 1), Count21State(7, 2)]
-    >>> batch = Count21StateBatch.from_sequence(states)
+    >>> states = [GameState(5, 1), GameState(7, 2)]
+    >>> batch = BatchGameState.from_sequence(states)
     >>> len(batch)
     2
     >>> batch
-    Count21StateBatch(score=tensor([5, 7]), current_player=tensor([1, 2]))
+    BatchGameState(score=tensor([5, 7]), current_player=tensor([1, 2]))
     >>> batch[0]
-    Count21State(score=5, current_player=1)
+    GameState(score=5, current_player=1)
     """
 
     _unbatch_class: Type[T]
@@ -126,17 +126,22 @@ class Batch(Generic[T]):
         if not items:
             raise ValueError("Cannot create a batch from an empty sequence")
 
+        cls_fields = set(f.name for f in fields(cls))  # type: ignore
         batch_dict = {}
         for field in fields(items[0]):  # type: ignore
+            if field.name not in cls_fields:
+                continue
             values = [getattr(item, field.name) for item in items]
-            batch_dict[field.name] = torch.tensor(values)
+            # We need to handle both primitive values and torch.Tensors here.
+            # torch.tensor(primitive_list) is probably more efficient, but doesn't work for tensors.
+            batch_dict[field.name] = torch.stack([torch.tensor(value) for value in values])
 
         batch = cls(**batch_dict)
         batch._unbatch_class = type(items[0])
         return batch
 
     def __getitem__(self, index: int) -> T:
-        item_dict = {field.name: getattr(self, field.name)[index].item() for field in fields(self)}  # type: ignore
+        item_dict = {field.name: field.type(getattr(self, field.name)[index]) for field in fields(self)}  # type: ignore
         return self._unbatch_class(**item_dict)
 
     def __len__(self) -> int:

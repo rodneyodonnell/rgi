@@ -1,19 +1,11 @@
 # rgi/tests/core/test_trajectory.py
 
-from pathlib import Path
+from dataclasses import dataclass
+
 import pytest
 import torch
-from dataclasses import dataclass
-from typing import Sequence, Any
-from rgi.core.base import Game, GameSerializer, Batch, PrimitiveBatch, StateEmbedder, ActionEmbedder
-from rgi.games.count21 import (
-    Count21Game,
-    GameState,
-    BatchGameState,
-    Count21Serializer,
-    Count21StateEmbedder,
-    Count21ActionEmbedder,
-)
+
+from rgi.core.base import Batch, PrimitiveBatch
 
 
 @dataclass
@@ -26,16 +18,6 @@ class DummyState:
 class DummyBatch(Batch[DummyState]):
     value: torch.Tensor
     flag: torch.Tensor
-
-
-@pytest.fixture
-def game() -> Count21Game:
-    return Count21Game()
-
-
-@pytest.fixture
-def serializer() -> Count21Serializer:
-    return Count21Serializer()
 
 
 def test_batch() -> None:
