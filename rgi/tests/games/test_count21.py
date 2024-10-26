@@ -1,74 +1,85 @@
 import pytest
-import jax.numpy as jnp
+import torch
+from rgi.games import count21
 from rgi.games.count21 import Count21Game, Count21Serializer
+
+# pylint: disable=redefined-outer-name  # pytest fixtures trigger this false positive
 
 
 @pytest.fixture
-def game():
+def game() -> Count21Game:
     return Count21Game()
 
 
 @pytest.fixture
-def serializer():
+def serializer() -> Count21Serializer:
     return Count21Serializer()
 
 
-def test_initial_state(game):
-    assert game.initial_state() == (0,)
+def test_initial_state(game: Count21Game) -> None:
+    assert game.initial_state() == count21.GameState(0, 1)
 
 
-def test_current_player_id(game):
-    assert game.current_player_id((0,)) == 1
-    assert game.current_player_id((0, 1)) == 2
-    assert game.current_player_id((0, 1, 2)) == 1
+def test_current_player_id(game: Count21Game) -> None:
+    assert game.current_player_id(count21.GameState(0, 1)) == 1
+    assert game.current_player_id(count21.GameState(0, 2)) == 2
 
 
-def test_legal_actions(game):
-    assert game.legal_actions((0,)) == [1, 2, 3]
+def test_legal_actions(game: Count21Game) -> None:
+    assert game.legal_actions(count21.GameState(0, 1)) == (1, 2, 3)
 
 
-def test_next_state(game):
-    assert game.next_state((0,), 2) == (0, 2)
-    assert game.next_state((0, 2), 3) == (0, 2, 3)
+def test_next_state(game: Count21Game) -> None:
+    assert game.next_state(count21.GameState(0, 1), 3) == count21.GameState(3, 2)
+    assert game.next_state(count21.GameState(3, 2), 3) == count21.GameState(6, 1)
+    assert game.next_state(count21.GameState(6, 1), 1) == count21.GameState(7, 2)
 
 
-def test_is_terminal(game):
-    assert not game.is_terminal((0,))
-    assert not game.is_terminal((0, 2, 3, 4, 5))
-    assert game.is_terminal((0, 2, 3, 4, 5, 7))
+def test_is_terminal(game: Count21Game) -> None:
+    assert not game.is_terminal(count21.GameState(0, 1))
+    assert not game.is_terminal(count21.GameState(20, 1))
+    assert game.is_terminal(count21.GameState(21, 1))
 
 
-def test_reward(game):
-    non_terminal_state = (0, 2, 3, 4, 5)
-    assert game.reward(non_terminal_state, 1) == 0.0
-    assert game.reward(non_terminal_state, 2) == 0.0
+def test_reward(game: Count21Game) -> None:
 
-    terminal_state = (0, 2, 3, 4, 5, 7)
-    assert game.reward(terminal_state, 1) == -1.0
-    assert game.reward(terminal_state, 2) == 1.0
+    # non-terminal states
+    assert game.reward(count21.GameState(20, 1), 1) == 0.0
+    assert game.reward(count21.GameState(20, 1), 2) == 0.0
 
-
-def test_pretty_str(game):
-    assert game.pretty_str((0, 2, 3, 4)) == "Count: 9, Moves: (0, 2, 3, 4)"
+    # terminal state
+    assert game.reward(count21.GameState(21, 1), 1) == 1.0
+    assert game.reward(count21.GameState(21, 1), 2) == -1.0
 
 
-def test_serializer(game, serializer):
-    state = (0, 2, 3, 4)
-    serialized_state = serializer.serialize_state(game, state)
-    assert serialized_state == {"state": (0, 2, 3, 4)}
+def test_pretty_str(game: Count21Game) -> None:
+    assert game.pretty_str(count21.GameState(9, 1)) == "Score: 9, Player: 1"
+
+
+def test_serializer(game: Count21Game, serializer: Count21Serializer) -> None:
+    game_state = count21.GameState(9, 1)
+    serialized_state = serializer.serialize_state(game, game_state)
+    assert serialized_state == {"score": 9, "current_player": 1}
 
     action_data = {"action": 2}
     parsed_action = serializer.parse_action(game, action_data)
     assert parsed_action == 2
 
-    state_array = serializer.state_to_jax_array(game, state)
-    assert jnp.array_equal(state_array, jnp.array([0, 2, 3, 4]))
 
-    action_array = serializer.action_to_jax_array(game, 2)
-    assert jnp.array_equal(action_array, jnp.array(2))
+def test_batch_state(game: Count21Game) -> None:
+    game_state = game.initial_state()
+    game_state_list = [game_state]
+    game_action_list = []
+    for action in [1, 3, 2, 1]:
+        game_state = game.next_state(game_state, action)
+        game_state_list.append(game_state)
+        game_action_list.append(action)
 
-    deserialized_action = serializer.jax_array_to_action(game, jnp.array(2))
-    assert deserialized_action == 2
+    batch_game_state = count21.BatchGameState.from_sequence(game_state_list)
+    assert torch.equal(batch_game_state.score, torch.tensor([0, 1, 4, 6, 7]))
+    assert torch.equal(batch_game_state.current_player, torch.tensor([1, 2, 1, 2, 1]))
+    assert list(batch_game_state) == game_state_list
 
-    deserialized_state = serializer.jax_array_to_state(game, jnp.array([0, 2, 3, 4]))
-    assert deserialized_state == (0, 2, 3, 4)
+    batch_game_action = count21.BatchAction.from_sequence(game_action_list)
+    assert torch.equal(batch_game_action.values, torch.tensor([1, 3, 2, 1]))
+    assert list(batch_game_action) == game_action_list

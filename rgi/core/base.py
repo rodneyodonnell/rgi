@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Generic, Protocol, TypeVar, Sequence, Type, Any
-from dataclasses import fields
+from dataclasses import fields, dataclass
 
 import torch
 from torch import nn
@@ -16,6 +16,7 @@ TBatchAction = TypeVar("TBatchAction", bound="Batchable[Any]")  # pylint: disabl
 TEmbedding = TypeVar("TEmbedding", bound=torch.Tensor)  # pylint: disable=invalid-name
 
 T = TypeVar("T")
+TBatch = TypeVar("TBatch", bound="Batch[Any]")
 
 
 class Game(ABC, Generic[TGameState, TPlayerId, TAction]):
@@ -121,7 +122,7 @@ class Batch(Generic[T]):
     _unbatch_class: Type[T]
 
     @classmethod
-    def from_sequence(cls: Type["Batch[T]"], items: Sequence[T]) -> "Batch[T]":
+    def from_sequence(cls: Type[TBatch], items: Sequence[T]) -> TBatch:
         if not items:
             raise ValueError("Cannot create a batch from an empty sequence")
 
@@ -140,6 +141,35 @@ class Batch(Generic[T]):
 
     def __len__(self) -> int:
         return len(getattr(self, fields(self)[0].name))  # type: ignore
+
+
+@dataclass
+class PrimitiveBatch(Generic[T]):
+    """A batch class for primitive types like int, float, etc.
+
+    >>> batch = PrimitiveBatch.from_sequence([2,4,6,8])
+    >>> len(batch)
+    4
+    >>> batch
+    PrimitiveBatch(values=tensor([2, 4, 6, 8]))
+    >>> batch[0]
+    2
+    """
+
+    values: torch.Tensor
+
+    @classmethod
+    def from_sequence(cls: Type["PrimitiveBatch[T]"], items: Sequence[T]) -> "PrimitiveBatch[T]":
+        if not items:
+            raise ValueError("Cannot create a batch from an empty sequence")
+
+        return cls(values=torch.tensor(items))
+
+    def __getitem__(self, index: int) -> T:
+        return self.values[index].item()  # type: ignore
+
+    def __len__(self) -> int:
+        return self.values.shape[0]
 
 
 class StateEmbedder(ABC, nn.Module, Generic[TBatchGameState]):
