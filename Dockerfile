@@ -66,6 +66,9 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY scripts scripts
+COPY rgi rgi
+COPY notebooks notebooks
+
 
 # Update .bashrc to source the custom rgi.bashrc file
 RUN echo "source /app/scripts/rgi.bashrc" >> /home/$USERNAME/.bashrc
