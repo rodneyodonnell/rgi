@@ -1,15 +1,16 @@
-from abc import ABC, abstractmethod
-from typing import Generic, Protocol, TypeVar, Sequence, Type, Any
+from typing import Generic, TypeVar, Sequence, Any
 from dataclasses import fields, dataclass
+
+from abc import ABC, abstractmethod
+
+TGame = TypeVar("TGame", bound="Game[Any, Any]")  # pylint: disable=invalid-name
+TGameState = TypeVar("TGameState")  # pylint: disable=invalid-name
+TPlayerState = TypeVar("TPlayerState")  # pylint: disable=invalid-name
+TAction = TypeVar("TAction")  # pylint: disable=invalid-name
+TPlayerId = int  # pylint: disable=invalid-name
 
 import torch
 from torch import nn
-
-TGame = TypeVar("TGame", bound="Game[Any, Any, Any]")  # pylint: disable=invalid-name
-TGameState = TypeVar("TGameState")  # pylint: disable=invalid-name
-TPlayerState = TypeVar("TPlayerState")  # pylint: disable=invalid-name
-TPlayerId = TypeVar("TPlayerId")  # pylint: disable=invalid-name
-TAction = TypeVar("TAction")  # pylint: disable=invalid-name
 
 TBatchGameState = TypeVar("TBatchGameState", bound="Batchable[Any]")  # pylint: disable=invalid-name
 TBatchAction = TypeVar("TBatchAction", bound="Batchable[Any]")  # pylint: disable=invalid-name
@@ -19,22 +20,22 @@ T = TypeVar("T")
 TBatch = TypeVar("TBatch", bound="Batch[Any]")
 
 
-class Game(ABC, Generic[TGameState, TPlayerId, TAction]):
+class Game(ABC, Generic[TGameState, TAction]):
     @abstractmethod
     def initial_state(self) -> TGameState:
-        pass
+        """Create an initial game state."""
 
     @abstractmethod
     def current_player_id(self, game_state: TGameState) -> TPlayerId:
-        pass
+        """Return the ID of the current player. Sequential starting at 1."""
 
     @abstractmethod
-    def all_player_ids(self, game_state: TGameState) -> Sequence[TPlayerId]:
-        """Return a sequence of all player IDs in the game."""
+    def num_players(self, game_state: TGameState) -> int:
+        """Number of players in the game."""
 
     @abstractmethod
     def legal_actions(self, game_state: TGameState) -> Sequence[TAction]:
-        pass
+        """Return a sequence of all legal actions for the game state."""
 
     @abstractmethod
     def all_actions(self) -> Sequence[TAction] | None:
@@ -42,11 +43,11 @@ class Game(ABC, Generic[TGameState, TPlayerId, TAction]):
 
     @abstractmethod
     def next_state(self, game_state: TGameState, action: TAction) -> TGameState:
-        pass
+        """Return a new immutable game state. Must not modify the input state."""
 
     @abstractmethod
     def is_terminal(self, game_state: TGameState) -> bool:
-        pass
+        """Return True if the game is in a terminal state."""
 
     @abstractmethod
     def reward(self, game_state: TGameState, player_id: TPlayerId) -> float:
@@ -63,7 +64,7 @@ class Game(ABC, Generic[TGameState, TPlayerId, TAction]):
 class Player(ABC, Generic[TGameState, TPlayerState, TAction]):
     @abstractmethod
     def select_action(self, game_state: TGameState, legal_actions: Sequence[TAction]) -> TAction:
-        pass
+        """Select an action from the legal actions."""
 
     @abstractmethod
     def update_state(self, game_state: TGameState, action: TAction) -> None:
@@ -78,7 +79,10 @@ class GameSerializer(ABC, Generic[TGame, TGameState, TAction]):
 
     @abstractmethod
     def serialize_state(self, game: TGame, game_state: TGameState) -> dict[str, Any]:
-        """Serialize the game state to a dictionary for frontend consumption."""
+        """Serialize the game state to a dictionary for frontend consumption.
+
+        Result must be JSON serializable.
+        """
 
     @abstractmethod
     def parse_action(self, game: TGame, action_data: dict[str, Any]) -> TAction:

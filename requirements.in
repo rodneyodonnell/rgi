@@ -11,21 +11,22 @@
 
 # Use the extra index URL for PyTorch (for CUDA 12.4)
 --extra-index-url https://download.pytorch.org/whl/cu124
+--extra-index-url https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+
+# Tensorflow, Jax, Pytorch & Playwright are installed via Dockerfile.
+# Versions here must match Dockerfile, and are included here to keep consistency with dependencies.
+jax[cuda]==0.4.35
+tensorflow==2.18.0
+torch==2.5.0
+playwright==1.48.0
+
 
 # Core
-tensorflow==2.18.0rc2
 numpy
 jupyter
-immutables
 
 # JAX/flax
-jax[cuda]
 flax
-
-# Pytorch
-torch
-torchvision
-torchaudio
 
 # Frontend
 fastapi==0.114.1
@@ -39,10 +40,9 @@ pytest-timeout
 pytest-xdist
 
 # Frontent testing
-playwright==1.47.0
-pytest-playwright==0.5.2
-selenium==4.24.0
-webdriver-manager==4.0.2
+pytest-playwright
+selenium
+webdriver-manager
 
 # Tools
 pip-tools

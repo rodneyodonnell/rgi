@@ -1,0 +1,73 @@
+from dataclasses import dataclass
+
+from typing import Any, Sequence
+from typing_extensions import override
+
+from rgi.core import base
+
+
+@dataclass
+class Count21State:
+    score: int
+    current_player: int
+
+
+TGameState = Count21State
+TAction = int
+TPlayerId = int
+
+
+class Count21Game(base.Game[TGameState, TAction]):
+    def __init__(self, num_players: int = 2, target: int = 21, max_guess: int = 3):
+        self._num_players = num_players
+        self.target = target
+        self._all_actions = tuple(TAction(g + 1) for g in range(max_guess))
+
+    @override
+    def initial_state(self) -> TGameState:
+        return TGameState(score=0, current_player=1)
+
+    @override
+    def current_player_id(self, game_state: TGameState) -> TPlayerId:
+        return game_state.current_player
+
+    @override
+    def num_players(self, game_state: TGameState) -> int:
+        return self._num_players
+
+    @override
+    def legal_actions(self, game_state: TGameState) -> Sequence[TAction]:
+        return self._all_actions
+
+    @override
+    def all_actions(self) -> Sequence[TAction]:
+        return self._all_actions
+
+    @override
+    def next_state(self, game_state: TGameState, action: TAction) -> TGameState:
+        next_player = game_state.current_player % self._num_players + 1
+        return TGameState(score=game_state.score + action, current_player=next_player)
+
+    @override
+    def is_terminal(self, game_state: TGameState) -> bool:
+        return game_state.score >= self.target
+
+    @override
+    def reward(self, game_state: TGameState, player_id: TPlayerId) -> float:
+        if not self.is_terminal(game_state):
+            return 0.0
+        return 1.0 if self.current_player_id(game_state) == player_id else -1.0
+
+    @override
+    def pretty_str(self, game_state: TGameState) -> str:
+        return f"Score: {game_state.score}, Player: {game_state.current_player}"
+
+
+class Count21Serializer(base.GameSerializer[Count21Game, TGameState, TAction]):
+    @override
+    def serialize_state(self, game: Count21Game, game_state: TGameState) -> dict[str, Any]:
+        return {"score": game_state.score, "current_player": game_state.current_player}
+
+    @override
+    def parse_action(self, game: Count21Game, action_data: dict[str, Any]) -> TAction:
+        return TAction(action_data["action"])
