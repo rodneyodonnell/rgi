@@ -315,12 +315,15 @@ numpy==2.0.2
     #   jaxlib
     #   keras
     #   ml-dtypes
+    #   numpy-typing
     #   optax
     #   orbax-checkpoint
     #   scipy
     #   tensorboard
     #   tensorflow
     #   tensorstore
+numpy-typing==1.1.1
+    # via -r requirements.in
 nvidia-cublas-cu12==12.4.5.8
     # via
     #   jax-cuda12-plugin

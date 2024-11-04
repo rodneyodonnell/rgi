@@ -23,6 +23,7 @@ playwright==1.48.0
 
 # Core
 numpy
+numpy-typing
 jupyter
 
 # JAX/flax
