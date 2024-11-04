@@ -1,0 +1,19 @@
+*~
+__pycache__/
+.ipynb_checkpoints
+
+# Ignore most .vscode files, but keep those launch.json, etc, to simplify sharing settings
+.vscode/*
+!.vscode/launch.json
+!.vscode/tasks.json
+!.vscode/extensions.json
+
+# Ignore build artifacts (compiled JavaScript files)
+web_app/static/**/*.js
+web_app/static/**/*.js.map
+node_modules/
+
+# Ignore data output (trajectories, etc)
+data/
+
+.venv

@@ -1,0 +1,48 @@
+# requirements.in
+#
+# This file lists the direct dependencies of the project.
+# To update dependencies:
+# 1. Edit this file to add, remove, or update dependencies.
+# 2. Run: python3 -m piptools compile requirements.in
+# 4. Run: pip install -r requirements.txt
+#
+# To upgrade all packages to their latest versions:
+# Run: python3 -m piptools compile --upgrade requirements.in
+
+# Use the extra index URL for PyTorch (for CUDA 12.4)
+--extra-index-url https://download.pytorch.org/whl/cu124
+--extra-index-url https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+
+# Tensorflow, Jax, Pytorch & Playwright are installed via Dockerfile.
+# Versions here must match Dockerfile, and are included here to keep consistency with dependencies.
+jax[cuda]==0.4.35
+tensorflow==2.18.0
+torch==2.5.0
+playwright==1.48.0
+
+
+# Core
+numpy
+jupyter
+
+# JAX/flax
+flax
+
+# Frontend
+fastapi==0.114.1
+uvicorn[standard]==0.30.6
+Jinja2==3.1.4
+
+# Testing
+pytest
+pytest-mock
+pytest-timeout
+pytest-xdist
+
+# Tools
+pip-tools
+pylint
+mypy
+tqdm
+line_profiler
+memory_profiler

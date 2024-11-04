@@ -1,0 +1,34 @@
+{
+  "type": "module",
+  "devDependencies": {
+    "@types/bootstrap": "^5.2.10",
+    "@typescript-eslint/eslint-plugin": "^8.6.0",
+    "@typescript-eslint/parser": "^8.6.0",
+    "eslint": "^9.11.0",
+    "husky": "^9.1.6",
+    "lint-staged": "^15.2.10",
+    "prettier": "^3.3.3",
+    "typescript": "5.5"
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "lint-staged"
+    }
+  },
+  "lint-staged": {
+    "*.py": [
+      "black",
+      "pylint",
+      "mypy"
+    ],
+    "*.ts": [
+      "prettier --write",
+      "eslint --fix",
+      "tsc --noEmit"
+    ]
+  },
+  "scripts": {
+    "lint:ts": "eslint 'web_app/src/**/*.ts'",
+    "typecheck:ts": "tsc --noEmit"
+  }
+}

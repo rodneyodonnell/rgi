@@ -1,0 +1,21 @@
+[tool.pylint]
+max-line-length = 120
+disable = [
+    "C0111",  # missing-docstring,
+    "W1203",  # Use lazy % or .format() formatting in logging functions
+    "R1723",  # no-else-break
+    "R1705",  # no-else-return
+    "R0801",  # duplicate-code (we see this in tests)
+    "C0115",  # missing-class-docstring
+    "C0114",  # missing-module-docstring
+]
+
+[tool.mypy]
+ignore_missing_imports = true
+strict = true
+
+[tool.pylint.main]
+ignore = [
+    "node_modules",
+    ".ipynb_checkpoints"
+]
