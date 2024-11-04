@@ -2,9 +2,8 @@ import textwrap
 from typing import Literal
 
 import pytest
-import torch
-
-from rgi.games.connect4 import Connect4Game, Connect4Serializer, GameState, BatchGameState
+import numpy as np
+from rgi.games.connect4.connect4 import Connect4Game, Connect4Serializer
 
 TPlayerId = Literal[1, 2]
 
@@ -24,7 +23,7 @@ def serializer() -> Connect4Serializer:
 def test_initial_state(game: Connect4Game) -> None:
     state = game.initial_state()
     assert state.current_player == 1
-    assert torch.all(state.board == 0)
+    assert np.all(state.board == 0)
 
 
 def test_legal_actions(game: Connect4Game) -> None:
@@ -244,12 +243,12 @@ def test_middle_of_row_win() -> None:
 
 def test_state_immutability(game: Connect4Game) -> None:
     initial_state = game.initial_state()
-    assert torch.all(initial_state.board == 0)
+    assert np.all(initial_state.board == 0)
 
     updated_state = game.next_state(initial_state, 3)
-    assert torch.all(initial_state.board == 0)
+    assert np.all(initial_state.board == 0)
     assert initial_state.current_player == 1
-    assert not torch.all(updated_state.board == 0)
+    assert not np.all(updated_state.board == 0)
     assert updated_state.current_player == 2
 
 
