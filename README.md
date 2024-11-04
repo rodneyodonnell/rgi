@@ -8,3 +8,8 @@ docker run -it --gpus all -v $(pwd):/rgi-src rgi-gpu /app/scripts/check_rgi_setu
 ```
 check_rgi_setup.py
 ```
+
+# Create a new game from the simple template game.
+```
+create_game_from_template.sh othello
+```
