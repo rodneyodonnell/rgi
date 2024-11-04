@@ -3,6 +3,7 @@
 from dataclasses import replace
 from typing import Any
 import pytest
+import torch
 from rgi.games.infiltr8 import (
     Infiltr8Game,
     Infiltr8State,
