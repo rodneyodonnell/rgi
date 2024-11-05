@@ -20,7 +20,8 @@ from rgi.core.base import (
 from rgi.games import connect4
 from rgi.games import infiltr8
 from rgi.games import othello
-from rgi.players.zerozero.zerozero_player import ZeroZeroPlayer
+
+# from rgi.players.zerozero.zerozero_player import ZeroZeroPlayer
 from rgi.players.minimax_player import MinimaxPlayer
 from rgi.players.random_player import RandomPlayer
 from rgi.players.human_player import HumanPlayer
@@ -82,22 +83,16 @@ def load_zerozero_player(
     key = jax.random.PRNGKey(0)
 
     # Initialize model parameters
-    zerozero_model_params = zerozero_model.init(
-        key, dummy_state_batch, dummy_action_batch
-    )
+    zerozero_model_params = zerozero_model.init(key, dummy_state_batch, dummy_action_batch)
     old_params = zerozero_model_params
 
     # Load checkpoint if it exists
     if args.checkpoint_dir:
         absolute_checkpoint_dir = os.path.abspath(args.checkpoint_dir)
     else:
-        absolute_checkpoint_dir = os.path.abspath(
-            os.path.join("data", "checkpoints", args.game)
-        )
+        absolute_checkpoint_dir = os.path.abspath(os.path.join("data", "checkpoints", args.game))
 
-    zerozero_model_params = checkpoints.restore_checkpoint(
-        absolute_checkpoint_dir, target=zerozero_model_params
-    )
+    zerozero_model_params = checkpoints.restore_checkpoint(absolute_checkpoint_dir, target=zerozero_model_params)
     new_params = zerozero_model_params
 
     loaded_params = checkpoints.restore_checkpoint(absolute_checkpoint_dir, target=None)
@@ -107,25 +102,17 @@ def load_zerozero_player(
         apply_fn=zerozero_model.apply, params=zerozero_model_params, tx=dummy_tx
     )
 
-    _train_state_2 = train_state.TrainState.create(
-        apply_fn=zerozero_model.apply, params=old_params, tx=dummy_tx
-    )
+    _train_state_2 = train_state.TrainState.create(apply_fn=zerozero_model.apply, params=old_params, tx=dummy_tx)
     latest_checkpoint = checkpoints.latest_checkpoint(absolute_checkpoint_dir)
     _train_state_2_old = _train_state_2
     if latest_checkpoint is not None:
-        _train_state_2 = checkpoints.restore_checkpoint(
-            latest_checkpoint, _train_state_2
-        )
+        _train_state_2 = checkpoints.restore_checkpoint(latest_checkpoint, _train_state_2)
     else:
         print("No checkpoint found, starting from scratch.")
     _train_state_2_new = _train_state_2
 
-    print(
-        f'default params: {_train_state_2_old.params["params"]["action_embedder"]["action_embeddings"][0][:5]}'
-    )
-    print(
-        f'update params : {_train_state_2_new.params["params"]["action_embedder"]["action_embeddings"][0][:5]}'
-    )
+    print(f'default params: {_train_state_2_old.params["params"]["action_embedder"]["action_embeddings"][0][:5]}')
+    print(f'update params : {_train_state_2_new.params["params"]["action_embedder"]["action_embeddings"][0][:5]}')
     # Load the checkpoint into the TrainState
     # state = checkpoints.restore_checkpoint(absolute_checkpoint_dir, target=state)
 
@@ -161,10 +148,8 @@ PLAYER_REGISTRY: dict[
 ] = {
     "human": lambda args, game, registered_game, player_id, params: HumanPlayer(game),
     "random": lambda args, game, registered_game, player_id, params: RandomPlayer(),
-    "minimax": lambda args, game, registered_game, player_id, params: MinimaxPlayer(
-        game, player_id
-    ),
-    "zerozero": lambda args, game, registered_game, player_id, params: load_zerozero_player(
-        args, game, registered_game, player_id
-    ),
+    "minimax": lambda args, game, registered_game, player_id, params: MinimaxPlayer(game, player_id),
+    # "zerozero": lambda args, game, registered_game, player_id, params: load_zerozero_player(
+    #     args, game, registered_game, player_id
+    # ),
 }

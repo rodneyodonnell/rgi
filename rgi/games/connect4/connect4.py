@@ -1,218 +1,153 @@
 from dataclasses import dataclass
-from typing import Literal, Optional, Any
+
+from typing import Sequence, Any, Optional
 from typing_extensions import override
 
-from immutables import Map
-import torch
+import numpy as np
+from numpy.typing import NDArray
 
-from rgi.core.base import Game, GameSerializer
-
-TPlayerId = Literal[1, 2]
-TAction = int
-TPosition = tuple[int, int]
+from rgi.core import base
 
 
-@dataclass(frozen=True)
+@dataclass
 class Connect4State:
-    board: Map[
-        tuple[int, int], int
-    ]  # Indexed by (row,column). board[(1,1)] is bottom left corner.
-    current_player: TPlayerId  # The current player
-    winner: Optional[TPlayerId] = None  # The winner, if the game has ended
+    board: NDArray[np.int8]  # (height, width)
+    current_player: int
+    winner: Optional[int] = None  # The winner, if the game has ended
 
 
-class Connect4Game(Game[Connect4State, TPlayerId, TAction]):
+GameState = Connect4State
+Action = int
+PlayerId = int
+
+
+class Connect4Game(base.Game[GameState, Action]):
     """Connect 4 game implementation.
 
     Actions are column numbers (1-7) where the player can drop a piece.
     """
 
-    def __init__(self, width: int = 7, height: int = 6, connect: int = 4):
+    def __init__(self, width: int = 7, height: int = 6, connect_length: int = 4):
         self.width = width
         self.height = height
-        self.connect = connect
-        self._all_column_ids = list(range(1, width + 1))
-        self._all_row_ids = list(range(1, height + 1))
+        self.connect_length = connect_length
+        self._all_column_ids = tuple(range(1, width + 1))
+        self._all_row_ids = tuple(range(1, height + 1))
 
     @override
-    def initial_state(self) -> Connect4State:
-        return Connect4State(board=Map(), current_player=1)
+    def initial_state(self) -> GameState:
+        return GameState(board=np.zeros([self.height, self.width], dtype=np.int8), current_player=1, winner=None)
 
     @override
-    def current_player_id(self, state: Connect4State) -> TPlayerId:
-        return state.current_player
+    def current_player_id(self, game_state: GameState) -> int:
+        return game_state.current_player
 
     @override
-    def all_player_ids(self, state: Connect4State) -> list[TPlayerId]:
-        """Return a list of all player IDs."""
-        return [1, 2]
+    def num_players(self, game_state: GameState) -> int:
+        return 2
 
     @override
-    def legal_actions(self, state: Connect4State) -> list[TAction]:
-        return [
-            col for col in self._all_column_ids if (self.height, col) not in state.board
-        ]
+    def legal_actions(self, game_state: GameState) -> Sequence[Action]:
+        return tuple(col + 1 for col in range(self.width) if game_state.board[0, col] == 0)
 
     @override
-    def all_actions(self) -> list[TAction]:
+    def all_actions(self) -> Sequence[Action]:
         return self._all_column_ids
 
     @override
-    def next_state(self, state: Connect4State, action: TAction) -> Connect4State:
+    def next_state(self, game_state: GameState, action: Action) -> GameState:
         """Find the lowest empty row in the selected column and return the updated game state."""
-        if action not in self.legal_actions(state):
-            raise ValueError(
-                f"Invalid move: Invalid column '{action}' no in {self._all_column_ids}"
-            )
+        if action not in self.legal_actions(game_state):
+            raise ValueError(f"Invalid move: Invalid column '{action}' not in {self._all_column_ids}")
 
-        for row in range(1, self.height + 1):
-            if (row, action) not in state.board:
-                new_board = state.board.set((row, action), state.current_player)
-                winner = self._calculate_winner(
-                    new_board, action, row, state.current_player
-                )
-                next_player: TPlayerId = 2 if state.current_player == 1 else 1
-                return Connect4State(
-                    board=new_board, current_player=next_player, winner=winner
-                )
+        column = action - 1  # Convert 1-based action to 0-based column index
+        row = np.nonzero(game_state.board[:, column] == 0)[0][-1]
 
-        raise ValueError("Invalid move: column is full")
+        new_board = game_state.board.copy()
+        new_board[row, column] = game_state.current_player
 
-    def _calculate_winner(
-        self, board: Map[tuple[int, int], int], col: int, row: int, player: TPlayerId
-    ) -> Optional[TPlayerId]:
+        winner = game_state.winner or self._calculate_winner(new_board, column, row, game_state.current_player)
+        next_player: PlayerId = 2 if game_state.current_player == 1 else 1
+
+        return GameState(board=new_board, current_player=next_player, winner=winner)
+
+    def _calculate_winner(self, board: NDArray[np.int8], col: int, row: int, player: PlayerId) -> Optional[PlayerId]:
         """Check if the last move made at (row, col) by 'player' wins the game."""
         directions = [
-            ((1, 0), (-1, 0)),  # Vertical
-            ((0, 1), (0, -1)),  # Horizontal
-            ((1, 1), (-1, -1)),  # Diagonal /
-            ((1, -1), (-1, 1)),  # Diagonal \
+            (0, 1),  # Horizontal
+            (1, 0),  # Vertical
+            (1, 1),  # Diagonal /
+            (1, -1),  # Diagonal \
         ]
 
-        def count_in_direction(delta_row: int, delta_col: int) -> int:
-            """Count consecutive pieces in one direction."""
-            count = 0
-            current_row, current_col = row + delta_row, col + delta_col
-            while 1 <= current_row <= self.height and 1 <= current_col <= self.width:
-                if board.get((current_row, current_col)) == player:
+        for dr, dc in directions:
+            count = 1
+            for factor in [-1, 1]:
+                r, c = row + dr * factor, col + dc * factor
+                while 0 <= r < self.height and 0 <= c < self.width and board[r, c] == player:
                     count += 1
-                    current_row += delta_row
-                    current_col += delta_col
-                else:
-                    break
-            return count
-
-        for (delta_row1, delta_col1), (delta_row2, delta_col2) in directions:
-            consecutive_count = (
-                count_in_direction(delta_row1, delta_col1)
-                + count_in_direction(delta_row2, delta_col2)
-                + 1  # Include the current piece
-            )
-            if consecutive_count >= self.connect:
-                return player
+                    r, c = r + dr * factor, c + dc * factor
+                    if count >= self.connect_length:
+                        return player
 
         return None  # No winner yet
 
     @override
-    def is_terminal(self, state: Connect4State) -> bool:
-        if state.winner is not None:
+    def is_terminal(self, game_state: GameState) -> bool:
+        if game_state.winner is not None:
             return True
-        return all((self.height, col) in state.board for col in self._all_column_ids)
+        return np.all(game_state.board != 0).item()
 
     @override
-    def reward(self, state: Connect4State, player_id: TPlayerId) -> float:
-        if state.winner == player_id:
+    def reward(self, game_state: GameState, player_id: PlayerId) -> float:
+        if game_state.winner == player_id:
             return 1.0
-        elif state.winner is not None:
+        elif game_state.winner is not None:
             return -1.0
         return 0.0
 
     @override
-    def pretty_str(self, state: Connect4State) -> str:
+    def pretty_str(self, game_state: GameState) -> str:
+        symbols = [" ", "●", "○"]
         return (
-            "\n".join(
-                "|"
-                + "|".join(
-                    " ●○"[state.board.get((row, col), 0)]
-                    for col in self._all_column_ids
-                )
-                + "|"
-                for row in reversed(
-                    self._all_row_ids
-                )  # Start from the top row and work down
-            )
+            "\n".join("|" + "|".join(symbols[int(cell)] for cell in row) + "|" for row in game_state.board)
             + "\n+"
             + "-+" * self.width
         )
 
-    def parse_board(self, board_str: str, current_player: TPlayerId) -> Connect4State:
-        """Parses the output of pretty_str into a Connect4State."""
+    def parse_board(self, board_str: str, current_player: PlayerId) -> GameState:
+        """Parses the output of pretty_str into a GameState."""
         rows = board_str.strip().split("\n")[:-1]  # Skip the bottom border row
-        board: Map[TPosition, int] = Map()
-        for r, row in enumerate(reversed(rows), start=1):
+        board = np.zeros((self.height, self.width), dtype=np.int8)
+        for r, row in enumerate(rows):
             row_cells = row.strip().split("|")[1:-1]  # Extract cells between borders
-            for c, cell in enumerate(row_cells, start=1):
+            for c, cell in enumerate(row_cells):
                 if cell == "●":
-                    board = board.set((r, c), 1)  # Player 1
+                    board[r, c] = 1  # Player 1
                 elif cell == "○":
-                    board = board.set((r, c), 2)  # Player 2
-        return Connect4State(board=board, current_player=current_player)
+                    board[r, c] = 2  # Player 2
+        return GameState(board=board, current_player=current_player)
 
 
-class Connect4Serializer(GameSerializer[Connect4Game, Connect4State, TAction]):
+class Connect4Serializer(base.GameSerializer[Connect4Game, GameState, Action]):
     @override
-    def serialize_state(
-        self, game: Connect4Game, state: Connect4State
-    ) -> dict[str, Any]:
+    def serialize_state(self, game: Connect4Game, game_state: GameState) -> dict[str, Any]:
         """Serialize the game state to a dictionary for frontend consumption."""
-        board = [
-            [state.board.get((row + 1, col + 1), 0) for col in range(game.width)]
-            for row in range(game.height)
-        ]
+        board = game_state.board.tolist()
         return {
             "rows": game.height,
             "columns": game.width,
             "state": board,
-            "current_player": state.current_player,
-            "is_terminal": game.is_terminal(state),
+            "current_player": int(game_state.current_player),
+            "is_terminal": game.is_terminal(game_state),
         }
 
     @override
-    def parse_action(self, game: Connect4Game, action_data: dict[str, Any]) -> TAction:
+    def parse_action(self, game: Connect4Game, action_data: dict[str, Any]) -> Action:
         """Parse an action from frontend data."""
         column = action_data.get("column")
         if column is None:
             raise ValueError("Action data must include 'column'")
         if not isinstance(column, int):
             raise ValueError("Column must be an integer")
-        return column
-
-    @override
-    def state_to_tensor(self, game: Connect4Game, state: Connect4State) -> torch.Tensor:
-        tensor = torch.zeros(game.height * game.width + 1, dtype=torch.float32)
-        for (row, col), player in state.board.items():
-            index = (row - 1) * game.width + (col - 1)
-            tensor[index] = player
-        tensor[-1] = state.current_player
-        return tensor
-
-    @override
-    def action_to_tensor(self, game: Connect4Game, action: int) -> torch.Tensor:
-        return torch.tensor(action - 1, dtype=torch.long)
-
-    @override
-    def tensor_to_action(self, game: Connect4Game, action_tensor: torch.Tensor) -> int:
-        return action_tensor.item() + 1
-
-    @override
-    def tensor_to_state(
-        self, game: Connect4Game, state_tensor: torch.Tensor
-    ) -> Connect4State:
-        board = {}
-        for i in range(game.height * game.width):
-            if state_tensor[i] != 0:
-                row = i // game.width + 1
-                col = i % game.width + 1
-                board[(row, col)] = int(state_tensor[i].item())
-        current_player = int(state_tensor[-1].item())
-        return Connect4State(board=board, current_player=current_player)
+        return Action(column)

@@ -16,16 +16,16 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
 
   case "$1" in
     --all)
-      pytest -n auto
+      pytest -n auto --doctest-modules
       ;;
     --backend)
-      pytest -n auto rgi
+      pytest -n auto rgi --doctest-modules
       ;;
     --frontend)
-      pytest -n auto web_app
+      pytest -n auto web_app --doctest-modules
       ;;
     --headed)
-      pytest web_app/tests/test_connect4_frontend.py -v --headed
+      pytest web_app/tests/test_connect4_frontend.py -v --headed --doctest-modules
       ;;
     *)
       echo "Invalid option. Use: ${run_tests_options}"

@@ -10,7 +10,8 @@ RUN apt-get update && apt-get install -y \
     python3 \
     python3-pip \
     python-is-python3 \
-    python3-venv
+    python3-venv \
+    git
 
 # Install Node.js and Yarn
 RUN curl -sL https://deb.nodesource.com/setup_20.x | bash - && \
@@ -27,23 +28,6 @@ RUN echo "$USERNAME ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers && \
 USER $USERNAME
 WORKDIR /app
 RUN chown -R $USERNAME:$USERNAME /app
-ENV PYTHONPATH="/app"
-
-# Create a virtual environment
-RUN python3 -m venv .venv
-ENV PATH="/app/.venv/bin:$PATH"
-
-# Upgrade pip
-RUN python3 -m pip install --upgrade pip
-
-# Install JAX with CUDA 12.6 support
-RUN pip install --upgrade "jax[cuda]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
-
-# Install playwright for frontend testing
-RUN pip install playwright
-RUN python -m playwright install
-RUN python -m playwright install-deps
-RUN python -m playwright install chromium
 
 # Install TypeScript and related tools
 RUN yarn add typescript@5.5 --dev
@@ -54,11 +38,35 @@ RUN yarn add husky lint-staged --dev
 # Install Bootstrap type definitions
 RUN yarn add @types/bootstrap --dev
 
+# Create a virtual environment
+ENV PYTHONPATH="/app"
+RUN python3 -m venv .venv
+ENV PATH="/app/.venv/bin:$PATH"
+
+# Upgrade pip
+RUN python3 -m pip install --upgrade pip
+
+
+# Install playwright & chromium for frontend testing
+# These are slow to install, so adding them here makes requirements.txt installs faster.
+# ## NOTE: Updates here must also be changed in requirements.in
+RUN pip install playwright==1.48.0
+RUN python -m playwright install-deps
+RUN python -m playwright install chromium
+
+# Install JAX, torch & tensorflow before requirements.txt is processed.
+# These are slow to install, so adding them here makes requirements.txt installs faster.
+# ## NOTE: Updates here must also be changed in requirements.in
+RUN pip install --upgrade "jax[cuda12]==0.4.35" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+RUN pip install torch==2.5.0 --index-url https://download.pytorch.org/whl/cu121
+RUN pip install tensorflow==2.18.0
+
+RUN pip install pip-tools
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY rgi rgi
 COPY scripts scripts
+COPY rgi rgi
 COPY notebooks notebooks
 
 # Update .bashrc to source the custom rgi.bashrc file

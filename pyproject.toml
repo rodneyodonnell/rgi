@@ -1,3 +1,6 @@
+[tool.black]
+line-length = 120
+
 [tool.pylint]
 max-line-length = 120
 disable = [
@@ -6,6 +9,9 @@ disable = [
     "R1723",  # no-else-break
     "R1705",  # no-else-return
     "R0801",  # duplicate-code (we see this in tests)
+    "C0115",  # missing-class-docstring
+    "C0114",  # missing-module-docstring
+    "W0212",  # protected-access
 ]
 
 [tool.mypy]

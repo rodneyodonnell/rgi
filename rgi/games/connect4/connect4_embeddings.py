@@ -1,5 +1,7 @@
 import torch
-import torch.nn as nn
+from torch import nn
+
+from rgi.games import connect4
 
 
 class Connect4StateEmbedder(nn.Module):
@@ -14,11 +16,9 @@ class Connect4StateEmbedder(nn.Module):
         self.linear1 = nn.Linear(64 * 6 * 7, self.hidden_dim)
         self.linear2 = nn.Linear(self.hidden_dim, self.embedding_dim)
 
-    def _state_to_array(self, encoded_state_batch: torch.Tensor) -> torch.Tensor:
-        return encoded_state_batch[:, :-1].reshape(-1, 1, 6, 7)
-
-    def forward(self, encoded_state_batch: torch.Tensor) -> torch.Tensor:
-        x = self._state_to_array(encoded_state_batch)
+    def forward(self, game_states: connect4.BatchGameState) -> torch.Tensor:
+        # Add an extra dimension for the channel. Use (N, C, H, W) format.
+        x = game_states.board.unsqueeze(1).float()
         x = torch.relu(self.conv1(x))
         x = torch.relu(self.conv2(x))
         x = self.flatten(x)
@@ -34,8 +34,8 @@ class Connect4ActionEmbedder(nn.Module):
         self.num_actions = num_actions
         self.embedding = nn.Embedding(num_actions, embedding_dim)
 
-    def forward(self, action: int) -> torch.Tensor:
-        return self.embedding(action - 1)
+    def forward(self, actions: connect4.BatchAction) -> torch.Tensor:
+        return self.embedding(actions.values - 1)
 
     def all_action_embeddings(self) -> torch.Tensor:
         return self.embedding.weight

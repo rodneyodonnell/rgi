@@ -2,9 +2,8 @@ import textwrap
 from typing import Literal
 
 import pytest
-import torch
-
-from rgi.games.connect4 import Connect4Game, Connect4Serializer, Connect4State
+import numpy as np
+from rgi.games.connect4.connect4 import Connect4Game, Connect4Serializer
 
 TPlayerId = Literal[1, 2]
 
@@ -24,24 +23,24 @@ def serializer() -> Connect4Serializer:
 def test_initial_state(game: Connect4Game) -> None:
     state = game.initial_state()
     assert state.current_player == 1
-    assert all(state.board.get((row, col)) is None for row in range(1, 6 + 1) for col in range(1, 7 + 1))
+    assert np.all(state.board == 0)
 
 
 def test_legal_actions(game: Connect4Game) -> None:
     state = game.initial_state()
-    assert game.legal_actions(state) == list(range(1, 7 + 1))
+    assert game.legal_actions(state) == tuple(range(1, 8))
 
     # Fill up a column
-    for _ in range(1, 6 + 1):
+    for _ in range(6):
         state = game.next_state(state, action=1)
-    assert game.legal_actions(state) == list(range(2, 7 + 1))
+    assert game.legal_actions(state) == tuple(range(2, 8))
 
 
 def test_next_state(game: Connect4Game) -> None:
     state = game.initial_state()
     next_state = game.next_state(state, action=3)
     assert next_state.current_player == 2
-    assert next_state.board.get((1, 3)) == 1
+    assert next_state.board[5, 2] == 1  # Remember, it's zero-indexed now
 
 
 def test_is_terminal(game: Connect4Game) -> None:
@@ -49,7 +48,7 @@ def test_is_terminal(game: Connect4Game) -> None:
     assert not game.is_terminal(state)
 
     # Create a winning state
-    for i in range(1, 3 + 1):
+    for i in range(1, 4):
         state = game.next_state(state, action=i)
         assert not game.is_terminal(state)
         state = game.next_state(state, action=i)
@@ -109,12 +108,33 @@ def test_invalid_move(game: Connect4Game) -> None:
 
 
 def test_custom_board_size() -> None:
-    game = Connect4Game(width=8, height=7, connect=5)
+    game = Connect4Game(width=8, height=7, connect_length=5)
     state = game.initial_state()
     assert len(game.legal_actions(state)) == 8
     for _ in range(7):
         state = game.next_state(state, 1)
     assert len(game.legal_actions(state)) == 7
+
+
+def test_pretty_str(game: Connect4Game) -> None:
+    state = game.initial_state()
+    for action in [1, 2, 2, 3, 3, 3, 4, 4, 5, 6, 7, 7, 7]:
+        state = game.next_state(state, action)
+
+    assert (
+        game.pretty_str(state).strip()
+        == textwrap.dedent(
+            """
+            | | | | | | | |
+            | | | | | | | |
+            | | | | | | | |
+            | | |○| | | |●|
+            | |●|●|○| | |○|
+            |●|○|○|●|●|○|●|
+            +-+-+-+-+-+-+-+
+            """
+        ).strip()
+    )
 
 
 @pytest.mark.parametrize("verbose", [True, False])
@@ -220,26 +240,30 @@ def test_middle_of_row_win() -> None:
     new_state = game.next_state(state, 6)
     assert new_state.winner == 1, f"Expected Player 1 to win, but got {state.winner}"
 
-    def state_to_tensor(self, game: Connect4Game, state: Connect4State) -> torch.Tensor:
-        tensor = torch.zeros(game.height * game.width + 1, dtype=torch.float32)
-        for (row, col), player in state.board.items():
-            index = (row - 1) * game.width + (col - 1)
-            tensor[index] = player
-        tensor[-1] = state.current_player
-        return tensor
 
-    def action_to_tensor(self, game: Connect4Game, action: int) -> torch.Tensor:
-        return torch.tensor(action - 1, dtype=torch.long)
+def test_state_immutability(game: Connect4Game) -> None:
+    initial_state = game.initial_state()
+    assert np.all(initial_state.board == 0)
 
-    def tensor_to_action(self, game: Connect4Game, action_tensor: torch.Tensor) -> int:
-        return action_tensor.item() + 1
+    updated_state = game.next_state(initial_state, 3)
+    assert np.all(initial_state.board == 0)
+    assert initial_state.current_player == 1
+    assert not np.all(updated_state.board == 0)
+    assert updated_state.current_player == 2
 
-    def tensor_to_state(self, game: Connect4Game, state_tensor: torch.Tensor) -> Connect4State:
-        board = {}
-        for i in range(game.height * game.width):
-            if state_tensor[i] != 0:
-                row = i // game.width + 1
-                col = i % game.width + 1
-                board[(row, col)] = int(state_tensor[i].item())
-        current_player = int(state_tensor[-1].item())
-        return Connect4State(board=board, current_player=current_player)
+
+def test_serializer(game: Connect4Game, serializer: Connect4Serializer) -> None:
+    state = game.initial_state()
+    state = game.next_state(state, 3)
+    state = game.next_state(state, 4)
+
+    serialized = serializer.serialize_state(game, state)
+    assert serialized["rows"] == game.height
+    assert serialized["columns"] == game.width
+    assert serialized["current_player"] == 1
+    assert not serialized["is_terminal"]
+    assert serialized["state"][5][2] == 1
+    assert serialized["state"][5][3] == 2
+
+    action = serializer.parse_action(game, {"column": 5})
+    assert action == 5

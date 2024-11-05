@@ -1,4 +1,12 @@
-from .connect4 import Connect4Game, Connect4State, Connect4Serializer
+from .connect4 import (
+    Connect4Game,
+    GameState,
+    BatchGameState,
+    Action,
+    BatchAction,
+    PlayerId,
+    Connect4Serializer,
+)
 from .connect4_embeddings import (
     Connect4StateEmbedder,
     Connect4ActionEmbedder,
@@ -6,8 +14,12 @@ from .connect4_embeddings import (
 
 __all__ = [
     "Connect4Game",
-    "Connect4State",
-    "Connect4Serializer",
+    "GameState",
+    "BatchGameState",
+    "Action",
+    "BatchAction",
+    "PlayerId",
     "Connect4StateEmbedder",
     "Connect4ActionEmbedder",
+    "Connect4Serializer",
 ]

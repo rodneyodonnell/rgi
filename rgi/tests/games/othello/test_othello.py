@@ -1,12 +1,11 @@
+import random
 from typing import Literal
 import textwrap
+
 import pytest
+import numpy as np
 
-from immutables import Map
-import torch
-
-from rgi.games.othello import OthelloGame, OthelloState, OthelloSerializer, TAction
-from rgi.players.random_player import RandomPlayer
+from rgi.games.othello.othello import OthelloGame, OthelloState, OthelloSerializer, Action
 
 # pylint: disable=redefined-outer-name  # pytest fixtures trigger this false positive
 
@@ -30,47 +29,42 @@ def test_initial_state(game: OthelloGame) -> None:
 
     # Check initial discs
     mid = game.board_size // 2
-    expected_initial_positions: dict[TPosition, TPlayerId] = {
+    expected_initial_positions = {
+        (mid - 1, mid - 1): 2,
+        (mid - 1, mid): 1,
+        (mid, mid - 1): 1,
         (mid, mid): 2,
-        (mid + 1, mid + 1): 2,
-        (mid, mid + 1): 1,
-        (mid + 1, mid): 1,
     }
     for pos, player in expected_initial_positions.items():
-        assert state.board.get(pos) == player
+        assert state.board[pos] == player
 
 
 def test_legal_actions_initial(game: OthelloGame) -> None:
     state = game.initial_state()
     legal_moves = game.legal_actions(state)
-    expected_moves: list[TPosition] = [
-        (3, 4),  # Up from (4,4)
-        (4, 3),  # Left from (4,4)
-        (5, 6),  # Right from (5,5)
-        (6, 5),  # Down from (5,5)
-    ]
+    expected_moves = [(6, 4), (5, 3), (4, 6), (3, 5)]
     assert set(legal_moves) == set(expected_moves)
 
 
 def test_next_state_simple_move(game: OthelloGame) -> None:
     state = game.initial_state()
-    action: TPosition = (3, 4)  # A legal move for Black at the start
+    action: TPosition = (6, 4)  # A legal move for Black at the start
     next_state = game.next_state(state, action)
 
     # Verify current player has switched
     assert next_state.current_player == 2
 
     # Verify the action has been placed
-    assert next_state.board.get(action) == 1
+    assert game.get_piece(next_state, action) == 1
 
     # Verify the opponent's disc has been flipped
-    flipped_pos: TPosition = (4, 4)
-    assert next_state.board.get(flipped_pos) == 1
+    flipped_pos: TPosition = (5, 4)
+    assert game.get_piece(next_state, flipped_pos) == 1
 
 
 def test_illegal_move(game: OthelloGame) -> None:
     state = game.initial_state()
-    illegal_action: TPosition = (1, 1)  # An empty corner at the start, which is illegal
+    illegal_action: TPosition = (0, 0)  # An empty corner at the start, which is illegal
     with pytest.raises(ValueError):
         game.next_state(state, illegal_action)
 
@@ -95,7 +89,7 @@ def test_pass_turn(game: OthelloGame) -> None:
 
 def test_is_terminal(game: OthelloGame) -> None:
     # Fill the board completely
-    board: Map[TPosition, int] = Map()
+    board = np.ones((8, 8), dtype=np.int8)
     state = OthelloState(board=board, current_player=1, is_terminal=True)
     assert game.is_terminal(state)
     state = OthelloState(board=board, current_player=1, is_terminal=False)
@@ -104,9 +98,7 @@ def test_is_terminal(game: OthelloGame) -> None:
 
 def test_reward_win(game: OthelloGame) -> None:
     # Create a winning state for player 1
-    board: Map[TPosition, int] = Map(
-        {(row, col): 1 for row in range(1, game.board_size + 1) for col in range(1, game.board_size + 1)}
-    )
+    board = np.ones((8, 8), dtype=np.int8)
     state = OthelloState(board=board, current_player=1, is_terminal=True)
     assert game.reward(state, 1) == 1.0
     assert game.reward(state, 2) == -1.0
@@ -114,13 +106,9 @@ def test_reward_win(game: OthelloGame) -> None:
 
 def test_reward_draw(game: OthelloGame) -> None:
     # Create a draw state
-    board: Map[TPosition, int] = Map(
-        {
-            (row, col): 1 if (row + col) % 2 == 0 else 2
-            for row in range(1, game.board_size + 1)
-            for col in range(1, game.board_size + 1)
-        }
-    )
+    board = np.ones((8, 8), dtype=np.int8)
+    board[::2, ::2] = 2
+    board[1::2, 1::2] = 2
     state = OthelloState(board=board, current_player=1, is_terminal=True)
     assert game.reward(state, 1) == 0.0
     assert game.reward(state, 2) == 0.0
@@ -130,11 +118,11 @@ def test_full_game_simulation(game: OthelloGame) -> None:
     # Simulate a short sequence of moves
     state = game.initial_state()
     moves: list[TPosition] = [
-        (4, 3),  # Player 1
-        (3, 3),  # Player 2
-        (3, 4),  # Player 1
-        (5, 3),  # Player 2
-        (5, 2),  # Player 1
+        (5, 3),  # Player 1
+        (6, 3),  # Player 2
+        (7, 3),  # Player 1
+        (7, 2),  # Player 2
+        (3, 5),  # Player 1
     ]
     for move in moves:
         print(game.pretty_str(state))
@@ -144,71 +132,49 @@ def test_full_game_simulation(game: OthelloGame) -> None:
     # Verify board state after moves
     expected_board_str = """
         . . . . . . . .
-        . . . . . . . .
-        . . . . . . . .
-        . ● ○ ○ ○ . . .
-        . . ● ● ● . . .
-        . . ○ ● . . . .
+        . ○ ● . . . . .
+        . . ○ . . . . .
+        . . ● ○ ● . . .
+        . . . ● ● . . .
+        . . . . ● . . .
         . . . . . . . .
         . . . . . . . .
         """
-    expected_state = game.parse_board(expected_board_str, current_player=1, is_terminal=False)
+    expected_state = game.parse_board(expected_board_str, current_player=2, is_terminal=False)
 
-    assert expected_state.board == state.board
+    assert np.all(expected_state.board == state.board)
 
 
 def test_edge_flipping(game: OthelloGame) -> None:
     # Test flipping discs on the edge of the board
-    board: Map[TPosition, int] = Map(
-        {
-            (1, 1): 2,
-            (1, 2): 1,
-            (1, 3): 1,
-            (1, 4): 1,
-            (1, 5): 1,
-            (1, 6): 1,
-            (1, 7): 1,
-        }
-    )
+    board = np.zeros((8, 8), dtype=np.int8)
+    board[0, :7] = np.array([2, 1, 1, 1, 1, 1, 1])
     state = OthelloState(board=board, current_player=2, is_terminal=False)
 
-    # Player 2 places at (1, 8), which should flip discs from (1,2)-(1,7)
-    action: TPosition = (1, 8)
+    # Player 2 places at (8, 8), which should flip discs from (1,2)-(1,7)
+    action: TPosition = game._to_human_coords((0, 7))  # pylint: disable=protected-access
     next_state = game.next_state(state, action)
 
-    for col in range(2, 8):
-        assert next_state.board.get((1, col)) == 2
+    assert np.all(next_state.board[0] == 2)
 
 
 def test_corner_capture(game: OthelloGame) -> None:
     # Test capturing a corner and flipping appropriately
-    board: Map[TPosition, int] = Map(
-        {
-            (1, 1): 2,
-            (2, 2): 1,
-            (3, 3): 1,
-            (4, 4): 1,
-            (5, 5): 1,
-            (6, 6): 1,
-            (7, 7): 1,
-        }
-    )
+    board = np.zeros((8, 8), dtype=np.int8)
+    board[range(7), range(7)] = 1
+    board[0, 0] = 2
     state = OthelloState(board=board, current_player=2, is_terminal=False)
 
     # Player 2 places at (8,8), which should flip discs along the diagonal
-    action: TPosition = (8, 8)
+    action: TPosition = game._to_human_coords((7, 7))  # pylint: disable=protected-access
     next_state = game.next_state(state, action)
-    for i in range(2, 8):
-        assert next_state.board.get((i, i)) == 2
+    assert np.all(next_state.board[range(8), range(8)] == 2)
 
 
 def test_no_flip_move(game: OthelloGame) -> None:
     # Attempting to make a move that doesn't flip any discs
     state = game.initial_state()
-    illegal_action: TPosition = (
-        1,
-        1,
-    )  # An empty corner at the start, which doesn't flip any discs
+    illegal_action: TPosition = (0, 0)  # An empty corner at the start, which doesn't flip any discs
     with pytest.raises(ValueError):
         game.next_state(state, illegal_action)
 
@@ -216,17 +182,10 @@ def test_no_flip_move(game: OthelloGame) -> None:
 def test_full_board_playthrough(game: OthelloGame) -> None:
     # Simulate a full game with random moves
     state = game.initial_state()
-    player1: RandomPlayer[OthelloState, TAction] = RandomPlayer()
-    player2: RandomPlayer[OthelloState, TAction] = RandomPlayer()
-    players: dict[TPlayerId, RandomPlayer[OthelloState, TAction]] = {
-        1: player1,
-        2: player2,
-    }
 
     while not game.is_terminal(state):
-        current_player_id = game.current_player_id(state)
         legal_actions = game.legal_actions(state)
-        action: TAction = players[current_player_id].select_action(state, legal_actions)
+        action: Action = random.choice(legal_actions)
         state = game.next_state(state, action)
 
     # At the end, check that the board is full or no moves are possible
@@ -269,14 +228,8 @@ def test_flipping_multiple_directions(game: OthelloGame) -> None:
 def test_no_legal_moves_for_current_player(game: OthelloGame) -> None:
     # Create a state where the current player has no legal moves but the game is not over
     # Manually set up the board so player 1 has no moves
-    board: Map[TPosition, int] = Map(
-        {
-            (1, 1): 2,
-            (1, 2): 2,
-            (2, 1): 2,
-            (2, 2): 1,
-        }
-    )
+    board = np.zeros((8, 8), dtype=np.int8)
+    board[0:2, 0:2] = np.array([[2, 2], [2, 1]])
     state = OthelloState(board=board, current_player=1, is_terminal=False)
 
     legal_moves = game.legal_actions(state)
@@ -328,18 +281,18 @@ def test_game_end_by_no_moves(game: OthelloGame) -> None:
     . . . . . . . .
     """,
             {
-                (3, 4): 1,
-                (3, 5): 2,
-                (4, 3): 1,
-                (4, 4): 2,
-                (4, 5): 1,
-                (4, 6): 2,
+                (6, 4): 2,
+                (6, 5): 1,
                 (5, 3): 2,
                 (5, 4): 1,
                 (5, 5): 2,
                 (5, 6): 1,
-                (6, 4): 2,
-                (6, 5): 1,
+                (4, 3): 1,
+                (4, 4): 2,
+                (4, 5): 1,
+                (4, 6): 2,
+                (3, 4): 1,
+                (3, 5): 2,
             },
         ),
     ],
@@ -348,12 +301,15 @@ def test_parse_board(game: OthelloGame, board_str: str, positions: dict[TPositio
     state = game.parse_board(board_str, current_player=1, is_terminal=False)
     # Verify the board is parsed correctly
     for pos, player in positions.items():
-        assert state.board.get(pos) == player
+        assert game.get_piece(state, pos) == player
 
 
 def test_pretty_str_bottom_left(game: OthelloGame) -> None:
-    # Define a state with pieces at (1,1) and (2,1)
-    state = OthelloState(board=Map({(1, 1): 2, (2, 1): 2}), current_player=1, is_terminal=False)
+    # Define a state with pieces at (7,0) and (6,0)
+    board = np.zeros((8, 8), dtype=np.int8)
+    board[7, 0] = 2
+    board[6, 0] = 2
+    state = OthelloState(board=board, current_player=1, is_terminal=False)
     expected_output = textwrap.dedent(
         """
          . . . . . . . .
@@ -369,37 +325,38 @@ def test_pretty_str_bottom_left(game: OthelloGame) -> None:
     assert game.pretty_str(state).strip() == expected_output.strip()
 
 
-def test_state_to_tensor(game: OthelloGame, serializer: OthelloSerializer):
+def test_serialize_initial_state(game: OthelloGame, serializer: OthelloSerializer) -> None:
     state = game.initial_state()
-    tensor = serializer.state_to_tensor(game, state)
-    assert tensor.shape == torch.Size([65])  # 8x8 board + 1 for current player
-    assert tensor[8 * 3 + 3] == 2  # Check (4,4) position
-    assert tensor[8 * 3 + 4] == 1  # Check (4,5) position
-    assert tensor[-1] == 1  # Check current player
+    serialized = serializer.serialize_state(game, state)
+    assert serialized["rows"] == 8
+    assert serialized["columns"] == 8
+    assert serialized["board"] == [
+        [0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 2, 1, 0, 0, 0],
+        [0, 0, 0, 1, 2, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0],
+    ]
+    assert serialized["current_player"] == 1
 
 
-def test_action_to_tensor(game: OthelloGame, serializer: OthelloSerializer):
-    action = (4, 5)
-    tensor = serializer.action_to_tensor(game, action)
-    assert torch.equal(tensor, torch.tensor([4, 5]))  # 1-based indices
-
-
-def test_tensor_to_action(game: OthelloGame, serializer: OthelloSerializer):
-    tensor = torch.tensor([4, 5])
-    action = serializer.tensor_to_action(game, tensor)
-    assert action == (4, 5)  # 1-based indices
-
-
-def test_tensor_to_state(game: OthelloGame, serializer: OthelloSerializer):
-    tensor = torch.zeros(65)
-    tensor[8 * 3 + 3] = 2
-    tensor[8 * 3 + 4] = 1
-    tensor[8 * 4 + 3] = 1
-    tensor[8 * 4 + 4] = 2
-    tensor[-1] = 1  # Set current player to 1
-    state = serializer.tensor_to_state(game, tensor)
-    assert state.board.get((4, 4)) == 2
-    assert state.board.get((4, 5)) == 1
-    assert state.board.get((5, 4)) == 1
-    assert state.board.get((5, 5)) == 2
-    assert state.current_player == 1
+def test_serialize_2(game: OthelloGame, serializer: OthelloSerializer) -> None:
+    state = game.initial_state()
+    state = game.next_state(state, (6, 4))
+    serialized = serializer.serialize_state(game, state)
+    assert serialized["rows"] == 8
+    assert serialized["columns"] == 8
+    assert serialized["board"] == [
+        [0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 1, 0, 0, 0, 0],
+        [0, 0, 0, 1, 1, 0, 0, 0],
+        [0, 0, 0, 1, 2, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0],
+    ]
+    assert serialized["current_player"] == 2
