@@ -1,0 +1,51 @@
+{% extends "game.html" %}
+
+{% block head %}
+{{ super() }}
+<style>
+    #game .grid-container {
+        display: grid;
+        grid-template-columns: repeat(8, 1fr);
+        gap: 2px;
+        width: 100%;
+        max-width: 1000px;
+        aspect-ratio: 1 / 1;
+        margin: 0 auto;
+        background-color: #1e8449;
+        padding: 2px;
+        border-radius: 10px;
+    }
+    #game .grid-cell {
+        aspect-ratio: 1 / 1;
+        background-color: #27ae60;
+        border: 1px solid #145a32;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        cursor: pointer;
+    }
+    #game .grid-cell::after {
+        content: '';
+        width: 80%;
+        height: 80%;
+        border-radius: 50%;
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+    #game .grid-cell.player1::after {
+        background-color: #2c3e50;
+    }
+    #game .grid-cell.player2::after {
+        background-color: #ecf0f1;
+    }
+    #game .grid-cell.legal-move::after {
+        background-color: rgba(255, 255, 255, 0.3);
+        box-shadow: 0 0 10px rgba(255,255,255,0.5);
+    }
+</style>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script type="module" src="{{ url_for('static', path='othello.js') }}"></script>
+{% endblock %}

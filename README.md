@@ -13,3 +13,19 @@ check_rgi_setup.py
 ```
 create_game_from_template.sh othello
 ```
+
+# Build web_app.
+```
+yarn tsc --watch  # or compile_typescript.sh
+```
+
+# Run tests.
+```
+python web_app/app/main.py   # Start web_app
+run_tests.sh --all           # Run all tests
+```
+
+# Run linters.
+```
+run_linter.sh --all
+```

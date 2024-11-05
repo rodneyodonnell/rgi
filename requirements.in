@@ -40,6 +40,11 @@ pytest-mock
 pytest-timeout
 pytest-xdist
 
+# Frontent testing
+pytest-playwright
+selenium
+webdriver-manager
+
 # Tools
 pip-tools
 pylint
