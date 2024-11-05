@@ -23,10 +23,14 @@
             "request": "launch",
             "program": "${workspaceFolder}/rgi/main.py",
             "args": [
-                "--game", "connect4",
-                "--player1", "zerozero",
-                "--player2", "zerozero",
-                "--num_games", "1",
+                "--game",
+                "connect4",
+                "--player1",
+                "zerozero",
+                "--player2",
+                "zerozero",
+                "--num_games",
+                "1",
                 // "--save_trajectories",
                 "--verbose"
             ],
@@ -39,10 +43,14 @@
             "request": "launch",
             "program": "${workspaceFolder}/rgi/main.py",
             "args": [
-                "--game", "connect4",
-                "--player1", "random",
-                "--player2", "random",
-                "--num_games", "10",
+                "--game",
+                "connect4",
+                "--player1",
+                "random",
+                "--player2",
+                "random",
+                "--num_games",
+                "10",
                 "--save_trajectories",
                 "--verbose"
             ],
@@ -56,11 +64,11 @@
             "program": "${workspaceFolder}/rgi/main.py",
             "args": [
                 "--train",
-                "--game","connect4",
+                "--game",
+                "connect4",
             ],
             "console": "integratedTerminal",
             "justMyCode": true
         }
-
     ]
 }

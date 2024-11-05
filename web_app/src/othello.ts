@@ -4,12 +4,13 @@ import {
   makeMove,
   startNewGame,
   currentPlayerType,
+  GameRenderer,
 } from './game_common.js'
 
 interface OthelloGameData extends BaseGameData {
   rows: number
   columns: number
-  state: number[][]
+  board: number[][]
   legal_actions: [number, number][]
   game_options: { [key: string]: any }
   player_options: { [key: number]: { player_type: string; [key: string]: any } }
@@ -21,7 +22,8 @@ let playerOptions: { [key: number]: { player_type: string; [key: string]: any } 
 document.addEventListener('DOMContentLoaded', () => {
   console.log('othello.ts loaded and DOMContentLoaded event fired.')
 
-  const renderGame = (data: OthelloGameData) => {
+  // Now renderGame is explicitly typed with GameRenderer
+  const renderGame: GameRenderer<OthelloGameData> = (data) => {
     console.log('Rendering game with data:', JSON.stringify(data, null, 2))
     const gameArea = document.getElementById('game')
     const status = document.getElementById('status')
@@ -57,34 +59,37 @@ document.addEventListener('DOMContentLoaded', () => {
       `Creating grid with ${data.rows} rows and ${data.columns} columns`,
     )
 
-    for (let row = data.rows; row >= 1; row--) {
-      for (let col = 1; col <= data.columns; col++) {
+    for (let row = 0; row < data.rows; row++) {
+      for (let col = 0; col < data.columns; col++) {
+        const human_row = data.rows - row
+        const human_col = col + 1
+
         const cell = document.createElement('div')
         cell.classList.add('grid-cell')
-        cell.dataset.row = row.toString()
-        cell.dataset.col = col.toString()
+        cell.dataset.row = human_row.toString()
+        cell.dataset.col = human_col.toString()
 
         console.log(
-          `Creating cell at (${row}, ${col}) with state: ${data.state[row - 1][col - 1]}`,
+          `Creating cell at (${human_row}, ${human_col}) with state: ${data.board[row][col]}`,
         )
 
         // Set cell color based on state
-        if (data.state[row - 1][col - 1] === 1) {
+        if (data.board[row][col] === 1) {
           cell.classList.add('player1')
-        } else if (data.state[row - 1][col - 1] === 2) {
+        } else if (data.board[row][col] === 2) {
           cell.classList.add('player2')
         }
 
         // Highlight legal moves
-        if (data.legal_actions.some(([r, c]) => r === row && c === col)) {
+        if (data.legal_actions.some(([r, c]) => r === human_row && c === human_col)) {
           cell.classList.add('legal-move')
-          console.log(`Legal move at (${row}, ${col})`)
+          console.log(`Legal move at (${human_row}, ${human_col})`)
         }
 
         if (!data.is_terminal && currentPlayerType(data) === 'human') {
           cell.addEventListener('click', () => {
-            console.log('Cell clicked:', { row, col })
-            makeMove<OthelloGameData>({ row, col }, renderGame)
+            console.log('Cell clicked:', { row: human_row, col: human_col })
+            makeMove<OthelloGameData>({ row: human_row, col: human_col }, renderGame)
           })
         }
 

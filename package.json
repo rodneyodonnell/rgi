@@ -28,6 +28,8 @@
     ]
   },
   "scripts": {
+    "lint": "eslint 'web_app/src/**/*.ts'",
+    "lint:fix": "eslint --fix 'web_app/src/**/*.ts'",
     "lint:ts": "eslint 'web_app/src/**/*.ts'",
     "typecheck:ts": "tsc --noEmit"
   }

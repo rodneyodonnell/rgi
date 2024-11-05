@@ -14,44 +14,29 @@ check_rgi_setup.py
 create_game_from_template.sh othello
 ```
 
+# Build web_app.
+```
+yarn tsc --watch  # or compile_typescript.sh
+```
+
+# Run tests.
+```
+python web_app/app/main.py   # Start web_app
+run_tests.sh --all           # Run all tests
+```
+
+# Run linters.
+```
+run_linter.sh --all
+```
+
 ## TODO: How much of this needs to be in README.md?
-
-docker run -it --gpus all \
-  -v $(pwd)/logs:/app/logs \
-  -v /usr/lib/x86_64-linux-gnu/libcuda.so:/usr/lib/x86_64-linux-gnu/libcuda.so \
-  -v /usr/lib/x86_64-linux-gnu/libcuda.so.1:/usr/lib/x86_64-linux-gnu/libcuda.so.1 \
-  -v /usr/lib/x86_64-linux-gnu/libcuda.so.560.35.03:/usr/lib/x86_64-linux-gnu/libcuda.so.560.35.03 \
-  rgi-gpu
-
-docker run -it --rm --gpus all \
-  --device=/dev/nvidiactl \
-  --device=/dev/nvidia-uvm \
-  --device=/dev/nvidia-uvm-tools \
-  --device=/dev/nvidia0 \
-  --cap-add=SYS_ADMIN \
-  rgi-gpu
-
-
-# Run using existing image, but updated /rgi
-docker run -it --gpus all -v $(pwd)/rgi:/app/rgi -v $(pwd)/logs:/app/logs rgi-gpu
-
-# Check GPU is working properly in docker image.
-python -c 'import torch; print(torch.cuda.is_available())'
 
 # Launch tensorboard to https://localhost:6006
 ```
 ./scripts/start_tensorboard.sh logs
 ```
 
-# Run tests:
-```
-pytest
-```
-
-# Reformat code:
-```
-black . --line-length 120
-```
 
 # Run 100 games.
 ```
@@ -105,39 +90,6 @@ your_project/
 │       ├── connect4.js
 │       └── othello.js
 └── ...
-
-
-# Run frontend tests
-```
-# Headless
-pytest web_app/tests/test_connect4_frontend.py
-
-# Headless parallel
-pytest -n 4
-
-# Non-headless
-pytest web_app/tests/test_connect4_frontend.py -v --headed
-```
-
-
-# Manually Run linters
-```
-mypy .
-pylint --rcfile=pyproject.toml $(git ls-files '*.py')
-yarn eslint 'web_app/static/**/*.ts'
-yarn tsc --noEmit
-```
-
-
-# Auto-build typescript
-```
-yarn tsc --watch
-```
-
-
-# Load multiple files into VSCode
-Open-matching-files (alt-f)
-*infiltr8*.{ts,py,html}
 
 
 # Create training data

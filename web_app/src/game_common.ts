@@ -45,8 +45,10 @@ export function showErrorToast(message: string) {
   console.log(`Error toast displayed: ${message}`)
 }
 
+export type GameRenderer<T extends BaseGameData> = (data: T) => void
+
 export function updateGameState<T extends BaseGameData>(
-  renderGame: (data: T) => void,
+  renderGame: GameRenderer<T>
 ): Promise<T> {
   const gameId = getCurrentGameId()
   console.log('Updating game state for game ID:', gameId)
@@ -78,7 +80,7 @@ export function updateGameState<T extends BaseGameData>(
 
 export function makeMove<T extends BaseGameData>(
   action: { [key: string]: number | string },
-  renderGame: (data: T) => void,
+  renderGame: GameRenderer<T>
 ) {
   const gameId = getCurrentGameId()
   console.log(`Making move for game ${gameId}:`, action)
@@ -106,7 +108,7 @@ export function startNewGame(
   gameType: string,
   gameOptions: { [key: string]: any },
   playerOptions: { [key: number]: { player_type: string; [key: string]: any } },
-  renderGame: (data: any) => void,
+  renderGame: GameRenderer<any>
 ): Promise<void> {
   console.log(`Starting a new ${gameType} game with options:`, { gameOptions, playerOptions })
 
@@ -152,7 +154,7 @@ export function startNewGame(
     })
 }
 
-export function makeAIMove(renderGame: (data: any) => void) {
+export function makeAIMove(renderGame: GameRenderer<any>) {
   const gameId = getCurrentGameId()
   console.log('Attempting AI move for game ID:', gameId)
 

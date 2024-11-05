@@ -40,7 +40,9 @@ async-lru==2.0.4
 attrs==24.2.0
     # via
     #   jsonschema
+    #   outcome
     #   referencing
+    #   trio
 babel==2.16.0
     # via jupyterlab-server
 beautifulsoup4==4.12.3
@@ -54,6 +56,7 @@ certifi==2024.8.30
     #   httpcore
     #   httpx
     #   requests
+    #   selenium
 cffi==1.17.1
     # via argon2-cffi-bindings
 charset-normalizer==3.4.0
@@ -116,6 +119,7 @@ h11==0.14.0
     # via
     #   httpcore
     #   uvicorn
+    #   wsproto
 h5py==3.12.1
     # via
     #   keras
@@ -134,6 +138,7 @@ idna==3.10
     #   httpx
     #   jsonschema
     #   requests
+    #   trio
 importlib-resources==6.4.5
     # via etils
 iniconfig==2.0.0
@@ -383,6 +388,8 @@ optree==0.13.0
     # via keras
 orbax-checkpoint==0.8.0
     # via flax
+outcome==1.3.0.post0
+    # via trio
 overrides==7.7.0
     # via jupyter-server
 packaging==24.1
@@ -397,6 +404,7 @@ packaging==24.1
     #   pytest
     #   tensorboard
     #   tensorflow
+    #   webdriver-manager
 pandocfilters==1.5.1
     # via nbconvert
 parso==0.8.4
@@ -410,7 +418,9 @@ platformdirs==4.3.6
     #   jupyter-core
     #   pylint
 playwright==1.48.0
-    # via -r requirements.in
+    # via
+    #   -r requirements.in
+    #   pytest-playwright
 pluggy==1.5.0
     # via pytest
 prometheus-client==0.21.0
@@ -454,13 +464,21 @@ pyproject-hooks==1.2.0
     # via
     #   build
     #   pip-tools
+pysocks==1.7.1
+    # via urllib3
 pytest==8.3.3
     # via
     #   -r requirements.in
+    #   pytest-base-url
     #   pytest-mock
+    #   pytest-playwright
     #   pytest-timeout
     #   pytest-xdist
+pytest-base-url==2.1.0
+    # via pytest-playwright
 pytest-mock==3.14.0
+    # via -r requirements.in
+pytest-playwright==0.5.2
     # via -r requirements.in
 pytest-timeout==2.3.1
     # via -r requirements.in
@@ -471,9 +489,13 @@ python-dateutil==2.9.0.post0
     #   arrow
     #   jupyter-client
 python-dotenv==1.0.1
-    # via uvicorn
+    # via
+    #   uvicorn
+    #   webdriver-manager
 python-json-logger==2.0.7
     # via jupyter-events
+python-slugify==8.0.4
+    # via pytest-playwright
 pyyaml==6.0.2
     # via
     #   flax
@@ -494,7 +516,9 @@ referencing==0.35.1
 requests==2.32.3
     # via
     #   jupyterlab-server
+    #   pytest-base-url
     #   tensorflow
+    #   webdriver-manager
 rfc3339-validator==0.1.4
     # via
     #   jsonschema
@@ -515,6 +539,8 @@ scipy==1.14.1
     # via
     #   jax
     #   jaxlib
+selenium==4.26.1
+    # via -r requirements.in
 send2trash==1.8.3
     # via jupyter-server
 six==1.16.0
@@ -530,6 +556,9 @@ sniffio==1.3.1
     # via
     #   anyio
     #   httpx
+    #   trio
+sortedcontainers==2.4.0
+    # via trio
 soupsieve==2.6
     # via beautifulsoup4
 stack-data==0.6.3
@@ -554,6 +583,8 @@ terminado==0.18.1
     # via
     #   jupyter-server
     #   jupyter-server-terminals
+text-unidecode==1.3
+    # via python-slugify
 tinycss2==1.4.0
     # via nbconvert
 tomlkit==0.13.2
@@ -588,6 +619,12 @@ traitlets==5.14.3
     #   nbclient
     #   nbconvert
     #   nbformat
+trio==0.27.0
+    # via
+    #   selenium
+    #   trio-websocket
+trio-websocket==0.11.1
+    # via selenium
 triton==3.1.0
     # via torch
 types-python-dateutil==2.9.0.20241003
@@ -604,12 +641,15 @@ typing-extensions==4.12.2
     #   pydantic
     #   pydantic-core
     #   pyee
+    #   selenium
     #   tensorflow
     #   torch
 uri-template==1.3.0
     # via jsonschema
-urllib3==2.2.3
-    # via requests
+urllib3[socks]==2.2.3
+    # via
+    #   requests
+    #   selenium
 uvicorn[standard]==0.30.6
     # via -r requirements.in
 uvloop==0.21.0
@@ -620,12 +660,16 @@ wcwidth==0.2.13
     # via prompt-toolkit
 webcolors==24.8.0
     # via jsonschema
+webdriver-manager==4.0.2
+    # via -r requirements.in
 webencodings==0.5.1
     # via
     #   bleach
     #   tinycss2
 websocket-client==1.8.0
-    # via jupyter-server
+    # via
+    #   jupyter-server
+    #   selenium
 websockets==13.1
     # via uvicorn
 werkzeug==3.1.1
@@ -638,6 +682,8 @@ widgetsnbextension==4.0.13
     # via ipywidgets
 wrapt==1.16.0
     # via tensorflow
+wsproto==1.2.0
+    # via trio-websocket
 zipp==3.20.2
     # via etils
 
