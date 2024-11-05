@@ -1,4 +1,4 @@
-from typing import Generic, Literal
+from typing import Generic, Literal, Sequence
 from typing_extensions import override
 
 from rgi.core.base import Player, TGame, TGameState, TAction
@@ -13,7 +13,7 @@ class HumanPlayer(Player[TGameState, TPlayerState, TAction], Generic[TGame, TGam
         self.game = game
 
     @override
-    def select_action(self, game_state: TGameState, legal_actions: list[TAction]) -> TAction:
+    def select_action(self, game_state: TGameState, legal_actions: Sequence[TAction]) -> TAction:
         while True:
             print("Current game state:")
             print(self.game.pretty_str(game_state))

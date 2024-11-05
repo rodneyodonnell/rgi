@@ -2,18 +2,18 @@ from typing import Any, cast
 
 from pytest_mock import MockerFixture
 import pytest
-from rgi.players.random_player import RandomPlayer
+from rgi.players.random_player.random_player import RandomPlayer
 from rgi.core.base import Game
 
 # pylint: disable=redefined-outer-name  # pytest fixtures trigger this false positive
 
 
 @pytest.fixture
-def game(mocker: MockerFixture) -> Game[Any, Any, int]:
+def game(mocker: MockerFixture) -> Game[Any, int]:
     mock_game = mocker.Mock(spec=Game)
-    mock_game.legal_actions.return_value = [1, 2, 3]
+    mock_game.legal_actions.return_value = [1, 2, 7]
     mock_game.pretty_str.return_value = "Mock pretty state"
-    return cast(Game[Any, Any, int], mock_game)
+    return cast(Game[Any, int], mock_game)
 
 
 @pytest.fixture
@@ -21,7 +21,7 @@ def player() -> RandomPlayer[Any, Any]:
     return RandomPlayer()
 
 
-def test_select_action(game: Game[Any, Any, int], player: RandomPlayer[Any, Any]) -> None:
+def test_select_action(game: Game[Any, int], player: RandomPlayer[Any, Any]) -> None:
     state = None  # RandomPlayer doesn't use the state
     actions = game.legal_actions(state)
 
