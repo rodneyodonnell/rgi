@@ -110,7 +110,7 @@ def test_human_vs_ai_player_move(page: Page) -> None:
     "player1_type, player2_type",
     [
         ("random", "random"),
-        ("minimax", "zerozero"),
+        ("minimax", "random"),
         # Add more player type combinations as needed
     ],
 )

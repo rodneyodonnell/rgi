@@ -4,6 +4,7 @@ import {
   makeMove,
   startNewGame,
   currentPlayerType,
+  GameRenderer,
 } from './game_common.js'
 
 interface Connect4GameData extends BaseGameData {
@@ -19,7 +20,7 @@ let playerOptions: { [key: number]: { player_type: string; [key: string]: any } 
 document.addEventListener('DOMContentLoaded', () => {
   console.log('connect4.ts loaded and DOMContentLoaded event fired.')
 
-  const renderGame = (data: Connect4GameData) => {
+  const renderGame: GameRenderer<Connect4GameData> = (data) => {
     console.log('Rendering game with data:', data)
     const gameArea = document.getElementById('game')!
     const status = document.getElementById('status')!
@@ -44,7 +45,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const grid = document.createElement('div')
     grid.classList.add('grid-container')
 
-    for (let row = data.rows - 1; row >= 0; row--) {
+    // for (let row = data.rows - 1; row >= 0; row--) {
+    for (let row = 0; row < data.rows; row++) {
       for (let col = 0; col < data.columns; col++) {
         const cell = document.createElement('div')
         cell.classList.add('grid-cell')

@@ -1,25 +1,42 @@
 # rgi/core/game_registry.py
 
 from dataclasses import dataclass
-from typing import Generic, Any, Optional, Callable
 
-from flax.training import train_state, checkpoints
-import optax
-import jax.numpy as jnp
-import jax
+from typing import Generic, Any, Callable
+
 import argparse
-from rgi.core.base import (
-    Game,
-    GameSerializer,
-    TGameState,
-    TPlayerState,
-    TAction,
-    TPlayerId,
-    Player,
-)
-from rgi.games import connect4
-from rgi.games import infiltr8
-from rgi.games import othello
+from rgi.core.base import Game, GameSerializer, TGameState, TAction, Player
+from rgi.games.connect4 import connect4
+from rgi.games.othello import othello
+from rgi.games.count21 import count21
+from rgi.games.infiltr8 import infiltr8
+
+from rgi.players.minimax_player.minimax_player import MinimaxPlayer
+from rgi.players.random_player.random_player import RandomPlayer
+from rgi.players.human_player.human_player import HumanPlayer
+
+
+@dataclass
+class RegisteredGame(Generic[TGameState, TAction]):
+    game_fn: type[Game[TGameState, TAction]]
+    serializer_fn: type[GameSerializer[Any, TGameState, TAction]]
+    state_embedder_fn: type[StateEmbedder[TGameState]] | None = None
+    action_embedder_fn: type[ActionEmbedder[TAction]] | None = None
+
+
+# TODO: We should auto-discover games instead of hardcoding them here.
+GAME_REGISTRY: dict[str, RegisteredGame[Any, Any]] = {
+    "connect4": RegisteredGame(
+        connect4.Connect4Game,
+        connect4.Connect4Serializer,
+        connect4.Connect4StateEmbedder,
+        connect4.Connect4ActionEmbedder,
+    ),
+    "othello": RegisteredGame(othello.OthelloGame, othello.OthelloSerializer),
+    "infiltr8": RegisteredGame(infiltr8.Infiltr8Game, infiltr8.Infiltr8Serializer),
+    # Add new games here
+}
+
 
 # from rgi.players.zerozero.zerozero_player import ZeroZeroPlayer
 from rgi.players.minimax_player import MinimaxPlayer
@@ -32,28 +49,6 @@ from rgi.players.zerozero.zerozero_model import (
 )
 import os
 from flax.training import checkpoints
-
-
-@dataclass
-class RegisteredGame(Generic[TGameState, TPlayerId, TAction]):
-    game_fn: type[Game[TGameState, TPlayerId, TAction]]
-    # Ideally this type would be stricter, but this gets a bit tricky.
-    serializer_fn: type[GameSerializer[Any, TGameState, TAction]]
-    state_embedder_fn: type[StateEmbedder[TGameState]] | None = None
-    action_embedder_fn: type[ActionEmbedder[TAction]] | None = None
-
-
-GAME_REGISTRY: dict[str, RegisteredGame[Any, Any, Any]] = {
-    "connect4": RegisteredGame(
-        connect4.Connect4Game,
-        connect4.Connect4Serializer,
-        connect4.Connect4StateEmbedder,
-        connect4.Connect4ActionEmbedder,
-    ),
-    "othello": RegisteredGame(othello.OthelloGame, othello.OthelloSerializer),
-    "infiltr8": RegisteredGame(infiltr8.Infiltr8Game, infiltr8.Infiltr8Serializer),
-    # Add new games here
-}
 
 
 def load_zerozero_player(
@@ -136,13 +131,7 @@ def load_zerozero_player(
 PLAYER_REGISTRY: dict[
     str,
     Callable[
-        [
-            argparse.Namespace,
-            Game[Any, Any, Any],
-            RegisteredGame[Any, Any, Any],
-            int,
-            dict[str, Any],
-        ],
+        [argparse.Namespace, Game[Any, Any], RegisteredGame[Any, Any], int, dict[str, Any]],
         Player[Any, Any, Any],
     ],
 ] = {

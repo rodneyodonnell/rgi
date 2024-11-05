@@ -3,16 +3,15 @@ import parser from '@typescript-eslint/parser';
 
 export default [
   {
-    files: ['web_app/static/**/*.ts'],
+    files: ['web_app/src/**/*.ts'],
     languageOptions: {
       ecmaVersion: 2021,
       sourceType: 'module',
       parser: parser,
     },
     rules: {
-      semi: ['error', 'always'],
-      quotes: ['error', 'double'],
-      'no-unused-vars': 'warn',
+      semi: ['error', 'never'],
+      quotes: ['error', 'single'],
       'prefer-const': 'error',
     },
     plugins: {

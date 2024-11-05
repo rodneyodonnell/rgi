@@ -10,9 +10,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from rgi.core.game_registry import GAME_REGISTRY, PLAYER_REGISTRY, RegisteredGame
-from rgi.players.minimax_player import MinimaxPlayer
-from rgi.players.random_player import RandomPlayer
-from rgi.players.human_player import HumanPlayer
+from rgi.players.human_player.human_player import HumanPlayer
 from rgi.core.base import Game, Player, GameSerializer
 
 print("Server restarted at", datetime.now())
@@ -49,7 +47,6 @@ game_counter = ThreadSafeCounter()
 
 @app.get("/", response_class=HTMLResponse)
 async def root(request: Request) -> HTMLResponse:
-    logger.debug("Serving root page")
     return templates.TemplateResponse("index.html", {"request": request})
 
 
@@ -104,8 +101,8 @@ async def create_game(request: Request) -> dict[str, Any]:
 
 def create_player(
     player_type: str,
-    game: Game[Any, Any, Any],
-    registered_game: RegisteredGame[Any, Any, Any],
+    game: Game[Any, Any],
+    registered_game: RegisteredGame[Any, Any],
     player_id: int,
     options: dict[str, Any],
 ) -> Player[Any, Any, Any]:
@@ -117,7 +114,7 @@ def create_player(
         logger.error("Unknown player type: %s", player_type)
         raise ValueError(f"Unknown player type: {player_type}")
 
-    return player_fn(game, registered_game, player_id, constructor_options)
+    return player_fn(None, game, registered_game, player_id, constructor_options)
 
 
 @app.get("/games/{game_id}/state")
@@ -128,8 +125,8 @@ async def get_game_state(game_id: int) -> dict[str, Any]:
         logger.error("Game not found. ID: %d", game_id)
         raise HTTPException(status_code=404, detail="Game not found")
 
-    game = cast(Game[Any, Any, Any], game_session["game"])
-    serializer = cast(GameSerializer[Game[Any, Any, Any], Any, Any], game_session["serializer"])
+    game = cast(Game[Any, Any], game_session["game"])
+    serializer = cast(GameSerializer[Game[Any, Any], Any, Any], game_session["serializer"])
     state = game_session["state"]
     game_state = serializer.serialize_state(game, state)
 
@@ -138,7 +135,7 @@ async def get_game_state(game_id: int) -> dict[str, Any]:
     game_state["player_options"] = game_session["player_options"]
 
     if game.is_terminal(state):
-        all_players = game.all_player_ids(state)
+        all_players = range(1, game.num_players(state) + 1)
         rewards = {player_id: game.reward(state, player_id) for player_id in all_players}
         winner = [player_id for player_id, reward in rewards.items() if reward == 1.0]
         game_state["winner"] = winner[0] if winner else None
@@ -156,11 +153,11 @@ async def make_move(game_id: int, action_data: dict[str, Any]) -> dict[str, Any]
     if not game_session:
         raise HTTPException(status_code=404, detail="Game not found")
 
-    game = cast(Game[Any, Any, Any], game_session["game"])
+    game = cast(Game[Any, Any], game_session["game"])
     state = game_session["state"]
 
     try:
-        serializer = cast(GameSerializer[Game[Any, Any, Any], Any, Any], game_session["serializer"])
+        serializer = cast(GameSerializer[Game[Any, Any], Any, Any], game_session["serializer"])
         action = serializer.parse_action(game, action_data)
         if action not in game.legal_actions(state):
             return {"success": False, "error": "Invalid move"}
@@ -179,7 +176,7 @@ async def make_ai_move(game_id: int) -> dict[str, Any]:
         logger.error("Game not found. ID: %d", game_id)
         raise HTTPException(status_code=404, detail="Game not found")
 
-    game = cast(Game[Any, Any, Any], game_session["game"])
+    game = cast(Game[Any, Any], game_session["game"])
     state = game_session["state"]
     players = cast(dict[int, Player[Any, Any, Any]], game_session["players"])
 
