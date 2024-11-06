@@ -34,5 +34,5 @@ def test_select_action(game: Game[Any, int], player: RandomPlayer[Any, Any]) -> 
 
 def test_update_state(player: RandomPlayer[Any, Any]) -> None:
     # RandomPlayer's update_state should do nothing
-    player.update_state(None, None)
+    player.update_player_state(None, 0, 0)
     # If we reach here without error, the test passes

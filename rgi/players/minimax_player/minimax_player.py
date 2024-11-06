@@ -71,7 +71,3 @@ class MinimaxPlayer(Player[TGameState, TPlayerState, TAction]):
         if best_action is None:
             return legal_actions[0]
         return best_action
-
-    @override
-    def update_state(self, game_state: TGameState, action: TAction) -> None:
-        """No need for internal updates for this player."""
