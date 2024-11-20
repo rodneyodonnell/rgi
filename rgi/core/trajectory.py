@@ -1,6 +1,7 @@
 import dataclasses
 from pathlib import Path
-from typing import Generic, Sequence, Type, Any, get_origin, get_args, Union
+import typing
+from typing import Generic, Sequence, Type, Any, Union
 
 import numpy as np
 from numpy.typing import NDArray
@@ -11,7 +12,7 @@ from rgi.core.base import TGameState, TAction
 
 def _is_optional(type_hint: Any) -> bool:
     """Check if a type hint is Optional[T]."""
-    return get_origin(type_hint) is Union and type(None) in get_args(type_hint)
+    return typing.get_origin(type_hint) is Union and type(None) in typing.get_args(type_hint)
 
 
 @dataclasses.dataclass
@@ -60,9 +61,8 @@ class GameTrajectory(Generic[TGameState, TAction]):
                 f"({self.num_players})"
             )
 
-    def save(self, filepath: Path | str, allow_pickle: bool = False) -> None:
-        """Save trajectory using numpy's efficient binary format."""
-        filepath = Path(filepath)
+    def write(self, file: Path | str | typing.BinaryIO, allow_pickle: bool = False) -> None:
+        """Write trajectory to file or streamusing numpy's efficient binary format."""
 
         def to_valid_array(name: str, seq: Sequence[Any], assert_dtype: type[np.generic] | None = None) -> NDArray[Any]:
             arr = np.asarray(seq)
@@ -96,7 +96,7 @@ class GameTrajectory(Generic[TGameState, TAction]):
 
         # Save all arrays in a single .npz file
         np.savez_compressed(
-            filepath,
+            file,
             action_player_ids=action_player_ids,
             incremental_rewards=incremental_rewards,
             final_reward=final_reward,
@@ -106,16 +106,15 @@ class GameTrajectory(Generic[TGameState, TAction]):
         )
 
     @classmethod
-    def load(
+    def read(
         cls,
-        filepath: Path | str,
+        file: Path | str | typing.BinaryIO,
         game_state_type: Type[TGameState],
         action_type: Type[TAction],
         allow_pickle: bool = False,
     ) -> "GameTrajectory[TGameState, TAction]":
-        """Load trajectory from numpy binary format."""
-        filepath = Path(filepath)
-        data = np.load(filepath, allow_pickle=allow_pickle)
+        """Read trajectory from file or stream in numpy binary format."""
+        data = np.load(file, allow_pickle=allow_pickle)
 
         # Reconstruct states
         if dataclasses.is_dataclass(game_state_type):

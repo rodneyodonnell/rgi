@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import Any, Type
+import io
 
 import pytest
 
@@ -33,10 +34,10 @@ def test_fixed_trajectory_save_load(
     runner = GameRunner(connect4_game, [player1, player2])
     original_trajectory = runner.run()
     save_path = tmp_path / "trajectory.npz"
-    original_trajectory.save(save_path, allow_pickle=False)
+    original_trajectory.write(save_path, allow_pickle=False)
 
     # Load trajectory
-    reloaded_trajectory: GameTrajectory[connect4.GameState, connect4.Action] = GameTrajectory.load(
+    reloaded_trajectory: GameTrajectory[connect4.GameState, connect4.Action] = GameTrajectory.read(
         save_path, connect4.GameState, connect4.Action, allow_pickle=True
     )
 
@@ -105,9 +106,27 @@ def test_random_games(
 
     # save & reload
     save_path = tmp_path / "trajectory.npz"
-    trajectory.save(save_path, allow_pickle=allow_pickle)
-    reloaded_trajectory: GameTrajectory[Any, Any] = GameTrajectory.load(
+    trajectory.write(save_path, allow_pickle=allow_pickle)
+    reloaded_trajectory: GameTrajectory[Any, Any] = GameTrajectory.read(
         save_path, state_type, action_type, allow_pickle=allow_pickle
+    )
+
+    equality_checker = test_utils.EqualityChecker()
+    assert equality_checker.check_equality(trajectory, reloaded_trajectory)
+    assert not equality_checker.errors
+
+
+def test_trajectory_read_from_stream(connect4_game: connect4.Connect4Game) -> None:
+    players = [RandomPlayer[Any, Any](), RandomPlayer[Any, Any]()]
+    runner = GameRunner(connect4_game, players, verbose=False)
+    trajectory = runner.run()
+    assert connect4_game.is_terminal(runner.game_state)
+
+    stream = io.BytesIO()
+    trajectory.write(stream, allow_pickle=False)
+    stream.seek(0)
+    reloaded_trajectory: GameTrajectory[Any, Any] = GameTrajectory.read(
+        stream, connect4.GameState, connect4.Action, allow_pickle=False
     )
 
     equality_checker = test_utils.EqualityChecker()
