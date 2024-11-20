@@ -35,8 +35,3 @@ class HumanPlayer(Player[TGameState, TPlayerState, TAction], Generic[TGame, TGam
             except (ValueError, IndexError):
                 pass
             print("##\n##\n## Invalid input. Please enter a valid action action.\n##\n##")
-
-    @override
-    def update_state(self, game_state: TGameState, action: TAction) -> None:
-        # Human player doesn't need to maintain any state
-        pass

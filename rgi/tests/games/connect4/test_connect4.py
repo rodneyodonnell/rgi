@@ -235,7 +235,7 @@ def test_middle_of_row_win() -> None:
         """
     )
     state = game.parse_board(board_str, current_player=1)
-    assert state.winner is None
+    assert state.winner == 0
 
     new_state = game.next_state(state, 6)
     assert new_state.winner == 1, f"Expected Player 1 to win, but got {state.winner}"

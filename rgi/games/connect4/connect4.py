@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from typing import Sequence, Any, Optional
+from typing import Sequence, Any
 from typing_extensions import override
 
 import numpy as np
@@ -13,12 +13,12 @@ from rgi.core import base
 class Connect4State:
     board: NDArray[np.int8]  # (height, width)
     current_player: int
-    winner: Optional[int] = None  # The winner, if the game has ended
+    winner: int  # The winner, if the game has ended, else 0
 
 
+PlayerId = int
 GameState = Connect4State
 Action = int
-PlayerId = int
 
 
 class Connect4Game(base.Game[GameState, Action]):
@@ -36,7 +36,11 @@ class Connect4Game(base.Game[GameState, Action]):
 
     @override
     def initial_state(self) -> GameState:
-        return GameState(board=np.zeros([self.height, self.width], dtype=np.int8), current_player=1, winner=None)
+        return GameState(
+            board=np.zeros([self.height, self.width], dtype=np.int8),
+            current_player=1,
+            winner=0,
+        )
 
     @override
     def current_player_id(self, game_state: GameState) -> int:
@@ -57,8 +61,8 @@ class Connect4Game(base.Game[GameState, Action]):
     @override
     def next_state(self, game_state: GameState, action: Action) -> GameState:
         """Find the lowest empty row in the selected column and return the updated game state."""
-        if action not in self.legal_actions(game_state):
-            raise ValueError(f"Invalid move: Invalid column '{action}' not in {self._all_column_ids}")
+        if action not in (legal_actions := self.legal_actions(game_state)):
+            raise ValueError(f"Invalid move: Invalid column '{action}' not in {legal_actions}")
 
         column = action - 1  # Convert 1-based action to 0-based column index
         row = np.nonzero(game_state.board[:, column] == 0)[0][-1]
@@ -71,7 +75,7 @@ class Connect4Game(base.Game[GameState, Action]):
 
         return GameState(board=new_board, current_player=next_player, winner=winner)
 
-    def _calculate_winner(self, board: NDArray[np.int8], col: int, row: int, player: PlayerId) -> Optional[PlayerId]:
+    def _calculate_winner(self, board: NDArray[np.int8], col: int, row: int, player: PlayerId) -> PlayerId:
         """Check if the last move made at (row, col) by 'player' wins the game."""
         directions = [
             (0, 1),  # Horizontal
@@ -90,21 +94,21 @@ class Connect4Game(base.Game[GameState, Action]):
                     if count >= self.connect_length:
                         return player
 
-        return None  # No winner yet
+        return 0  # No winner yet
 
     @override
     def is_terminal(self, game_state: GameState) -> bool:
-        if game_state.winner is not None:
+        if game_state.winner:
             return True
         return np.all(game_state.board != 0).item()
 
     @override
     def reward(self, game_state: GameState, player_id: PlayerId) -> float:
+        if game_state.winner == 0:
+            return 0.0
         if game_state.winner == player_id:
             return 1.0
-        elif game_state.winner is not None:
-            return -1.0
-        return 0.0
+        return -1.0
 
     @override
     def pretty_str(self, game_state: GameState) -> str:
@@ -126,7 +130,7 @@ class Connect4Game(base.Game[GameState, Action]):
                     board[r, c] = 1  # Player 1
                 elif cell == "○":
                     board[r, c] = 2  # Player 2
-        return GameState(board=board, current_player=current_player)
+        return GameState(board=board, current_player=current_player, winner=0)
 
 
 class Connect4Serializer(base.GameSerializer[Connect4Game, GameState, Action]):

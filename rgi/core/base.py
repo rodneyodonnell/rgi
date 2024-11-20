@@ -35,6 +35,10 @@ class Game(ABC, Generic[TGameState, TAction]):
     def num_players(self, game_state: TGameState) -> int:
         """Number of players in the game."""
 
+    def player_ids(self, game_state: TGameState) -> Sequence[TPlayerId]:
+        """Return a sequence of all player IDs in the game."""
+        return range(1, self.num_players(game_state) + 1)
+
     @abstractmethod
     def legal_actions(self, game_state: TGameState) -> Sequence[TAction]:
         """Return a sequence of all legal actions for the game state."""
@@ -68,12 +72,15 @@ class Player(ABC, Generic[TGameState, TPlayerState, TAction]):
     def select_action(self, game_state: TGameState, legal_actions: Sequence[TAction]) -> TAction:
         """Select an action from the legal actions."""
 
-    @abstractmethod
-    def update_state(self, game_state: TGameState, action: TAction) -> None:
+    def update_player_state(self, old_game_state: TGameState, action: TAction, new_game_state: TGameState) -> None:
         """Update the player's internal state based on the game state and action.
 
         This method is called after each action, allowing the player to update any
         internal state or learning parameters based on the game progression."""
+
+    def get_player_state(self) -> TPlayerState:
+        """Return the player's internal state."""
+        return None  # type: ignore
 
 
 class GameSerializer(ABC, Generic[TGame, TGameState, TAction]):
