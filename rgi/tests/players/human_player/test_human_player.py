@@ -53,5 +53,5 @@ def test_invalid_input(game: Game[Any, int], player: HumanPlayer[Game[Any, int],
 
 def test_update_state(player: HumanPlayer[Game[Any, int], Any, int]) -> None:
     # HumanPlayer's update_state should do nothing
-    player.update_state(None, 0)
+    player.update_player_state(None, 0, 0)
     # If we reach here without error, the test passes

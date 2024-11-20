@@ -1,150 +1,115 @@
-# rgi/tests/core/test_trajectory.py
-
 from pathlib import Path
-import pytest
-import torch
+from typing import Any, Type
 
-from rgi.core.trajectory import Trajectory, EncodedTrajectory, encode_trajectory, save_trajectories, load_trajectories
-from rgi.games.connect4 import Connect4Game, Connect4State, Connect4Serializer
+import pytest
+
+from rgi.core.trajectory import GameTrajectory
+from rgi.core import base
+from rgi.core.game_runner import GameRunner
+from rgi.players.random_player.random_player import RandomPlayer
+from rgi.games.connect4 import connect4
+from rgi.games.othello import othello
+from rgi.games.count21 import count21
+from rgi.tests import test_utils
 
 # pylint: disable=redefined-outer-name  # pytest fixtures trigger this false positive
 
 
 @pytest.fixture
-def game() -> Connect4Game:
-    return Connect4Game()
+def connect4_game() -> connect4.Connect4Game:
+    return connect4.Connect4Game()
 
 
-@pytest.fixture
-def serializer() -> Connect4Serializer:
-    return Connect4Serializer()
-
-
-@pytest.fixture
-def sample_trajectory(game: Connect4Game) -> Trajectory:
-    initial_state = game.initial_state()
-    states = [initial_state]
-    actions = [4, 3, 2]  # Sample actions
-    state_rewards = [0.0, 0.0, 0.0, 0.0]  # No intermediate rewards for Connect4
-    player_ids = [1, 2, 1]
-    for action in actions:
-        states.append(game.next_state(states[-1], action))
-
-    return Trajectory(
-        states=states,
-        actions=actions,
-        state_rewards=state_rewards,
-        player_ids=player_ids,
-        final_rewards=[1.0, -1.0],  # Player 1 wins, Player 2 loses
-    )
-
-
-def test_trajectory_creation(sample_trajectory: Trajectory) -> None:
-    assert len(sample_trajectory.states) == 4
-    assert len(sample_trajectory.actions) == 3
-    assert len(sample_trajectory.state_rewards) == 4
-    assert len(sample_trajectory.player_ids) == 3
-    assert len(sample_trajectory.final_rewards) == 2
-
-
-def test_encode_trajectory(game: Connect4Game, serializer: Connect4Serializer, sample_trajectory: Trajectory) -> None:
-    encoded = encode_trajectory(game, sample_trajectory, serializer)
-
-    assert isinstance(encoded, EncodedTrajectory)
-    assert encoded.states.shape == (4, 43)  # 4 states, 43 elements per state (6*7 + 1)
-    assert encoded.actions.shape == (3,)
-    assert encoded.state_rewards.shape == (4,)
-    assert encoded.player_ids.shape == (3,)
-    assert encoded.final_rewards.shape == (2,)
-    assert encoded.num_actions == 3
-    assert encoded.num_players == 2
-
-
-def test_save_and_load_trajectories(
-    tmp_path: Path, game: Connect4Game, serializer: Connect4Serializer, sample_trajectory: Trajectory
+def test_fixed_trajectory_save_load(
+    connect4_game: connect4.Connect4Game,
+    tmp_path: Path,
 ) -> None:
-    encoded = encode_trajectory(game, sample_trajectory, serializer)
-    file_path = tmp_path / "test_trajectories.pt"
+    """Test that trajectories can be saved and loaded correctly."""
 
-    # Save trajectories
-    save_trajectories([encoded], str(file_path))
+    player1 = test_utils.PresetPlayer[connect4.GameState, connect4.Action](actions=[2, 2, 2, 2])
+    player2 = test_utils.PresetPlayer[connect4.GameState, connect4.Action](actions=[1, 3, 4, 5])
 
-    # Load trajectories
-    loaded_trajectories = load_trajectories(str(file_path))
+    # Create and save trajectory
+    runner = GameRunner(connect4_game, [player1, player2])
+    original_trajectory = runner.run()
+    save_path = tmp_path / "trajectory.npz"
+    original_trajectory.save(save_path, allow_pickle=False)
 
-    assert len(loaded_trajectories) == 1
-    loaded = loaded_trajectories[0]
+    # Load trajectory
+    reloaded_trajectory: GameTrajectory[connect4.GameState, connect4.Action] = GameTrajectory.load(
+        save_path, connect4.GameState, connect4.Action, allow_pickle=True
+    )
 
-    assert torch.equal(loaded.states, encoded.states)
-    assert torch.equal(loaded.actions, encoded.actions)
-    assert torch.equal(loaded.state_rewards, encoded.state_rewards)
-    assert torch.equal(loaded.player_ids, encoded.player_ids)
-    assert torch.equal(loaded.final_rewards, encoded.final_rewards)
-    assert loaded.num_actions == encoded.num_actions
-    assert loaded.num_players == encoded.num_players
+    # Check equality
+    equality_checker = test_utils.EqualityChecker()
+    assert equality_checker.check_equality(original_trajectory, reloaded_trajectory)
+    assert not equality_checker.errors
 
 
-def test_multiple_trajectories(
-    tmp_path: Path, game: Connect4Game, serializer: Connect4Serializer, sample_trajectory: Trajectory
+def test_trajectory_validation(connect4_game: connect4.Connect4Game) -> None:
+    """Test that GameTrajectory validates its inputs correctly."""
+
+    # Create a valid state
+    valid_state = connect4_game.initial_state()
+
+    # Test with empty states
+    with pytest.raises(ValueError, match="must contain at least one state"):
+        GameTrajectory(
+            game_states=[],
+            actions=[],
+            action_player_ids=[],
+            incremental_rewards=[],
+            num_players=2,
+            final_reward=[1.0, -1.0],
+        )
+
+    # Test with mismatched lengths
+    with pytest.raises(ValueError, match="must be one more than the number of actions"):
+        GameTrajectory(
+            game_states=[valid_state],
+            actions=[1],
+            action_player_ids=[1],
+            incremental_rewards=[0.0],
+            num_players=2,
+            final_reward=[1.0, -1.0],
+        )
+
+    # Test with mismatched number of final rewards
+    with pytest.raises(ValueError, match="must be the same as the number of players"):
+        GameTrajectory(
+            game_states=[valid_state, valid_state],
+            actions=[1],
+            action_player_ids=[1],
+            incremental_rewards=[0.0],
+            num_players=2,
+            final_reward=[1.0],
+        )
+
+
+# Validation of random player on various games.
+@pytest.mark.parametrize(
+    "game,state_type,action_type, allow_pickle",
+    [
+        pytest.param(connect4.Connect4Game(), connect4.GameState, connect4.Action, False, id="connect4"),
+        pytest.param(othello.OthelloGame(), othello.GameState, othello.Action, False, id="othello"),
+        pytest.param(count21.Count21Game(), count21.TGameState, count21.TAction, False, id="count21"),
+    ],
+)
+def test_random_games(
+    game: base.Game[Any, Any], state_type: Type[Any], action_type: Type[Any], allow_pickle: bool, tmp_path: Path
 ) -> None:
-    encoded1 = encode_trajectory(game, sample_trajectory, serializer)
-    encoded2 = encode_trajectory(game, sample_trajectory, serializer)  # Using the same trajectory for simplicity
-    all_encoded = [encoded1, encoded2]
-    file_path = tmp_path / "test_multiple_trajectories.pt"
+    players = [RandomPlayer[Any, Any](), RandomPlayer[Any, Any]()]
+    runner = GameRunner(game, players, verbose=False)
+    trajectory = runner.run()
+    assert game.is_terminal(runner.game_state)
 
-    # Save trajectories
-    save_trajectories(all_encoded, str(file_path))
-
-    # Load trajectories
-    loaded_trajectories = load_trajectories(str(file_path))
-
-    assert len(loaded_trajectories) == 2
-    for loaded, original in zip(loaded_trajectories, all_encoded):
-        assert torch.equal(loaded.states, original.states)
-        assert torch.equal(loaded.actions, original.actions)
-        assert torch.equal(loaded.state_rewards, original.state_rewards)
-        assert torch.equal(loaded.player_ids, original.player_ids)
-        assert torch.equal(loaded.final_rewards, original.final_rewards)
-        assert loaded.num_actions == original.num_actions
-        assert loaded.num_players == original.num_players
-
-
-def test_variable_length_trajectories(tmp_path: Path, game: Connect4Game, serializer: Connect4Serializer) -> None:
-    trajectory1 = Trajectory(
-        states=[game.initial_state() for _ in range(3)],
-        actions=[1, 2],
-        state_rewards=[0.0, 0.0, 0.0],
-        player_ids=[1, 2],
-        final_rewards=[1.0, -1.0],
-    )
-    trajectory2 = Trajectory(
-        states=[game.initial_state() for _ in range(5)],
-        actions=[1, 2, 3, 4],
-        state_rewards=[0.0, 0.0, 0.0, 0.0, 0.0],
-        player_ids=[1, 2, 1, 2],
-        final_rewards=[1.0, -1.0],
+    # save & reload
+    save_path = tmp_path / "trajectory.npz"
+    trajectory.save(save_path, allow_pickle=allow_pickle)
+    reloaded_trajectory: GameTrajectory[Any, Any] = GameTrajectory.load(
+        save_path, state_type, action_type, allow_pickle=allow_pickle
     )
 
-    encoded1 = encode_trajectory(game, trajectory1, serializer)
-    encoded2 = encode_trajectory(game, trajectory2, serializer)
-
-    file_path = tmp_path / "test_variable_length_trajectories.pt"
-
-    # Save trajectories
-    save_trajectories([encoded1, encoded2], str(file_path))
-
-    # Load trajectories
-    loaded_trajectories = load_trajectories(str(file_path))
-
-    assert len(loaded_trajectories) == 2
-    assert loaded_trajectories[0].num_actions == 2
-    assert loaded_trajectories[1].num_actions == 4
-
-    for loaded, original in zip(loaded_trajectories, [encoded1, encoded2]):
-        assert torch.equal(loaded.states, original.states)
-        assert torch.equal(loaded.actions, original.actions)
-        assert torch.equal(loaded.state_rewards, original.state_rewards)
-        assert torch.equal(loaded.player_ids, original.player_ids)
-        assert torch.equal(loaded.final_rewards, original.final_rewards)
-        assert loaded.num_actions == original.num_actions
-        assert loaded.num_players == original.num_players
+    equality_checker = test_utils.EqualityChecker()
+    assert equality_checker.check_equality(trajectory, reloaded_trajectory)
+    assert not equality_checker.errors

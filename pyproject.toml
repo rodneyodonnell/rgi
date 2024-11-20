@@ -5,12 +5,13 @@ line-length = 120
 max-line-length = 120
 disable = [
     "C0111",  # missing-docstring,
+    "C0114",  # missing-module-docstring
+    "C0115",  # missing-class-docstring
+    "C0116",  # missing-function-docstring
     "W1203",  # Use lazy % or .format() formatting in logging functions
     "R1723",  # no-else-break
     "R1705",  # no-else-return
     "R0801",  # duplicate-code (we see this in tests)
-    "C0115",  # missing-class-docstring
-    "C0114",  # missing-module-docstring
     "W0212",  # protected-access
 ]
 
