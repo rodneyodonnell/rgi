@@ -17,7 +17,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
   declare -A commands
   commands["--mypy"]="mypy ."
   commands["--pylint"]="pylint --rcfile=pyproject.toml \$(git ls-files '*.py')"
-  commands["--eslint"]="yarn eslint 'web_app/static/**/*.ts'"
+  commands["--eslint"]="yarn eslint 'web_app/src/**/*.ts'"
   commands["--tsc"]="yarn tsc --noEmit"
 
   selected_commands=()

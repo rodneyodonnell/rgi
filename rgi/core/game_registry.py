@@ -32,7 +32,7 @@ GAME_REGISTRY: dict[str, RegisteredGame[Any, Any]] = {
 PLAYER_REGISTRY: dict[
     str,
     Callable[
-        [argparse.Namespace, Game[Any, Any], RegisteredGame[Any, Any], int, dict[str, Any]],
+        [argparse.Namespace | None, Game[Any, Any], RegisteredGame[Any, Any], int, dict[str, Any]],
         Player[Any, Any, Any],
     ],
 ] = {
