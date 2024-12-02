@@ -1,6 +1,7 @@
 from typing import override, Literal, Sequence, Any
 from typing import TypeGuard, Protocol, Iterator, runtime_checkable
-
+from pathlib import Path
+import shutil
 
 import dataclasses
 import numpy as np
@@ -97,3 +98,11 @@ class EqualityChecker:
                 self.errors.append((path, f"value mismatch: {obj1} != {obj2}"))
                 return False
         return True
+
+
+def delete_directory_contents(path: Path) -> None:
+    for item in path.iterdir():
+        if item.is_file():
+            item.unlink()
+        elif item.is_dir():
+            shutil.rmtree(item)

@@ -19,7 +19,10 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
       pytest -n auto --doctest-modules
       ;;
     --backend)
-      pytest -n auto rgi --doctest-modules
+      pytest -n auto rgi --doctest-modules --benchmark-skip
+      ;;
+    --benchmark)
+      pytest -n auto rgi/benchmarks --benchmark-only
       ;;
     --frontend)
       pytest -n auto web_app --doctest-modules

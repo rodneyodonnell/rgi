@@ -118,7 +118,7 @@ class GameTrajectory(Generic[TGameState, TAction]):
 
         # Reconstruct states
         if dataclasses.is_dataclass(game_state_type):
-            game_state_fields = {
+            game_state_fields = game_state_fields = {
                 field_name: data[f"state_{field_name}"] for field_name in game_state_type.__dataclass_fields__
             }
             game_states = [

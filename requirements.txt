@@ -444,6 +444,8 @@ ptyprocess==0.7.0
     #   terminado
 pure-eval==0.2.3
     # via stack-data
+py-cpuinfo==9.0.0
+    # via pytest-benchmark
 pycparser==2.22
     # via cffi
 pydantic==2.9.2
@@ -470,12 +472,15 @@ pytest==8.3.3
     # via
     #   -r requirements.in
     #   pytest-base-url
+    #   pytest-benchmark
     #   pytest-mock
     #   pytest-playwright
     #   pytest-timeout
     #   pytest-xdist
 pytest-base-url==2.1.0
     # via pytest-playwright
+pytest-benchmark==5.1.0
+    # via -r requirements.in
 pytest-mock==3.14.0
     # via -r requirements.in
 pytest-playwright==0.5.2
