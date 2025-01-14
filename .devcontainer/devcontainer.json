@@ -4,11 +4,9 @@
         "context": "..",
         "dockerfile": "../Dockerfile",
         "args": {
-            "USERNAME": "ubuntu"
+            "USERNAME": "${localEnv:DEVCONTAINER_USER|ubuntu}"
         }
     },
-    // Launch jupyter on localhost:8888 during dev.
-    // "postCreateCommand": "jupyter notebook --ip 0.0.0.0 --port 8888 --no-browser --allow-root --NotebookApp.token='' --NotebookApp.password=''",
     "forwardPorts": [
         8888
     ],
@@ -23,7 +21,7 @@
         "source=${localWorkspaceFolder}/scripts,target=/app/scripts,type=bind",
         "source=${localWorkspaceFolder}/notebooks,target=/app/notebooks,type=bind"
     ],
-    "remoteUser": "ubuntu",
+    "remoteUser": "${localEnv:DEVCONTAINER_USER|ubuntu}",
     "updateRemoteUserUID": true,
     "customizations": {
         "vscode": {
