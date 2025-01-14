@@ -3,27 +3,22 @@ import dataclasses
 import typing
 import types
 
-from typing import TypeVar, Union, overload, Protocol, Any
+from typing import TypeVar, Any, Sequence, cast
+from types import GenericAlias
+
 
 import numpy as np
 
+from rgi.core.types import FileOrPath, PrimitiveType, DataclassProtocol, is_primitive_type, is_dataclass_type
+
 T = typing.TypeVar("T")
 
-PrimitiveType = Union[int, float, str, bool]
-P = TypeVar("P", bound=PrimitiveType)
 
 ArchiveColumn = np.ndarray[Any, np.dtype[Any]]
-SerializedArchive = dict[str, ArchiveColumn]
+ArchiveColumns = dict[str, ArchiveColumn]
 
 
-class DataclassProtocol(Protocol):
-    __dataclass_fields__: dict[str, typing.Any]
-
-
-D = TypeVar("D", bound=DataclassProtocol)
-
-
-class Archive(typing.Sequence[T], abc.ABC):
+class Archive(Sequence[T], abc.ABC):
     pass
 
 
@@ -54,10 +49,10 @@ class ListBasedArchive(AppendableArchive[T]):
     def __getitem__(self, idx: int) -> T: ...
 
     @typing.overload
-    def __getitem__(self, idx: slice) -> typing.Sequence[T]: ...
+    def __getitem__(self, idx: slice) -> Sequence[T]: ...
 
     @typing.override
-    def __getitem__(self, idx: int | slice) -> T | typing.Sequence[T]:
+    def __getitem__(self, idx: int | slice) -> T | Sequence[T]:
         return self._items[idx]
 
     @typing.override
@@ -69,231 +64,94 @@ class ArchiveSerializer(typing.Generic[T]):
     def __init__(self, item_type: type[T] | types.GenericAlias):
         self._item_type = item_type
 
-    def serialize_to_dict(self, items: typing.Sequence[T]) -> SerializedArchive:
+    def serialize_to_dict(self, items: Sequence[T]) -> ArchiveColumns:
         return self._serialize_to_dict("", self._item_type, items)
 
-    U = TypeVar("U")
+    def serialize_to_file(self, items: Sequence[T], file: FileOrPath) -> None:
+        d = self.serialize_to_dict(items)
+        np.savez_compressed(file, **d)
+
+    _U = TypeVar("_U")
 
     def _serialize_to_dict(
-        self, field_path: str, item_type: type[U] | types.GenericAlias, items: typing.Sequence[U]
-    ) -> SerializedArchive:
+        self, field_path: str, item_type: type[_U] | GenericAlias, items: Sequence[_U]
+    ) -> ArchiveColumns:
 
-        if item_type in (int, float, str, bool):
-            return self._serialize_primitive(field_path, items)
-        if dataclasses.is_dataclass(item_type):
-            return self._serialize_dataclass(field_path, item_type, items)
+        if is_primitive_type(item_type):
+            return self._serialize_primitive(field_path, item_type, cast(Sequence[PrimitiveType], items))
+
+        if is_dataclass_type(item_type):
+            return self._serialize_dataclass(field_path, item_type, cast(Sequence[DataclassProtocol], items))
+
+        if item_type is np.ndarray:
+            return self._serialize_ndarray(field_path, cast(Sequence[np.ndarray[Any, Any]], items))
+
+        if (base_type := typing.get_origin(item_type)) is not None:
+            base_type_args = typing.get_args(item_type)
+
+            if base_type is list:
+                return self._serialize_generic_list(field_path, base_type_args[0], cast(Sequence[Sequence[Any]], items))
+            if base_type is tuple:
+                return self._serialize_generic_tuple(field_path, base_type_args, cast(Sequence[Sequence[Any]], items))
+            if base_type is np.ndarray:
+                return self._serialize_ndarray(field_path, cast(Sequence[np.ndarray[Any, Any]], items))
 
         raise NotImplementedError(f"Cannot add fields for field `{field_path}` with unhandled type {item_type}")
 
-    def _serialize_primitive(self, field_path: str, items: typing.Sequence[PrimitiveType]) -> SerializedArchive:
+    def _serialize_primitive(
+        self, field_path: str, item_type: type[PrimitiveType], items: Sequence[PrimitiveType]
+    ) -> ArchiveColumns:
         """Serialize primitive types to ndarray."""
         # TODO: Check returned array is not of type 'o' if serialization is strict.
-        return {field_path: np.array(items)}
+        return {field_path: np.array(items, dtype=item_type)}
 
     def _serialize_dataclass(
-        self, field_path: str, item_type: type[DataclassProtocol], items: typing.Sequence[DataclassProtocol]
-    ) -> SerializedArchive:
+        self, field_path: str, item_type: type[DataclassProtocol], items: Sequence[DataclassProtocol]
+    ) -> ArchiveColumns:
         """For dataclass types, which will recursively handle fields of various types."""
-
-        assert dataclasses.is_dataclass(item_type)
-
-        d = {}
+        d: ArchiveColumns = {}
         for field in dataclasses.fields(item_type):
-            # add type guard
             field_type = field.type
-            if not isinstance(field_type, (type, types.GenericAlias)):
+            if not isinstance(field_type, (type, GenericAlias)):
                 raise ValueError(f"Field {field.name} with field_type {field_type} is not a Type. Unable to serialize.")
 
             field_key = f"{field_path}.{field.name}"
             field_items = [getattr(item, field.name) for item in items]
-            d[field_key] = self._serialize_to_dict(field_key, field_type, field_items)
+
+            field_dict = self._serialize_to_dict(field_key, field_type, field_items)
+            d.update(field_dict)
         return d
 
-
-def foo():
-
-    # Handle generic lists and tuples.
-    if isinstance(item_type, types.GenericAlias):
-        base_type = typing.get_origin(item_type)
-        base_type_args = typing.get_args(item_type)
-
-        # Handle variable length tuples of a single type (e.g. tuple[int, ...]) like they are a list.
-        # This is primiarily to handle np.array shapes.
-        if base_type is tuple and base_type_args[-1] is Ellipsis:
-            if len(base_type_args) != 2:
-                raise ValueError(
-                    f"Tuple with ellipsis must have exactly 2 elements, got {len(base_type_args)} and type {base_type_args}"
-                )
-            list_type = list[base_type_args[0]]
-            return serialize_to_dict(field_path, list_type, items)
-
-        if base_type is tuple:
-            if Ellipsis in base_type_args:
-                raise ValueError(f"ellipsis only supported in tuples as a single last element, got type {item_type}")
-            d = {}
-            for i, t in enumerate(base_type_args):
-                tuple_field_path = f"{field_path}.{i}"
-                tuple_field_items = [item[i] for item in items]  # type: ignore
-                tuple_serialized = serialize_to_dict(tuple_field_path, t, tuple_field_items)
-                d.update(tuple_serialized)
-            return d
-
-        if base_type is list:
-            unrolled_items = [item for item_list in items for item in item_list]  # type: ignore
-            unrolled_lengths = [len(item_list) for item_list in items]  # type: ignore
-            values_dict = serialize_to_dict(f"{field_path}.*", base_type_args[0], unrolled_items)
-            length_dict = serialize_to_dict(f"{field_path}.#", int, unrolled_lengths)
-            return values_dict | length_dict
-
-    if item_type is np.ndarray:
-        flat_values = np.concatenate([arr.flatten() for arr in items])  # type: ignore
-        shapes = [arr.shape for arr in items]  # type: ignore
+    def _serialize_ndarray(self, field_path: str, items: Sequence[np.ndarray[Any, Any]]) -> ArchiveColumns:
+        flat_values = np.concatenate([arr.flatten() for arr in items])
+        shapes = [arr.shape for arr in items]
 
         values_dict = {f"{field_path}.*": flat_values}
-        shape_dict = serialize_to_dict(f"{field_path}.#", tuple[int, ...], shapes)
+        shape_dict = self._serialize_to_dict(f"{field_path}.#", tuple[int, ...], shapes)
         return values_dict | shape_dict
 
-    raise NotImplementedError(f"Cannot add fields for field `{field_path}` with non-dataclass type {item_type}")
+    def _serialize_generic_list(
+        self, field_path: str, item_type: type[_U], items: Sequence[Sequence[_U]]
+    ) -> ArchiveColumns:
+        unrolled_items = [item for item_list in items for item in item_list]
+        unrolled_lengths = [len(item_list) for item_list in items]
+        values_dict = self._serialize_to_dict(f"{field_path}.*", item_type, unrolled_items)
+        length_dict = self._serialize_to_dict(f"{field_path}.#", int, unrolled_lengths)
+        return values_dict | length_dict
 
+    def _serialize_generic_tuple(
+        self, field_path: str, base_type_args: tuple[type, ...], items: Sequence[Sequence[_U]]
+    ) -> ArchiveColumns:
+        if base_type_args[-1] is Ellipsis:  # type: ignore
+            return self._serialize_generic_list(field_path, base_type_args[0], items)
 
-def serialize_generic_list(field_path: str, item_type: type, items: typing.Sequence[T]) -> dict[str, typing.Any]:
-    unrolled_items = [item for item_list in items for item in item_list]  # type: ignore
-    unrolled_lengths = [len(item_list) for item_list in items]  # type: ignore
-    values_dict = serialize_to_dict(f"{field_path}.*", item_type, unrolled_items)
-    length_dict = serialize_to_dict(f"{field_path}.#", int, unrolled_lengths)
-    return values_dict | length_dict
-
-
-def _serialize_generic_tuple(
-    field_path: str, base_type_args: tuple[type, ...], items: typing.Sequence[T]
-) -> dict[str, typing.Any]:
-
-    # Handle variable length tuples of a single type (e.g. tuple[int, ...]) like they are a list.
-    # This is primiarily to handle np.array shapes.
-    if base_type_args[-1] is Ellipsis:
-        if len(base_type_args) != 2:
-            raise ValueError(
-                f"Tuple with ellipsis must have exactly 2 elements, got {len(base_type_args)} and type {base_type_args}"
-            )
-        return serialize_generic_list(field_path, base_type_args[0], items)
-
-    if base_type is tuple:
-        if Ellipsis in base_type_args:
-            raise ValueError(f"ellipsis only supported in tuples as a single last element, got type {item_type}")
         d = {}
         for i, t in enumerate(base_type_args):
             tuple_field_path = f"{field_path}.{i}"
-            tuple_field_items = [item[i] for item in items]  # type: ignore
-            tuple_serialized = serialize_to_dict(tuple_field_path, t, tuple_field_items)
+            tuple_field_items = [item[i] for item in items]
+            tuple_serialized = self._serialize_to_dict(tuple_field_path, t, tuple_field_items)
             d.update(tuple_serialized)
         return d
-
-    return None
-
-
-# def serialize_to_dict(
-#     field_path: str, item_type: type | types.GenericAlias, items: typing.Sequence[T]
-# ) -> dict[str, typing.Any]:
-
-#     if item_type in (int, float, str, bool):
-#         return {field_path: np.array(items)}
-
-#     if dataclasses.is_dataclass(item_type):
-#         return _serialize_dataclass(field_path, item_type, items)
-
-#     # Handle generic lists and tuples.
-#     if isinstance(item_type, types.GenericAlias):
-#         base_type = typing.get_origin(item_type)
-#         base_type_args = typing.get_args(item_type)
-
-#         # Handle variable length tuples of a single type (e.g. tuple[int, ...]) like they are a list.
-#         # This is primiarily to handle np.array shapes.
-#         if base_type is tuple and base_type_args[-1] is Ellipsis:
-#             if len(base_type_args) != 2:
-#                 raise ValueError(
-#                     f"Tuple with ellipsis must have exactly 2 elements, got {len(base_type_args)} and type {base_type_args}"
-#                 )
-#             list_type = list[base_type_args[0]]
-#             return serialize_to_dict(field_path, list_type, items)
-
-#         if base_type is tuple:
-#             if Ellipsis in base_type_args:
-#                 raise ValueError(f"ellipsis only supported in tuples as a single last element, got type {item_type}")
-#             d = {}
-#             for i, t in enumerate(base_type_args):
-#                 tuple_field_path = f"{field_path}.{i}"
-#                 tuple_field_items = [item[i] for item in items]  # type: ignore
-#                 tuple_serialized = serialize_to_dict(tuple_field_path, t, tuple_field_items)
-#                 d.update(tuple_serialized)
-#             return d
-
-#         if base_type is list:
-#             unrolled_items = [item for item_list in items for item in item_list]  # type: ignore
-#             unrolled_lengths = [len(item_list) for item_list in items]  # type: ignore
-#             values_dict = serialize_to_dict(f"{field_path}.*", base_type_args[0], unrolled_items)
-#             length_dict = serialize_to_dict(f"{field_path}.#", int, unrolled_lengths)
-#             return values_dict | length_dict
-
-#     if item_type is np.ndarray:
-#         flat_values = np.concatenate([arr.flatten() for arr in items])  # type: ignore
-#         shapes = [arr.shape for arr in items]  # type: ignore
-
-#         values_dict = {f"{field_path}.*": flat_values}
-#         shape_dict = serialize_to_dict(f"{field_path}.#", tuple[int, ...], shapes)
-#         return values_dict | shape_dict
-
-#     raise NotImplementedError(f"Cannot add fields for field `{field_path}` with non-dataclass type {item_type}")
-
-
-# def _serialize_dataclass(field_path: str, item_type: type, items: typing.Sequence[T]) -> dict[str, typing.Any]:
-#     assert dataclasses.is_dataclass(item_type)
-
-#     d = {}
-#     for field in dataclasses.fields(item_type):
-#         # add type guard
-#         field_type = field.type
-#         if not isinstance(field_type, (type, types.GenericAlias)):
-#             raise ValueError(f"Field {field.name} with field_type {field_type} is not a Type. Unable to serialize.")
-
-#         field_key = f"{field_path}.{field.name}"
-#         field_items = [getattr(item, field.name) for item in items]
-#         d[field_key] = serialize_to_dict(field_key, field_type, field_items)
-#     return d
-
-
-# def serialize_generic_list(field_path: str, item_type: type, items: typing.Sequence[T]) -> dict[str, typing.Any]:
-#     unrolled_items = [item for item_list in items for item in item_list]  # type: ignore
-#     unrolled_lengths = [len(item_list) for item_list in items]  # type: ignore
-#     values_dict = serialize_to_dict(f"{field_path}.*", item_type, unrolled_items)
-#     length_dict = serialize_to_dict(f"{field_path}.#", int, unrolled_lengths)
-#     return values_dict | length_dict
-
-
-# def _serialize_generic_tuple(
-#     field_path: str, base_type_args: tuple[type, ...], items: typing.Sequence[T]
-# ) -> dict[str, typing.Any]:
-
-#     # Handle variable length tuples of a single type (e.g. tuple[int, ...]) like they are a list.
-#     # This is primiarily to handle np.array shapes.
-#     if base_type_args[-1] is Ellipsis:
-#         if len(base_type_args) != 2:
-#             raise ValueError(
-#                 f"Tuple with ellipsis must have exactly 2 elements, got {len(base_type_args)} and type {base_type_args}"
-#             )
-#         return serialize_generic_list(field_path, base_type_args[0], items)
-
-#     if base_type is tuple:
-#         if Ellipsis in base_type_args:
-#             raise ValueError(f"ellipsis only supported in tuples as a single last element, got type {item_type}")
-#         d = {}
-#         for i, t in enumerate(base_type_args):
-#             tuple_field_path = f"{field_path}.{i}"
-#             tuple_field_items = [item[i] for item in items]  # type: ignore
-#             tuple_serialized = serialize_to_dict(tuple_field_path, t, tuple_field_items)
-#             d.update(tuple_serialized)
-#         return d
-
-#     return None
 
 
 # class MMappedArchive(Archive[T]):
