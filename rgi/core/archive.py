@@ -3,7 +3,7 @@ import dataclasses
 import typing
 import types
 
-from typing import TypeVar, Any, Sequence, cast
+from typing import Any, Sequence, cast
 from types import GenericAlias
 
 
@@ -12,6 +12,7 @@ import numpy as np
 from rgi.core.types import FileOrPath, PrimitiveType, DataclassProtocol, is_primitive_type, is_dataclass_type
 
 T = typing.TypeVar("T")
+_U = typing.TypeVar("_U")
 
 
 ArchiveColumn = np.ndarray[Any, np.dtype[Any]]
@@ -64,94 +65,196 @@ class ArchiveSerializer(typing.Generic[T]):
     def __init__(self, item_type: type[T] | types.GenericAlias):
         self._item_type = item_type
 
-    def serialize_to_dict(self, items: Sequence[T]) -> ArchiveColumns:
-        return self._serialize_to_dict("", self._item_type, items)
+    def save(self, items: Sequence[T], file: FileOrPath) -> None:
+        columns = self.to_columns(items)
+        return self.to_file(columns, file)
 
-    def serialize_to_file(self, items: Sequence[T], file: FileOrPath) -> None:
-        d = self.serialize_to_dict(items)
-        np.savez_compressed(file, **d)
+    def load(self, file: FileOrPath) -> Sequence[T]:
+        columns = np.load(file)
+        return self.from_columns(columns)
 
-    _U = TypeVar("_U")
+    def to_columns(self, items: Sequence[T]) -> ArchiveColumns:
+        return self._to_columns("", self._item_type, items)
 
-    def _serialize_to_dict(
-        self, field_path: str, item_type: type[_U] | GenericAlias, items: Sequence[_U]
-    ) -> ArchiveColumns:
+    def from_columns(self, columns: ArchiveColumns) -> Sequence[T]:
+        return self._from_columns("", self._item_type, columns)
+
+    def to_file(self, columns: ArchiveColumns, file: FileOrPath) -> None:
+        np.savez_compressed(file, **columns)
+
+    def from_file(self, file: FileOrPath) -> ArchiveColumns:
+        columns: ArchiveColumns = np.load(file)
+        return columns
+
+    def _to_columns(self, field_path: str, item_type: type[_U] | GenericAlias, items: Sequence[_U]) -> ArchiveColumns:
 
         if is_primitive_type(item_type):
-            return self._serialize_primitive(field_path, item_type, cast(Sequence[PrimitiveType], items))
+            return self._to_primitive_columns(field_path, item_type, cast(Sequence[PrimitiveType], items))
 
         if is_dataclass_type(item_type):
-            return self._serialize_dataclass(field_path, item_type, cast(Sequence[DataclassProtocol], items))
+            return self._to_dataclass_columns(field_path, item_type, cast(Sequence[DataclassProtocol], items))
 
         if item_type is np.ndarray:
-            return self._serialize_ndarray(field_path, cast(Sequence[np.ndarray[Any, Any]], items))
+            return self._to_ndarray_columns(field_path, cast(Sequence[np.ndarray[Any, Any]], items))
 
         if (base_type := typing.get_origin(item_type)) is not None:
             base_type_args = typing.get_args(item_type)
 
             if base_type is list:
-                return self._serialize_generic_list(field_path, base_type_args[0], cast(Sequence[Sequence[Any]], items))
+                return self._to_generic_list_columns(
+                    field_path, base_type_args[0], cast(Sequence[Sequence[Any]], items)
+                )
             if base_type is tuple:
-                return self._serialize_generic_tuple(field_path, base_type_args, cast(Sequence[Sequence[Any]], items))
+                return self._to_generic_tuple_columns(field_path, base_type_args, cast(Sequence[Sequence[Any]], items))
             if base_type is np.ndarray:
-                return self._serialize_ndarray(field_path, cast(Sequence[np.ndarray[Any, Any]], items))
+                return self._to_ndarray_columns(field_path, cast(Sequence[np.ndarray[Any, Any]], items))
 
         raise NotImplementedError(f"Cannot add fields for field `{field_path}` with unhandled type {item_type}")
 
-    def _serialize_primitive(
+    def _to_primitive_columns(
         self, field_path: str, item_type: type[PrimitiveType], items: Sequence[PrimitiveType]
     ) -> ArchiveColumns:
         """Serialize primitive types to ndarray."""
         # TODO: Check returned array is not of type 'o' if serialization is strict.
         return {field_path: np.array(items, dtype=item_type)}
 
-    def _serialize_dataclass(
+    def _to_dataclass_columns(
         self, field_path: str, item_type: type[DataclassProtocol], items: Sequence[DataclassProtocol]
     ) -> ArchiveColumns:
         """For dataclass types, which will recursively handle fields of various types."""
         d: ArchiveColumns = {}
         for field in dataclasses.fields(item_type):
             field_type = field.type
-            if not isinstance(field_type, (type, GenericAlias)):
-                raise ValueError(f"Field {field.name} with field_type {field_type} is not a Type. Unable to serialize.")
+            assert isinstance(field_type, (type, GenericAlias))
 
             field_key = f"{field_path}.{field.name}"
             field_items = [getattr(item, field.name) for item in items]
 
-            field_dict = self._serialize_to_dict(field_key, field_type, field_items)
+            field_dict = self._to_columns(field_key, field_type, field_items)
             d.update(field_dict)
         return d
 
-    def _serialize_ndarray(self, field_path: str, items: Sequence[np.ndarray[Any, Any]]) -> ArchiveColumns:
+    def _to_ndarray_columns(self, field_path: str, items: Sequence[np.ndarray[Any, Any]]) -> ArchiveColumns:
         flat_values = np.concatenate([arr.flatten() for arr in items])
         shapes = [arr.shape for arr in items]
 
         values_dict = {f"{field_path}.*": flat_values}
-        shape_dict = self._serialize_to_dict(f"{field_path}.#", tuple[int, ...], shapes)
+        shape_dict = self._to_columns(f"{field_path}.#", tuple[int, ...], shapes)
         return values_dict | shape_dict
 
-    def _serialize_generic_list(
+    def _to_generic_list_columns(
         self, field_path: str, item_type: type[_U], items: Sequence[Sequence[_U]]
     ) -> ArchiveColumns:
         unrolled_items = [item for item_list in items for item in item_list]
         unrolled_lengths = [len(item_list) for item_list in items]
-        values_dict = self._serialize_to_dict(f"{field_path}.*", item_type, unrolled_items)
-        length_dict = self._serialize_to_dict(f"{field_path}.#", int, unrolled_lengths)
+        values_dict = self._to_columns(f"{field_path}.*", item_type, unrolled_items)
+        length_dict = self._to_columns(f"{field_path}.#", int, unrolled_lengths)
         return values_dict | length_dict
 
-    def _serialize_generic_tuple(
+    def _to_generic_tuple_columns(
         self, field_path: str, base_type_args: tuple[type, ...], items: Sequence[Sequence[_U]]
     ) -> ArchiveColumns:
         if base_type_args[-1] is Ellipsis:  # type: ignore
-            return self._serialize_generic_list(field_path, base_type_args[0], items)
+            return self._to_generic_list_columns(field_path, base_type_args[0], items)
 
         d = {}
         for i, t in enumerate(base_type_args):
             tuple_field_path = f"{field_path}.{i}"
             tuple_field_items = [item[i] for item in items]
-            tuple_serialized = self._serialize_to_dict(tuple_field_path, t, tuple_field_items)
+            tuple_serialized = self._to_columns(tuple_field_path, t, tuple_field_items)
             d.update(tuple_serialized)
         return d
+
+    def _from_columns(
+        self, field_path: str, item_type: type[_U] | GenericAlias, columns: ArchiveColumns
+    ) -> Sequence[_U]:
+        if is_primitive_type(item_type):
+            return cast(Sequence[_U], self._from_primitive_columns(field_path, item_type, columns))
+        if is_dataclass_type(item_type):
+            return cast(Sequence[_U], self._from_dataclass_columns(field_path, item_type, columns))
+        if item_type is np.ndarray:
+            return cast(Sequence[_U], self._from_ndarray_columns(field_path, columns))
+        if (base_type := typing.get_origin(item_type)) is not None:
+            base_type_args = typing.get_args(item_type)
+            if base_type is list:
+                return cast(Sequence[_U], self._from_generic_list_columns(field_path, base_type_args[0], columns))
+            if base_type is tuple:
+                return cast(Sequence[_U], self._from_generic_tuple_columns(field_path, base_type_args, columns))
+            if base_type is np.ndarray:
+                return cast(Sequence[_U], self._from_ndarray_columns(field_path, columns))
+
+        raise NotImplementedError(f"Cannot deserialize columns for field `{field_path}` with type {item_type}")
+
+    def _from_primitive_columns(
+        self, field_path: str, item_type: type[PrimitiveType], columns: ArchiveColumns
+    ) -> Sequence[PrimitiveType]:
+        return cast(Sequence[PrimitiveType], [item_type(item) for item in columns[field_path]])
+
+    def _from_dataclass_columns(
+        self, field_path: str, item_type: type[DataclassProtocol], columns: ArchiveColumns
+    ) -> Sequence[DataclassProtocol]:
+        deserialized_fields: list[Any] = []
+        for field in dataclasses.fields(item_type):
+            field_type = field.type
+            assert isinstance(field_type, (type, GenericAlias))
+
+            field_key = f"{field_path}.{field.name}"
+            field_items = self._from_columns(field_key, field_type, columns)
+            deserialized_fields.append(field_items)
+
+        items = [item_type(*fields) for fields in zip(*deserialized_fields)]
+        return cast(Sequence[DataclassProtocol], items)
+
+    def _from_generic_list_columns(
+        self, field_path: str, item_type: type[_U], columns: ArchiveColumns
+    ) -> Sequence[Sequence[_U]]:
+        unrolled_items = self._from_columns(f"{field_path}.*", item_type, columns)
+        unrolled_lengths = columns[f"{field_path}.#"]
+        assert sum(unrolled_lengths) == len(unrolled_items)
+
+        ret: list[Sequence[_U]] = []
+        start = 0
+        for length in unrolled_lengths:
+            end = start + length
+            ret.append(unrolled_items[start:end])
+            start = end
+        return ret
+
+    def _from_generic_tuple_columns(
+        self, field_path: str, base_type_args: tuple[type, ...], columns: ArchiveColumns
+    ) -> Sequence[tuple[_U]]:
+        if base_type_args[-1] is Ellipsis:  # type: ignore
+            return self._from_generic_list_columns(field_path, base_type_args[0], columns)  # type: ignore
+
+        deserialized_fields: list[Any] = []
+        for i, t in enumerate(base_type_args):
+            tuple_field_path = f"{field_path}.{i}"
+            tuple_field_items = self._from_columns(tuple_field_path, t, columns)  # type: ignore
+            deserialized_fields.append(tuple_field_items)
+
+        items = [tuple(fields) for fields in zip(*deserialized_fields)]
+        return items  # type: ignore
+
+    def _from_ndarray_columns(self, field_path: str, columns: ArchiveColumns) -> Sequence[np.ndarray[Any, Any]]:
+        flat_values = columns[f"{field_path}.*"]
+        shapes = self._from_columns(f"{field_path}.#", tuple[int, ...], columns)
+
+        start = 0
+        ret: list[np.ndarray[Any, Any]] = []
+        for shape in shapes:
+            size = np.prod(shape)
+            end = start + size
+            ret.append(np.reshape(flat_values[start:end], shape))
+            start = end
+        return ret
+
+    # def _to_ndarray_columns(self, field_path: str, items: Sequence[np.ndarray[Any, Any]]) -> ArchiveColumns:
+    #     flat_values = np.concatenate([arr.flatten() for arr in items])
+    #     shapes = [arr.shape for arr in items]
+
+    #     values_dict = {f"{field_path}.*": flat_values}
+    #     shape_dict = self._to_columns(f"{field_path}.#", tuple[int, ...], shapes)
+    #     return values_dict | shape_dict
 
 
 # class MMappedArchive(Archive[T]):
