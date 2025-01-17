@@ -1,7 +1,9 @@
+import pathlib
 from dataclasses import dataclass
 from typing import Any
 import numpy as np
 import pytest
+import contextlib
 
 from numpy.testing import assert_equal
 
@@ -21,6 +23,16 @@ class NestedData:
     values: list[int]
     points: tuple[float, float, float]
     matrix: np.ndarray[Any, np.dtype[np.float64]]
+
+    def __eq__(self, other: Any) -> bool:
+        if not isinstance(other, NestedData):
+            return False
+        return (
+            self.simple == other.simple
+            and self.values == other.values
+            and self.points == other.points
+            and np.array_equal(self.matrix, other.matrix)
+        )
 
 
 def test_primitive_serialization() -> None:
@@ -97,7 +109,7 @@ def test_invalid_type() -> None:
         serializer.to_columns([NonDataclass()])
 
 
-def test_file_io(tmp_path: Path) -> None:
+def test_file_io(tmp_path: pathlib.Path) -> None:
     """Test to_file and from_file methods."""
     # Create test data and serialize to columns
     data = [SimpleData(x=1, y=2.0, name="test"), SimpleData(x=3, y=4.0, name="test2")]
@@ -117,7 +129,7 @@ def test_file_io(tmp_path: Path) -> None:
         np.testing.assert_array_equal(columns[key], loaded_columns[key])
 
 
-def test_file_io_with_empty_columns(tmp_path: Path) -> None:
+def test_file_io_with_empty_columns(tmp_path: pathlib.Path) -> None:
     """Test handling of empty columns during file I/O."""
     serializer = ArchiveSerializer(SimpleData)
     empty_columns: dict[str, np.ndarray[Any, Any]] = {}
@@ -135,7 +147,7 @@ def test_simple_save_and_load_archive() -> None:
     data = [SimpleData(x=1, y=2.0, name="test"), SimpleData(x=3, y=4.0, name="test2")]
     serializer = ArchiveSerializer(SimpleData)
     serializer.save(data, "test.npz")
-    loaded_data = serializer.load("test.npz")
+    loaded_data = serializer.load_sequence("test.npz")
     assert len(loaded_data) == len(data)
     assert all(isinstance(item, SimpleData) for item in loaded_data)
     assert all(
@@ -147,7 +159,7 @@ def test_list_save_and_load_archive() -> None:
     data = [[10, 20, 30], [40, 50, 60, 70]]
     serializer = ArchiveSerializer(list[int])
     serializer.save(data, "test.npz")
-    loaded_data = serializer.load("test.npz")
+    loaded_data = serializer.load_sequence("test.npz")
     assert len(loaded_data) == len(data)
     assert data == loaded_data
 
@@ -156,7 +168,7 @@ def test_nested_list_save_and_load_archive() -> None:
     data = [[[10], [20, 30]], [[40], [50], [60, 70, 80]]]
     serializer = ArchiveSerializer(list[list[int]])
     serializer.save(data, "test.npz")
-    loaded_data = serializer.load("test.npz")
+    loaded_data = serializer.load_sequence("test.npz")
     assert len(loaded_data) == len(data)
     assert data == loaded_data
 
@@ -165,7 +177,7 @@ def test_tuple_save_and_load_archive() -> None:
     data = [(1, [2, 3], "a"), (4, [5, 6, 7], "b")]
     serializer = ArchiveSerializer(tuple[int, list[int], str])
     serializer.save(data, "test.npz")
-    loaded_data = serializer.load("test.npz")
+    loaded_data = serializer.load_sequence("test.npz")
     assert len(loaded_data) == len(data)
     assert data == loaded_data
 
@@ -187,6 +199,51 @@ def test_nested_data_save_and_load_archive() -> None:
     ]
     serializer = ArchiveSerializer(NestedData)
     serializer.save(data, "test.npz")
-    loaded_data = serializer.load("test.npz")
+    loaded_data = serializer.load_sequence("test.npz")
     assert len(loaded_data) == len(data)
     assert_equal(data, loaded_data)
+
+
+def test_mmap_archive_context_manager(tmp_path: pathlib.Path) -> None:
+    """Test MMappedArchive context manager behavior."""
+    # Create test data and save to file
+    data = [SimpleData(x=1, y=2.0, name="test"), SimpleData(x=3, y=4.0, name="test2")]
+    serializer = ArchiveSerializer(SimpleData)
+    file_path = tmp_path / "test_mmap.npz"
+    serializer.save(data, file_path)
+
+    # Test context manager
+    with serializer.load_mmap(file_path) as archive:
+        # assert len(archive) == len(data)
+        # Note: __getitem__ is not implemented yet, so we can't check contents
+        assert data[0] == archive[0]
+
+
+def test_mmap_archive_multiple_opens(tmp_path: pathlib.Path) -> None:
+    """Test MMappedArchive can be opened multiple times."""
+    data = [SimpleData(x=1, y=2.0, name="test"), SimpleData(x=3, y=4.0, name="test2")]
+    serializer = ArchiveSerializer(SimpleData)
+    file_path = tmp_path / "test_mmap.npz"
+    serializer.save(data, file_path)
+
+    # Open archive multiple times
+    with serializer.load_mmap(file_path) as archive1, serializer.load_mmap(file_path) as archive2:
+        # We can access the '.x' column while file files are open.
+        assert archive1._data[".x"] is not None
+        assert archive2._data[".x"] is not None
+        assert len(archive1) == len(archive2)
+
+    # Verify files are closed by checking we can't access data anymore
+    with pytest.raises(AttributeError):
+        _ = archive1._data[".x"]
+    with pytest.raises(AttributeError):
+        _ = archive2._data[".x"]
+
+
+def test_mmap_archive_file_not_found(tmp_path: pathlib.Path) -> None:
+    """Test MMappedArchive handles missing files."""
+    serializer = ArchiveSerializer(SimpleData)
+    file_path = tmp_path / "nonexistent.npz"
+
+    with pytest.raises(FileNotFoundError):
+        serializer.load_mmap(file_path)

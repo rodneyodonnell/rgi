@@ -1,8 +1,9 @@
 import abc
+import contextlib
 import dataclasses
 import typing
 import types
-
+import pathlib
 from typing import Any, Sequence, cast
 from types import GenericAlias
 
@@ -61,6 +62,52 @@ class ListBasedArchive(AppendableArchive[T]):
         return f"ListBasedArchive(item_type={self._item_type}, len={len(self)}, items[:1]={self._items[:1]})"
 
 
+class MMappedArchive(Archive[T]):
+    """Read-only archive storing items in a mmaped numpy file."""
+
+    def __init__(self, file: FileOrPath, item_type: type[T], allow_pickle: bool = True):
+        """Initialize archive from file.
+
+        Args:
+            file: File to load archive from
+            item_type: Type of items stored in archive
+        """
+        self._file = file
+        self._item_type = item_type
+        self._data = np.load(file, mmap_mode="r", allow_pickle=allow_pickle)
+
+    def __enter__(self) -> "MMappedArchive[T]":
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: types.TracebackType | None,
+    ) -> None:
+        self._data.close()
+
+    @typing.override
+    def __len__(self) -> int:
+        return len(self._data)
+
+    @typing.overload
+    def __getitem__(self, idx: int) -> T: ...
+
+    @typing.overload
+    def __getitem__(self, idx: slice) -> Sequence[T]: ...
+
+    @typing.override
+    def __getitem__(self, idx: int | slice) -> T | Sequence[T]:
+
+        raise NotImplementedError("Cannot get item from mmaped archive")
+
+    @typing.override
+    def __iter__(self) -> typing.Iterator[T]:
+        for i in range(len(self)):
+            yield self[i]
+
+
 class ArchiveSerializer(typing.Generic[T]):
     def __init__(self, item_type: type[T] | types.GenericAlias):
         self._item_type = item_type
@@ -69,9 +116,12 @@ class ArchiveSerializer(typing.Generic[T]):
         columns = self.to_columns(items)
         return self.to_file(columns, file)
 
-    def load(self, file: FileOrPath) -> Sequence[T]:
+    def load_sequence(self, file: FileOrPath) -> Sequence[T]:
         columns = np.load(file)
         return self.from_columns(columns)
+
+    def load_mmap(self, path: pathlib.Path) -> MMappedArchive[T]:
+        return MMappedArchive(path, self._item_type)
 
     def to_columns(self, items: Sequence[T]) -> ArchiveColumns:
         return self._to_columns("", self._item_type, items)
@@ -247,14 +297,6 @@ class ArchiveSerializer(typing.Generic[T]):
             ret.append(np.reshape(flat_values[start:end], shape))
             start = end
         return ret
-
-    # def _to_ndarray_columns(self, field_path: str, items: Sequence[np.ndarray[Any, Any]]) -> ArchiveColumns:
-    #     flat_values = np.concatenate([arr.flatten() for arr in items])
-    #     shapes = [arr.shape for arr in items]
-
-    #     values_dict = {f"{field_path}.*": flat_values}
-    #     shape_dict = self._to_columns(f"{field_path}.#", tuple[int, ...], shapes)
-    #     return values_dict | shape_dict
 
 
 # class MMappedArchive(Archive[T]):
