@@ -1,5 +1,4 @@
 import abc
-import contextlib
 import dataclasses
 import typing
 import types
@@ -18,6 +17,7 @@ _U = typing.TypeVar("_U")
 
 ArchiveColumn = np.ndarray[Any, np.dtype[Any]]
 ArchiveColumns = dict[str, ArchiveColumn]
+ArchiveMemmap = np.memmap[Any, Any]
 
 
 class Archive(Sequence[T], abc.ABC):
@@ -65,16 +65,19 @@ class ListBasedArchive(AppendableArchive[T]):
 class MMappedArchive(Archive[T]):
     """Read-only archive storing items in a mmaped numpy file."""
 
-    def __init__(self, file: FileOrPath, item_type: type[T], allow_pickle: bool = True):
+    def __init__(
+        self, file: FileOrPath, item_type: type[T], serializer: "ArchiveSerializer[T]", allow_pickle: bool = True
+    ):
         """Initialize archive from file.
 
         Args:
             file: File to load archive from
             item_type: Type of items stored in archive
         """
-        self._file = file
-        self._item_type = item_type
-        self._data = np.load(file, mmap_mode="r", allow_pickle=allow_pickle)
+        self._file: FileOrPath = file
+        self._item_type: type[T] = item_type
+        self._serializer: ArchiveSerializer[T] = serializer
+        self._data: np.memmap[Any, Any] = np.load(file, mmap_mode="r", allow_pickle=allow_pickle)
 
     def __enter__(self) -> "MMappedArchive[T]":
         return self
@@ -99,8 +102,9 @@ class MMappedArchive(Archive[T]):
 
     @typing.override
     def __getitem__(self, idx: int | slice) -> T | Sequence[T]:
-
-        raise NotImplementedError("Cannot get item from mmaped archive")
+        if isinstance(idx, slice):
+            raise NotImplementedError("Cannot get slice from mmaped archive")
+        return self._serializer._get_item("", self._item_type, idx, self._data)
 
     @typing.override
     def __iter__(self) -> typing.Iterator[T]:
@@ -120,8 +124,8 @@ class ArchiveSerializer(typing.Generic[T]):
         columns = np.load(file)
         return self.from_columns(columns)
 
-    def load_mmap(self, path: pathlib.Path) -> MMappedArchive[T]:
-        return MMappedArchive(path, self._item_type)
+    def load_mmap(self, path: FileOrPath) -> MMappedArchive[T]:
+        return MMappedArchive(path, self._item_type, self)
 
     def to_columns(self, items: Sequence[T]) -> ArchiveColumns:
         return self._to_columns("", self._item_type, items)
@@ -196,9 +200,9 @@ class ArchiveSerializer(typing.Generic[T]):
         self, field_path: str, item_type: type[_U], items: Sequence[Sequence[_U]]
     ) -> ArchiveColumns:
         unrolled_items = [item for item_list in items for item in item_list]
-        unrolled_lengths = [len(item_list) for item_list in items]
+        length_cumsum = np.cumsum([0] + [len(item_list) for item_list in items])
         values_dict = self._to_columns(f"{field_path}.*", item_type, unrolled_items)
-        length_dict = self._to_columns(f"{field_path}.#", int, unrolled_lengths)
+        length_dict = self._to_columns(f"{field_path}.#", int, length_cumsum)
         return values_dict | length_dict
 
     def _to_generic_tuple_columns(
@@ -259,15 +263,11 @@ class ArchiveSerializer(typing.Generic[T]):
         self, field_path: str, item_type: type[_U], columns: ArchiveColumns
     ) -> Sequence[Sequence[_U]]:
         unrolled_items = self._from_columns(f"{field_path}.*", item_type, columns)
-        unrolled_lengths = columns[f"{field_path}.#"]
-        assert sum(unrolled_lengths) == len(unrolled_items)
+        length_cumsum = columns[f"{field_path}.#"]
 
         ret: list[Sequence[_U]] = []
-        start = 0
-        for length in unrolled_lengths:
-            end = start + length
+        for start, end in zip(length_cumsum[:-1], length_cumsum[1:]):
             ret.append(unrolled_items[start:end])
-            start = end
         return ret
 
     def _from_generic_tuple_columns(
@@ -297,6 +297,98 @@ class ArchiveSerializer(typing.Generic[T]):
             ret.append(np.reshape(flat_values[start:end], shape))
             start = end
         return ret
+
+    def _get_item(
+        self, field_path: str, item_type: type[T], idx: int, data: ArchiveMemmap, allow_slow: bool = False
+    ) -> T:
+        if is_primitive_type(item_type):
+            return item_type(data[field_path][idx])  # type: ignore
+
+        if allow_slow:
+            print("WARNING: Falling back to slow lookup for {fielf_path} with fype {item_type}")
+            sequence = self._from_columns(field_path, item_type, data)  # type: ignore
+            return sequence[idx]
+
+        raise NotImplementedError(f"Cannot deserialize columns for field `{field_path}` with type {item_type}")
+
+    # def _from_columns(
+    #     self, field_path: str, item_type: type[_U] | GenericAlias, columns: ArchiveColumns
+    # ) -> Sequence[_U]:
+    #     if is_primitive_type(item_type):
+    #         return cast(Sequence[_U], self._from_primitive_columns(field_path, item_type, columns))
+    #     if is_dataclass_type(item_type):
+    #         return cast(Sequence[_U], self._from_dataclass_columns(field_path, item_type, columns))
+    #     if item_type is np.ndarray:
+    #         return cast(Sequence[_U], self._from_ndarray_columns(field_path, columns))
+    #     if (base_type := typing.get_origin(item_type)) is not None:
+    #         base_type_args = typing.get_args(item_type)
+    #         if base_type is list:
+    #             return cast(Sequence[_U], self._from_generic_list_columns(field_path, base_type_args[0], columns))
+    #         if base_type is tuple:
+    #             return cast(Sequence[_U], self._from_generic_tuple_columns(field_path, base_type_args, columns))
+    #         if base_type is np.ndarray:
+    #             return cast(Sequence[_U], self._from_ndarray_columns(field_path, columns))
+
+    #     raise NotImplementedError(f"Cannot deserialize columns for field `{field_path}` with type {item_type}")
+
+    # def _from_primitive_columns(
+    #     self, field_path: str, item_type: type[PrimitiveType], columns: ArchiveColumns
+    # ) -> Sequence[PrimitiveType]:
+    #     return cast(Sequence[PrimitiveType], [item_type(item) for item in columns[field_path]])
+
+    # def _from_dataclass_columns(
+    #     self, field_path: str, item_type: type[DataclassProtocol], columns: ArchiveColumns
+    # ) -> Sequence[DataclassProtocol]:
+    #     deserialized_fields: list[Any] = []
+    #     for field in dataclasses.fields(item_type):
+    #         field_type = field.type
+    #         assert isinstance(field_type, (type, GenericAlias))
+
+    #         field_key = f"{field_path}.{field.name}"
+    #         field_items = self._from_columns(field_key, field_type, columns)
+    #         deserialized_fields.append(field_items)
+
+    #     items = [item_type(*fields) for fields in zip(*deserialized_fields)]
+    #     return cast(Sequence[DataclassProtocol], items)
+
+    # def _from_generic_list_columns(
+    #     self, field_path: str, item_type: type[_U], columns: ArchiveColumns
+    # ) -> Sequence[Sequence[_U]]:
+    #     unrolled_items = self._from_columns(f"{field_path}.*", item_type, columns)
+    #     cumsum = columns[f"{field_path}.#"]
+    #
+    #     ret: list[Sequence[_U]] = []
+    #     for start, end in zip(cumsum[:-1], cumsum[1:]):
+    #         ret.append(unrolled_items[start:end])
+    #     return ret
+
+    # def _from_generic_tuple_columns(
+    #     self, field_path: str, base_type_args: tuple[type, ...], columns: ArchiveColumns
+    # ) -> Sequence[tuple[_U]]:
+    #     if base_type_args[-1] is Ellipsis:  # type: ignore
+    #         return self._from_generic_list_columns(field_path, base_type_args[0], columns)  # type: ignore
+
+    #     deserialized_fields: list[Any] = []
+    #     for i, t in enumerate(base_type_args):
+    #         tuple_field_path = f"{field_path}.{i}"
+    #         tuple_field_items = self._from_columns(tuple_field_path, t, columns)  # type: ignore
+    #         deserialized_fields.append(tuple_field_items)
+
+    #     items = [tuple(fields) for fields in zip(*deserialized_fields)]
+    #     return items  # type: ignore
+
+    # def _from_ndarray_columns(self, field_path: str, columns: ArchiveColumns) -> Sequence[np.ndarray[Any, Any]]:
+    #     flat_values = columns[f"{field_path}.*"]
+    #     shapes = self._from_columns(f"{field_path}.#", tuple[int, ...], columns)
+
+    #     start = 0
+    #     ret: list[np.ndarray[Any, Any]] = []
+    #     for shape in shapes:
+    #         size = np.prod(shape)
+    #         end = start + size
+    #         ret.append(np.reshape(flat_values[start:end], shape))
+    #         start = end
+    #     return ret
 
 
 # class MMappedArchive(Archive[T]):

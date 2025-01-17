@@ -3,7 +3,6 @@ from dataclasses import dataclass
 from typing import Any
 import numpy as np
 import pytest
-import contextlib
 
 from numpy.testing import assert_equal
 
@@ -42,6 +41,18 @@ def test_primitive_serialization() -> None:
     np.testing.assert_array_equal(result[""], np.array([1, 2, 3]))
 
 
+def test_list_serialization() -> None:
+    serializer = ArchiveSerializer(list[int])
+    original = [[1, 2], [3, 4, 5]]
+    serialized = serializer.to_columns(original)
+
+    np.testing.assert_array_equal(serialized[".*"], np.array([1, 2, 3, 4, 5]))
+    np.testing.assert_array_equal(serialized[".#"], np.array([0, 2, 5]))
+
+    deserialized = serializer.from_columns(serialized)
+    assert deserialized == original
+
+
 def test_dataclass_serialization() -> None:
     data = [SimpleData(x=1, y=2.0, name="test"), SimpleData(x=3, y=4.0, name="test2")]
     serializer = ArchiveSerializer(SimpleData)
@@ -53,7 +64,7 @@ def test_dataclass_serialization() -> None:
 
 
 def test_nested_dataclass_serialization() -> None:
-    data = [
+    original = [
         NestedData(
             simple=SimpleData(x=1, y=2.0, name="test"),
             values=[1, 2, 3],
@@ -62,23 +73,18 @@ def test_nested_dataclass_serialization() -> None:
         )
     ]
     serializer = ArchiveSerializer(NestedData)
-    result = serializer.to_columns(data)
+    serialized = serializer.to_columns(original)
 
-    np.testing.assert_array_equal(result[".simple.x"], np.array([1]))
-    np.testing.assert_array_equal(result[".values.*"], np.array([1, 2, 3]))
-    np.testing.assert_array_equal(result[".values.#"], np.array([3]))
-    np.testing.assert_array_equal(result[".points.0"], np.array([1.0]))
-    np.testing.assert_array_equal(result[".matrix.*"], np.array([1, 2, 3, 4]))
-    np.testing.assert_array_equal(result[".matrix.#.*"], np.array([2, 2]))
-    np.testing.assert_array_equal(result[".matrix.#.#"], np.array([2]))
+    np.testing.assert_array_equal(serialized[".simple.x"], np.array([1]))
+    np.testing.assert_array_equal(serialized[".values.*"], np.array([1, 2, 3]))
+    np.testing.assert_array_equal(serialized[".values.#"], np.array([0, 3]))
+    np.testing.assert_array_equal(serialized[".points.0"], np.array([1.0]))
+    np.testing.assert_array_equal(serialized[".matrix.*"], np.array([1, 2, 3, 4]))
+    np.testing.assert_array_equal(serialized[".matrix.#.*"], np.array([2, 2]))
+    np.testing.assert_array_equal(serialized[".matrix.#.#"], np.array([0, 2]))
 
-
-def test_list_serialization() -> None:
-    serializer = ArchiveSerializer(list[int])
-    result = serializer.to_columns([[1, 2], [3, 4, 5]])
-
-    np.testing.assert_array_equal(result[".*"], np.array([1, 2, 3, 4, 5]))
-    np.testing.assert_array_equal(result[".#"], np.array([2, 3]))
+    deserialized = serializer.from_columns(serialized)
+    assert deserialized == original
 
 
 def test_tuple_serialization() -> None:
@@ -92,12 +98,15 @@ def test_tuple_serialization() -> None:
 
 def test_ndarray_serialization() -> None:
     serializer = ArchiveSerializer(np.ndarray)
-    data = [np.array([[1, 2], [3, 4]]), np.array([[5, 6], [7, 8]])]
-    result = serializer.to_columns(data)
+    original = [np.array([[1, 2], [3, 4]]), np.array([[5, 6], [7, 8]])]
+    serialized = serializer.to_columns(original)
 
-    np.testing.assert_array_equal(result[".*"], np.array([1, 2, 3, 4, 5, 6, 7, 8]))
-    np.testing.assert_array_equal(result[".#.*"], np.array([2, 2, 2, 2]))
-    np.testing.assert_array_equal(result[".#.#"], np.array([2, 2]))
+    np.testing.assert_array_equal(serialized[".*"], np.array([1, 2, 3, 4, 5, 6, 7, 8]))
+    np.testing.assert_array_equal(serialized[".#.*"], np.array([2, 2, 2, 2]))
+    np.testing.assert_array_equal(serialized[".#.#"], np.array([0, 2, 4]))
+
+    deserialized = serializer.from_columns(serialized)
+    np.testing.assert_array_equal(deserialized, original)
 
 
 def test_invalid_type() -> None:
@@ -216,7 +225,8 @@ def test_mmap_archive_context_manager(tmp_path: pathlib.Path) -> None:
     with serializer.load_mmap(file_path) as archive:
         # assert len(archive) == len(data)
         # Note: __getitem__ is not implemented yet, so we can't check contents
-        assert data[0] == archive[0]
+        item = serializer._get_item("", SimpleData, 0, archive._data)
+        assert item == data[0]
 
 
 def test_mmap_archive_multiple_opens(tmp_path: pathlib.Path) -> None:
@@ -238,6 +248,15 @@ def test_mmap_archive_multiple_opens(tmp_path: pathlib.Path) -> None:
         _ = archive1._data[".x"]
     with pytest.raises(AttributeError):
         _ = archive2._data[".x"]
+
+
+def test_mmap_primitive_type() -> None:
+    serializer = ArchiveSerializer(int)
+    original = [10, 20, 30]
+    serializer.save(original, "test.npz")
+    with serializer.load_mmap("test.npz") as archive:
+        for idx, item in enumerate(original):
+            assert archive[idx] == item
 
 
 def test_mmap_archive_file_not_found(tmp_path: pathlib.Path) -> None:
