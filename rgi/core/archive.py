@@ -302,7 +302,16 @@ class ArchiveSerializer(typing.Generic[T]):
         self, field_path: str, item_type: type[T], idx: int, data: ArchiveMemmap, allow_slow: bool = False
     ) -> T:
         if is_primitive_type(item_type):
-            return item_type(data[field_path][idx])  # type: ignore
+            return self._get_primitive_item(field_path, item_type, idx, data)  # type: ignore
+
+        if (base_type := typing.get_origin(item_type)) is not None:
+            base_type_args = typing.get_args(item_type)
+            if base_type is list:
+                return self._get_generic_list_item(field_path, base_type_args[0], columns)
+            # if base_type is tuple:
+            #     return cast(Sequence[_U], self._from_generic_tuple_columns(field_path, base_type_args, columns))
+            # if base_type is np.ndarray:
+            #     return cast(Sequence[_U], self._from_ndarray_columns(field_path, columns))
 
         if allow_slow:
             print("WARNING: Falling back to slow lookup for {fielf_path} with fype {item_type}")
@@ -310,6 +319,30 @@ class ArchiveSerializer(typing.Generic[T]):
             return sequence[idx]
 
         raise NotImplementedError(f"Cannot deserialize columns for field `{field_path}` with type {item_type}")
+
+    def _get_primitive_item(
+        self, field_path: str, item_type: type[PrimitiveType], idx: int, data: ArchiveMemmap
+    ) -> PrimitiveType:
+        return item_type(data[field_path][idx])  # type: ignore
+
+    def _get_generic_list_item(
+        self, field_path: str, item_type: type[_U], idx: int, data: ArchiveMemmap
+    ) -> Sequence[_U]:
+        unrolled_items = data[f"{field_path}.*"]
+        length_cumsum = data[f"{field_path}.#"]
+
+        return data[field_path][idx]
+
+    # def _from_generic_list_columns(
+    #     self, field_path: str, item_type: type[_U], columns: ArchiveColumns
+    # ) -> Sequence[Sequence[_U]]:
+    #     unrolled_items = self._from_columns(f"{field_path}.*", item_type, columns)
+    #     cumsum = columns[f"{field_path}.#"]
+    #
+    #     ret: list[Sequence[_U]] = []
+    #     for start, end in zip(cumsum[:-1], cumsum[1:]):
+    #         ret.append(unrolled_items[start:end])
+    #     return ret
 
     # def _from_columns(
     #     self, field_path: str, item_type: type[_U] | GenericAlias, columns: ArchiveColumns

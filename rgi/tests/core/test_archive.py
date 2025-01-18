@@ -259,6 +259,15 @@ def test_mmap_primitive_type() -> None:
             assert archive[idx] == item
 
 
+def test_mmap_primitive_list_type() -> None:
+    serializer = ArchiveSerializer(list[int])
+    original = [[10, 20], [30, 40, 50]]
+    serializer.save(original, "test.npz")
+    with serializer.load_mmap("test.npz") as archive:
+        for idx, item in enumerate(original):
+            assert archive[idx] == item
+
+
 def test_mmap_archive_file_not_found(tmp_path: pathlib.Path) -> None:
     """Test MMappedArchive handles missing files."""
     serializer = ArchiveSerializer(SimpleData)
