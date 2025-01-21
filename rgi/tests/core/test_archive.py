@@ -214,7 +214,7 @@ def test_nested_data_save_and_load_archive() -> None:
 
 
 def test_mmap_archive_context_manager(tmp_path: pathlib.Path) -> None:
-    """Test MMappedArchive context manager behavior."""
+    """Test MMapColumnArchive context manager behavior."""
     # Create test data and save to file
     data = [SimpleData(x=1, y=2.0, name="test"), SimpleData(x=3, y=4.0, name="test2")]
     serializer = ArchiveSerializer(SimpleData)
@@ -223,14 +223,12 @@ def test_mmap_archive_context_manager(tmp_path: pathlib.Path) -> None:
 
     # Test context manager
     with serializer.load_mmap(file_path) as archive:
-        # assert len(archive) == len(data)
-        # Note: __getitem__ is not implemented yet, so we can't check contents
         item = serializer._get_item("", SimpleData, 0, archive._data)
         assert item == data[0]
 
 
 def test_mmap_archive_multiple_opens(tmp_path: pathlib.Path) -> None:
-    """Test MMappedArchive can be opened multiple times."""
+    """Test MMapColumnArchive can be opened multiple times."""
     data = [SimpleData(x=1, y=2.0, name="test"), SimpleData(x=3, y=4.0, name="test2")]
     serializer = ArchiveSerializer(SimpleData)
     file_path = tmp_path / "test_mmap.npz"
@@ -269,7 +267,7 @@ def test_mmap_primitive_list_type() -> None:
 
 
 def test_mmap_archive_file_not_found(tmp_path: pathlib.Path) -> None:
-    """Test MMappedArchive handles missing files."""
+    """Test MMapColumnArchive handles missing files."""
     serializer = ArchiveSerializer(SimpleData)
     file_path = tmp_path / "nonexistent.npz"
 
