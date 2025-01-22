@@ -356,7 +356,7 @@ class ColumnToSequenceConverter:
         return ret
 
 
-class ColumnArchiver:
+class ColumnFileArchiver:
     """Class for readining/writing sequences/columns to disk."""
 
     MAGIC = b"RGF"  # 3-byte magic string
@@ -415,9 +415,12 @@ class ColumnArchiver:
         self, item_type: type[T] | types.GenericAlias, path: pathlib.Path | str
     ) -> Sequence[T]:
         """Read sequence of items from file."""
-        columns, sequence_length = self.read_columns(path)
+        column_dict, sequence_length = self.read_columns(path)
         return self._columns_to_sequence_converter.from_columns(
-            "", item_type, columns, slice(0, sequence_length)
+            "",
+            item_type,
+            column_dict,
+            slice(0, sequence_length),
         )
 
     def read_columns(self, path: pathlib.Path | str) -> tuple[ArchiveColumnDict, int]:
@@ -426,28 +429,24 @@ class ColumnArchiver:
         with open(f"{path}.index", "x", encoding="utf-8") as f:
             metadata_dict = json.load(f)
 
-        archive_column_dict = {}
+        # Validate header.
         with open(path, "rb") as f:
             header = f.read(4)  # first 4 bytes
-            magic_part, version_part = header[:3], header[3:]
-            assert magic_part == self.MAGIC and version_part == self.VERSION
+            assert header[:3] == self.MAGIC and header[3:] == self.VERSION
 
-            for column_metadata in metadata_dict["column"]:
-                name = column_metadata["name"]
-                dtype_str = column_metadata["dtype"]
-                shape = tuple(column_metadata["shape"])
-                offset = column_metadata["offset"]
-
-                dtype = np.dtype(dtype_str)
-                mm = np.memmap(
-                    path,
-                    mode="r",  # read-only
-                    offset=offset,
-                    shape=shape,
-                    dtype=dtype,
-                    order="C",
-                )
-                archive_column_dict[name] = mm
+        # MMap columns.
+        archive_column_dict = {}
+        for column_metadata in metadata_dict["column"]:
+            # Note: mm objects have no close() method, so we just rely on GC to close the file.
+            mm = np.memmap(
+                path,
+                mode="r",  # read-only
+                offset=column_metadata["offset"],
+                shape=tuple(column_metadata["shape"]),
+                dtype=np.dtype(column_metadata["dtype"]),
+                order="C",
+            )
+            archive_column_dict[column_metadata["name"]] = mm
 
         return archive_column_dict, metadata_dict["sequence_length"]
 
@@ -455,55 +454,41 @@ class ColumnArchiver:
 class MMapColumnArchive(Archive[T]):
     """Read-only archive storing items in a mmaped numpy file."""
 
-    def __init__(
-        self,
-        file: FileOrPath,
-        item_type: type[T] | GenericAlias,
-        allow_pickle: bool = True,
-    ):
+    def __init__(self, path: pathlib.Path | str, item_type: type[T] | GenericAlias):
         """Initialize archive from file.
 
         Args:
             file: File to load archive from
             item_type: Type of items stored in archive
         """
-        self._file: FileOrPath = file
-        self._item_type: type[T] | GenericAlias = item_type
-        # self._archiver: ColumnArchiver = ColumnArchiver()
-        self._mmap_data: np.memmap[Any, Any] = np.load(
-            file, mmap_mode="r", allow_pickle=allow_pickle
-        )
+        self._item_type = item_type
 
-    def __enter__(self) -> "MMapColumnArchive[T]":
-        return self
+        archiver = ColumnFileArchiver()
+        column_dict, sequence_length = archiver.read_columns(path)
+        self._column_to_sequence_converter = ColumnToSequenceConverter()
 
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_value: BaseException | None,
-        traceback: types.TracebackType | None,
-    ) -> None:
-        self._mmap_data.close()  # type: ignore
+        self._column_dict = column_dict
+        self._sequence_length = sequence_length
 
     @typing.override
     def __len__(self) -> int:
-        return len(self._data)
+        return self._sequence_length
 
-    # overloads to make mypy happy. Actual implemenation in @override method.
-    @typing.overload
-    def __getitem__(self, idx: int) -> T: ...
+    def _get_slice(self, idx: slice) -> Sequence[T]:
+        return self._column_to_sequence_converter.from_columns(
+            "", self._item_type, self._column_dict, idx
+        )
 
-    @typing.overload
-    def __getitem__(self, idx: slice) -> Sequence[T]: ...
-
-    @typing.override
     def __getitem__(self, idx: int | slice) -> T | Sequence[T]:
-        return self._archiver._get_item("", self._item_type, idx, self._data)
+        if isinstance(idx, slice):
+            return self._get_slice(idx)
+        # get single item
+        return self._get_slice(slice(idx, idx + 1))[0]
 
     @typing.override
     def __iter__(self) -> typing.Iterator[T]:
         for i in range(len(self)):
-            yield self[i]
+            yield self[i]  # type: ignore
 
 
 class MMapRowArchive(Archive[T]):
