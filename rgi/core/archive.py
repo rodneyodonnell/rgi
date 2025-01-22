@@ -4,6 +4,7 @@ import abc
 import dataclasses
 import json
 import os
+import pickle
 import typing
 import types
 import pathlib
@@ -357,7 +358,7 @@ class ColumnToSequenceConverter:
 
 
 class ColumnFileArchiver:
-    """Class for readining/writing sequences/columns to disk."""
+    """Class for readining/writing sequences/columns to disk in column based format."""
 
     MAGIC = b"RGF"  # 3-byte magic string
     VERSION = b"\x01"  # 1-byte version
@@ -494,167 +495,120 @@ class MMapColumnArchive(Archive[T]):
 class MMapRowArchive(Archive[T]):
     """Archive for reading items from a mmaped numpy file."""
 
-    def __init__(
-        self, path: pathlib.Path | str, item_type: type[T] | types.GenericAlias
-    ):
-        self._path = path
+    def __init__(self, path: pathlib.Path | str, item_type: type[T] | GenericAlias):
         self._item_type = item_type
-        self._archiver = ColumnArchiver(item_type)
-        self._data: np.memmap[Any, Any] | None = self._archiver.read_columns(path)
 
-    def __enter__(self) -> "MMapColumnArchive[T]":
-        return self
+        # 1) Load the offsets array
+        self._offsets = np.load(f"{path}.index")  # shape = (count+1,)
+        self._sequence_length = len(self._offsets) - 1
 
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_value: BaseException | None,
-        traceback: types.TracebackType | None,
-    ) -> None:
-        self._data.close()  # type: ignore
+        # 2) Memory-map the data file
+        self._data = np.memmap(path, mode="r")
 
-    #     return self.from_columns(columns, slice_)
+        self._lookup_fn, self._sequence_length = RowFileArchiver().get_lookup_fn(path)
 
-    # def load_mmap(self, path: FileOrPath) -> MMapColumnArchive[T]:
-    #     """Load sequence of items from file in MMapColumnArchive format."""
-    #     return MMapColumnArchive(path, self._item_type, self)
+    def __len__(self) -> int:
+        return self._sequence_length
 
-    # def _encode_sequence_metadata(self, items: Sequence[T]) -> ArchiveColumns:
-    #     metadata = ColumnArchiveMetadata(len=len(items))
-    #     return self._to_columns("/", ColumnArchiveMetadata, [metadata])
+    def _get_item(self, idx: int) -> T:
+        start = self._offsets[idx]
+        end = self._offsets[idx + 1]
+        return pickle.loads(self._data[start:end].tobytes())
 
-    # def _decode_sequence_metadata(
-    #     self, columns: ArchiveColumns
-    # ) -> ColumnArchiveMetadata:
-    #     [metadata] = self._from_columns(
-    #         "/", ColumnArchiveMetadata, columns, slice(0, 1)
-    #     )
-    #     return metadata
+    def _get_slice(self, idx: slice) -> Sequence[T]:
+        return [self._get_item(i) for i in range(idx.start, idx.stop)]
 
-    # def to_columns(self, items: Sequence[T]) -> ArchiveColumns:
-    #     metadata = self._encode_sequence_metadata(items)
-    #     columns = self._to_columns("", self._item_type, items)
-    #     return columns | metadata
+    def __iter__(self) -> Iterator[T]:
+        for i in range(len(self)):
+            yield self._get_item(i)
 
-    # def from_columns(
-    #     self, columns: ArchiveColumns, slice_: slice | None = None
-    # ) -> Sequence[T]:
-    #     metadata = self._decode_sequence_metadata(columns)
-    #     slice_ = slice_ or slice(0, metadata.len, None)
-    #     return self._from_columns("", self._item_type, columns, slice_)
-
-    # def to_file(self, columns: ArchiveColumns, file: FileOrPath) -> None:
-    #     # np.savez_compressed(file, **columns)
-    #     np.savez(file, **columns)
-
-    # def from_file(self, file: FileOrPath) -> ArchiveColumns:
-    #     columns: ArchiveColumns = np.load(file)
-    #     return columns
-
-    # def _get_item(
-    #     self,
-    #     field_path: str,
-    #     item_type: type[T] | GenericAlias,
-    #     idx: int,
-    #     data: ArchiveMemmap,
-    #     allow_slow: bool = False,
-    # ) -> T:
-    #     if is_primitive_type(item_type):
-    #         return self._get_primitive_item(field_path, item_type, idx, data)  # type: ignore
-
-    #     if (base_type := typing.get_origin(item_type)) is not None:
-    #         base_type_args = typing.get_args(item_type)
-    #         if base_type is list:
-    #             return self._get_generic_list_item(
-    #                 field_path, base_type_args[0], columns
-    #             )
-    #         # if base_type is tuple:
-    #         #     return cast(Sequence[_U], self._from_generic_tuple_columns(field_path, base_type_args, columns))
-    #         # if base_type is np.ndarray:
-    #         #     return cast(Sequence[_U], self._from_ndarray_columns(field_path, columns))
-
-    #     if allow_slow:
-    #         print(
-    #             "WARNING: Falling back to slow lookup for {fielf_path} with fype {item_type}"
-    #         )
-    #         sequence = self._from_columns(field_path, item_type, data)  # type: ignore
-    #         return sequence[idx]
-
-    #     raise NotImplementedError(
-    #         f"Cannot deserialize columns for field `{field_path}` with type {item_type}"
-    #     )
-
-    # def _get_primitive_item(
-    #     self,
-    #     field_path: str,
-    #     item_type: type[PrimitiveType],
-    #     idx: int,
-    #     data: ArchiveMemmap,
-    # ) -> PrimitiveType:
-    #     return item_type(data[field_path][idx])  # type: ignore
-
-    # def _get_generic_list_item(
-    #     self, field_path: str, item_type: type[_U], idx: int, data: ArchiveMemmap
-    # ) -> Sequence[_U]:
-    #     unrolled_items = data[f"{field_path}.*"]
-    #     length_cumsum = data[f"{field_path}.#"]
-
-    #     return data[field_path][idx]
+    def __getitem__(self, idx: int | slice) -> T | Sequence[T]:
+        if isinstance(idx, slice):
+            return self._get_slice(idx)
+        return self._get_item(idx)
 
 
-# @dataclasses.dataclass
-# class ColumnArchiveMetadata:
-#     """Metadata stored along with items in an archive."""
+class RowFileArchiver:
+    """Class for reading/writing sequences/rows to disk in row based format."""
 
-#     len: int
-#     # TODO: We don't support union types yet so this can't be serialized.
-#     # item_type: type | GenericAlias
+    def write_items(self, items: typing.Iterable[T], path: pathlib.Path | str) -> None:
+        """Save sequence of items to file in row format.
+
+        Write 'objects' to data_filename as raw pickled bytes (one after another).
+        Then write offsets into a .npy array (index_filename), where:
+        offsets[i] = byte offset in data_filename for the i-th object
+        offsets[-1] = final size of the data file
+        """
+
+        # 1) Write data
+        offsets = [0]
+        with open(path, "wb") as fdata:
+            for item in items:
+                payload = pickle.dumps(item, protocol=5)
+                fdata.write(payload)
+                offsets.append(fdata.tell())
+
+        # 2) Convert offsets to a NumPy array and save
+        #    We'll use uint64 for large file support
+        offsets_array = np.array(offsets, dtype=np.uint64)
+        np.save(f"{path}.index", offsets_array)
+
+    def read_items(
+        self, path: pathlib.Path | str, item_type: type[T] | GenericAlias
+    ) -> MMapRowArchive[T]:
+        """Read sequence of items from file in row format."""
+        return MMapRowArchive(path, item_type)
 
 
-# class CombinedArchive(Archive[T]):
-#     """Archive combining multiple archives into a single view."""
+class CombinedArchive(Archive[T]):
+    """Archive combining multiple archives into a single view."""
 
-#     def __init__(self, archives: list[Archive[T]]):
-#         """Initialize combined archive.
+    def __init__(self, archives: list[Archive[T]]):
+        """Initialize combined archive.
 
-#         Args:
-#             archives: List of archives to combine
-#         """
-#         self._archives = archives
-#         self._lengths = [len(archive) for archive in archives]
-#         self._cumsum = np.cumsum([0] + self._lengths)
+        Args:
+            archives: List of archives to combine
+        """
+        self._archives = archives
+        self._lengths = [len(archive) for archive in archives]
+        self._cumsum = np.cumsum([0] + self._lengths)
 
-#     def _locate(self, idx: int) -> tuple[Archive[T], int]:
-#         """Find archive and local index for global index.
+    def _locate(self, idx: int) -> tuple[Archive[T], int]:
+        """Find archive and local index for global index.
 
-#         Args:
-#             idx: Global index into combined archive
+        Args:
+            idx: Global index into combined archive
 
-#         Returns:
-#             Tuple of (archive, local_index)
+        Returns:
+            Tuple of (archive, local_index)
 
-#         Raises:
-#             IndexError: If index is out of range
-#         """
-#         if not 0 <= idx < len(self):
-#             raise IndexError(f"Index {idx} out of range for archive with {len(self)} trajectories")
+        Raises:
+            IndexError: If index is out of range
+        """
+        if not 0 <= idx < len(self):
+            raise IndexError(
+                f"Index {idx} out of range for archive with {len(self)} trajectories"
+            )
 
-#         archive_idx = np.searchsorted(self._cumsum[1:], idx, side="right")
-#         local_idx = idx - self._cumsum[archive_idx]
-#         return self._archives[archive_idx], local_idx
+        archive_idx = np.searchsorted(self._cumsum[1:], idx, side="right")
+        local_idx = idx - self._cumsum[archive_idx]
+        return self._archives[archive_idx], local_idx
 
-#     def __len__(self) -> int:
-#         return self._cumsum[-1]
+    def __len__(self) -> int:
+        return self._cumsum[-1]
 
-#     def __getitem__(self, idx: int) -> T:
-#         archive, local_idx = self._locate(idx)
-#         return archive[local_idx]
+    def _get_item(self, idx: int) -> T:
+        archive, local_idx = self._locate(idx)
+        return archive[local_idx]
 
-#     def __iter__(self) -> Iterator[T]:
-#         for archive in self._archives:
-#             yield from archive
+    def _get_slice(self, _slice: slice) -> Sequence[T]:
+        return [self._get_item(i) for i in range(*_slice.indices(len(self)))]
 
-#     def close(self) -> None:
-#         """Close all archives."""
-#         for archive in self._archives:
-#             archive.close()
+    def __getitem__(self, idx: int | slice) -> T | Sequence[T]:
+        if isinstance(idx, slice):
+            return self._get_slice(idx)
+        return self._get_item(idx)
+
+    def __iter__(self) -> Iterator[T]:
+        for archive in self._archives:
+            yield from archive
