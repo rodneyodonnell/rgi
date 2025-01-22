@@ -35,7 +35,7 @@ class NamedColumn:
     """Column of data in an archive."""
 
     name: str
-    data: np.ndarray[Any, np.dtype[Any]]
+    data: ArchiveColumn
 
 
 class Archive(Sequence[T], abc.ABC):
@@ -83,81 +83,17 @@ class ListBasedArchive(AppendableArchive[T]):
         return f"ListBasedArchive(item_type={self._item_type}, len={len(self)}, items[:1]={self._items[:1]})"  # pylint: disable=line-too-long
 
 
-class MMapColumnArchive(Archive[T]):
-    """Read-only archive storing items in a mmaped numpy file."""
-
-    def __init__(
-        self,
-        file: FileOrPath,
-        item_type: type[T] | GenericAlias,
-        archiver: "ColumnArchiver[T]",
-        allow_pickle: bool = True,
-    ):
-        """Initialize archive from file.
-
-        Args:
-            file: File to load archive from
-            item_type: Type of items stored in archive
-        """
-        self._file: FileOrPath = file
-        self._item_type: type[T] | GenericAlias = item_type
-        self._archiver: ColumnArchiver[T] = archiver
-        self._data: np.memmap[Any, Any] = np.load(
-            file, mmap_mode="r", allow_pickle=allow_pickle
-        )
-
-    def __enter__(self) -> "MMapColumnArchive[T]":
-        return self
-
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_value: BaseException | None,
-        traceback: types.TracebackType | None,
-    ) -> None:
-        self._data.close()  # type: ignore
-
-    @typing.override
-    def __len__(self) -> int:
-        return len(self._data)
-
-    # overloads to make mypy happy. Actual implemenation in @override method.
-    @typing.overload
-    def __getitem__(self, idx: int) -> T: ...
-
-    @typing.overload
-    def __getitem__(self, idx: slice) -> Sequence[T]: ...
-
-    @typing.override
-    def __getitem__(self, idx: int | slice) -> T | Sequence[T]:
-        return self._archiver._get_item("", self._item_type, idx, self._data)
-
-    @typing.override
-    def __iter__(self) -> typing.Iterator[T]:
-        for i in range(len(self)):
-            yield self[i]
+# TODO: Move MMapRowArchive to here ... shoul dbe below ListBasedArchive.
 
 
-@dataclasses.dataclass
-class ColumnArchiveMetadata:
-    """Metadata stored along with items in an archive."""
-
-    len: int
-    # TODO: We don't support union types yet so this can't be serialized.
-    # item_type: type | GenericAlias
-
-
-class SequenceToColumnConverter(typing.Generic[T]):
+class SequenceToColumnConverter:
     """Class for converting item Sequences to columns of data."""
-
-    def __init__(self, item_type: type[T] | types.GenericAlias):
-        self._item_type = item_type
 
     def to_columns(
         self,
         field_path: str,
-        item_type: type[_U] | GenericAlias,
-        items: Sequence[_U],
+        item_type: type[T] | GenericAlias,
+        items: Sequence[T],
     ) -> Iterator[NamedColumn]:
         """Convert sequence of items to columns of data."""
 
@@ -216,7 +152,10 @@ class SequenceToColumnConverter(typing.Generic[T]):
         """For dataclass types, which will recursively handle fields of various types."""
         for field in dataclasses.fields(item_type):
             field_type = field.type
-            assert isinstance(field_type, (type, GenericAlias))
+            if not isinstance(field_type, (type, GenericAlias)):
+                raise ValueError(
+                    f"Field {field.name} of type {field_type} is not a valid field type in {field_path}"
+                )
 
             field_key = f"{field_path}.{field.name}"
             field_items = [getattr(item, field.name) for item in items]
@@ -236,7 +175,7 @@ class SequenceToColumnConverter(typing.Generic[T]):
         yield from self.to_columns(f"{field_path}.shape", tuple[int, ...], shapes)
 
     def to_generic_list_columns(
-        self, field_path: str, item_type: type[_U], items: Sequence[Sequence[_U]]
+        self, field_path: str, item_type: type[T], items: Sequence[Sequence[T]]
     ) -> Iterator[NamedColumn]:
         """Convert list of lists to columns of data."""
         unrolled_items = [item for item_list in items for item in item_list]
@@ -248,7 +187,7 @@ class SequenceToColumnConverter(typing.Generic[T]):
         self,
         field_path: str,
         base_type_args: tuple[type, ...],
-        items: Sequence[Sequence[_U]],
+        items: Sequence[Sequence[T]],
     ) -> Iterator[NamedColumn]:
         """Convert list of tuples to columns of data."""
         if base_type_args[-1] is Ellipsis:  # type: ignore
@@ -263,54 +202,53 @@ class SequenceToColumnConverter(typing.Generic[T]):
             yield from self.to_columns(tuple_field_path, t, tuple_field_items)
 
 
-class ColumnToSequenceConverter(typing.Generic[T]):
+class ColumnToSequenceConverter:
     """Class for converting columns of data to Sequences of items."""
-
-    def __init__(self, item_type: type[T] | types.GenericAlias):
-        self._item_type = item_type
 
     def from_columns(
         self,
         field_path: str,
-        item_type: type[_U] | GenericAlias,
+        item_type: type[T] | GenericAlias,
         columns: ArchiveColumnDict,
         slice_: slice,
-    ) -> Sequence[_U]:
+    ) -> Sequence[T]:
         """Convert columns of data to sequence of items."""
-        assert slice_ is not None
+        if slice_ is None:
+            raise ValueError("Slice must be provided")
+
         if is_primitive_type(item_type):
             return cast(
-                Sequence[_U],
+                Sequence[T],
                 self.from_primitive_columns(field_path, item_type, columns, slice_),
             )
         if is_dataclass_type(item_type):
             return cast(
-                Sequence[_U],
+                Sequence[T],
                 self.from_dataclass_columns(field_path, item_type, columns, slice_),
             )
         if item_type is np.ndarray:
             return cast(
-                Sequence[_U], self.from_ndarray_columns(field_path, columns, slice_)
+                Sequence[T], self.from_ndarray_columns(field_path, columns, slice_)
             )
         if (base_type := typing.get_origin(item_type)) is not None:
             base_type_args = typing.get_args(item_type)
             if base_type is list:
                 return cast(
-                    Sequence[_U],
+                    Sequence[T],
                     self.from_generic_list_columns(
                         field_path, base_type_args[0], columns, slice_
                     ),
                 )
             if base_type is tuple:
                 return cast(
-                    Sequence[_U],
+                    Sequence[T],
                     self.from_generic_tuple_columns(
                         field_path, base_type_args, columns, slice_
                     ),
                 )
             if base_type is np.ndarray:
                 return cast(
-                    Sequence[_U],
+                    Sequence[T],
                     self.from_ndarray_columns(field_path, columns, slice_),
                 )
 
@@ -325,6 +263,7 @@ class ColumnToSequenceConverter(typing.Generic[T]):
         columns: ArchiveColumnDict,
         slice_: slice,
     ) -> Sequence[PrimitiveType]:
+        """Deserialize primitive types from columns."""
         return cast(
             Sequence[PrimitiveType],
             [item_type(item) for item in columns[field_path][slice_]],
@@ -337,10 +276,14 @@ class ColumnToSequenceConverter(typing.Generic[T]):
         columns: ArchiveColumnDict,
         slice_: slice,
     ) -> Sequence[DataclassProtocol]:
+        """Deserialize dataclass types from columns."""
         deserialized_fields: list[Any] = []
         for field in dataclasses.fields(item_type):
             field_type = field.type
-            assert isinstance(field_type, (type, GenericAlias))
+            if not isinstance(field_type, (type, GenericAlias)):
+                raise ValueError(
+                    f"Field {field.name} of type {field_type} is not a valid field type in {field_path}"
+                )
 
             field_key = f"{field_path}.{field.name}"
             field_items = self.from_columns(field_key, field_type, columns, slice_)
@@ -352,10 +295,11 @@ class ColumnToSequenceConverter(typing.Generic[T]):
     def from_generic_list_columns(
         self,
         field_path: str,
-        item_type: type[_U],
+        item_type: type[T],
         columns: ArchiveColumnDict,
         slice_: slice,
-    ) -> Sequence[Sequence[_U]]:
+    ) -> Sequence[Sequence[T]]:
+        """Deserialize list of lists from columns."""
         assert slice_.step is None
         length_cumsum = columns[f"{field_path}.#"][slice_.start : slice_.stop + 1]
 
@@ -367,7 +311,7 @@ class ColumnToSequenceConverter(typing.Generic[T]):
         )
 
         offset = length_cumsum[0]
-        ret: list[Sequence[_U]] = []
+        ret: list[Sequence[T]] = []
         for start, end in zip(length_cumsum[:-1], length_cumsum[1:]):
             ret.append(unrolled_items[start - offset : end - offset])
         return ret
@@ -378,22 +322,26 @@ class ColumnToSequenceConverter(typing.Generic[T]):
         base_type_args: tuple[type, ...],
         columns: ArchiveColumnDict,
         slice_: slice,
-    ) -> Sequence[tuple[_U]]:
+    ) -> Sequence[Any]:
+        """Deserialize list of tuples from columns."""
         if base_type_args[-1] is Ellipsis:  # type: ignore
-            return self._from_generic_list_columns(field_path, base_type_args[0], columns, slice_)  # type: ignore
+            return self.from_generic_list_columns(
+                field_path, base_type_args[0], columns, slice_
+            )
 
         deserialized_fields: list[Any] = []
         for i, t in enumerate(base_type_args):
             tuple_field_path = f"{field_path}.{i}"
-            tuple_field_items = self._from_columns(tuple_field_path, t, columns, slice_)  # type: ignore
+            tuple_field_items = self.from_columns(tuple_field_path, t, columns, slice_)
             deserialized_fields.append(tuple_field_items)
 
         items = [tuple(fields) for fields in zip(*deserialized_fields)]
-        return items  # type: ignore
+        return items
 
     def from_ndarray_columns(
         self, field_path: str, columns: ArchiveColumnDict, slice_: slice
     ) -> Sequence[np.ndarray[Any, Any]]:
+        """Deserialize list of ndarrays from columns."""
         flat_values = columns[f"{field_path}.*"]
         size_cumsum = columns[f"{field_path}.#"]
         shapes = self.from_columns(
@@ -408,21 +356,25 @@ class ColumnToSequenceConverter(typing.Generic[T]):
         return ret
 
 
-class ColumnArchiver(typing.Generic[T]):
-    """Class for column based archival & retrieval of items sequences."""
+class ColumnArchiver:
+    """Class for readining/writing sequences/columns to disk."""
 
     MAGIC = b"RGF"  # 3-byte magic string
     VERSION = b"\x01"  # 1-byte version
 
-    def __init__(self, item_type: type[T] | types.GenericAlias):
-        self._item_type = item_type
-        self._sequence_to_columns_converter = SequenceToColumnConverter(item_type)
-        self._columns_to_sequence_converter = ColumnToSequenceConverter(item_type)
+    def __init__(self):
+        self._sequence_to_columns_converter = SequenceToColumnConverter()
+        self._columns_to_sequence_converter = ColumnToSequenceConverter()
 
-    def write_sequence(self, items: Sequence[T], path: pathlib.Path | str) -> None:
+    def write_sequence(
+        self,
+        item_type: type[T] | types.GenericAlias,
+        items: Sequence[T],
+        path: pathlib.Path | str,
+    ) -> None:
         """Save sequence of items to file in column format."""
         named_columns = self._sequence_to_columns_converter.to_columns(
-            "", self._item_type, items
+            "", item_type, items
         )
         return self.write_columns(path, named_columns, sequence_length=len(items))
 
@@ -441,6 +393,7 @@ class ColumnArchiver(typing.Generic[T]):
                 "column": [],
                 "sequence_length": sequence_length,
             }
+            # Write columns & create metadata_dict
             for column in named_columns:
                 data_offset = f.tell()
                 f.write(column.data.tobytes(order="C"))  # Write in C-contiguous order
@@ -454,14 +407,17 @@ class ColumnArchiver(typing.Generic[T]):
                 }
                 metadata_dict["column"].append(column_metadata)
 
+        # Write medatata_dict to a separate index file
         with open(f"{path}.index", "x", encoding="utf-8") as f:
             json.dump(metadata_dict, f, indent=2)
 
-    def read_sequence(self, path: pathlib.Path | str) -> Sequence[T]:
+    def read_sequence(
+        self, item_type: type[T] | types.GenericAlias, path: pathlib.Path | str
+    ) -> Sequence[T]:
         """Read sequence of items from file."""
         columns, sequence_length = self.read_columns(path)
         return self._columns_to_sequence_converter.from_columns(
-            "", self._item_type, columns, slice(0, sequence_length)
+            "", item_type, columns, slice(0, sequence_length)
         )
 
     def read_columns(self, path: pathlib.Path | str) -> tuple[ArchiveColumnDict, int]:
@@ -497,6 +453,60 @@ class ColumnArchiver(typing.Generic[T]):
 
 
 class MMapColumnArchive(Archive[T]):
+    """Read-only archive storing items in a mmaped numpy file."""
+
+    def __init__(
+        self,
+        file: FileOrPath,
+        item_type: type[T] | GenericAlias,
+        allow_pickle: bool = True,
+    ):
+        """Initialize archive from file.
+
+        Args:
+            file: File to load archive from
+            item_type: Type of items stored in archive
+        """
+        self._file: FileOrPath = file
+        self._item_type: type[T] | GenericAlias = item_type
+        # self._archiver: ColumnArchiver = ColumnArchiver()
+        self._mmap_data: np.memmap[Any, Any] = np.load(
+            file, mmap_mode="r", allow_pickle=allow_pickle
+        )
+
+    def __enter__(self) -> "MMapColumnArchive[T]":
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: types.TracebackType | None,
+    ) -> None:
+        self._mmap_data.close()  # type: ignore
+
+    @typing.override
+    def __len__(self) -> int:
+        return len(self._data)
+
+    # overloads to make mypy happy. Actual implemenation in @override method.
+    @typing.overload
+    def __getitem__(self, idx: int) -> T: ...
+
+    @typing.overload
+    def __getitem__(self, idx: slice) -> Sequence[T]: ...
+
+    @typing.override
+    def __getitem__(self, idx: int | slice) -> T | Sequence[T]:
+        return self._archiver._get_item("", self._item_type, idx, self._data)
+
+    @typing.override
+    def __iter__(self) -> typing.Iterator[T]:
+        for i in range(len(self)):
+            yield self[i]
+
+
+class MMapRowArchive(Archive[T]):
     """Archive for reading items from a mmaped numpy file."""
 
     def __init__(
@@ -605,6 +615,15 @@ class MMapColumnArchive(Archive[T]):
     #     length_cumsum = data[f"{field_path}.#"]
 
     #     return data[field_path][idx]
+
+
+# @dataclasses.dataclass
+# class ColumnArchiveMetadata:
+#     """Metadata stored along with items in an archive."""
+
+#     len: int
+#     # TODO: We don't support union types yet so this can't be serialized.
+#     # item_type: type | GenericAlias
 
 
 # class CombinedArchive(Archive[T]):
