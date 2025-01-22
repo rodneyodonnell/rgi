@@ -1,3 +1,5 @@
+"""Tests for archive implementations."""
+
 import pathlib
 from dataclasses import dataclass
 from typing import Any
@@ -6,7 +8,14 @@ import pytest
 
 from numpy.testing import assert_equal
 
-from rgi.core.archive import ArchiveSerializer
+from rgi.core.archive import (
+    ListBasedArchive,
+    ColumnFileArchiver,
+    MMapColumnArchive,
+    RowFileArchiver,
+    MMapRowArchive,
+    CombinedArchive,
+)
 
 
 @dataclass
@@ -273,3 +282,144 @@ def test_mmap_archive_file_not_found(tmp_path: pathlib.Path) -> None:
 
     with pytest.raises(FileNotFoundError):
         serializer.load_mmap(file_path)
+
+
+def test_list_based_archive() -> None:
+    """Test basic ListBasedArchive functionality."""
+    archive = ListBasedArchive(SimpleData)
+    data = SimpleData(x=1, y=2.0, name="test")
+    archive.append(data)
+
+    assert len(archive) == 1
+    assert archive[0] == data
+    assert list(archive) == [data]
+
+
+def test_list_based_archive_slice() -> None:
+    """Test ListBasedArchive slicing."""
+    archive = ListBasedArchive(SimpleData)
+    data = [SimpleData(x=i, y=float(i), name=f"test{i}") for i in range(3)]
+    for item in data:
+        archive.append(item)
+
+    assert archive[1:] == data[1:]
+    assert archive[:2] == data[:2]
+
+
+def test_column_file_archiver(tmp_path: pathlib.Path) -> None:
+    """Test ColumnFileArchiver write and read."""
+    archiver = ColumnFileArchiver()
+    data = [SimpleData(x=1, y=2.0, name="test"), SimpleData(x=3, y=4.0, name="test2")]
+    path = tmp_path / "test.col"
+
+    archiver.write_sequence(SimpleData, data, path)
+    result = archiver.read_sequence(SimpleData, path)
+
+    assert len(result) == len(data)
+    assert list(result) == data
+
+
+def test_column_file_archiver_nested(tmp_path: pathlib.Path) -> None:
+    """Test ColumnFileArchiver with nested data."""
+    archiver = ColumnFileArchiver()
+    data = [
+        NestedData(
+            simple=SimpleData(x=1, y=2.0, name="test"),
+            values=[1, 2, 3],
+            points=(1.0, 2.0, 3.0),
+            matrix=np.array([[1, 2], [3, 4]]),
+        )
+    ]
+    path = tmp_path / "test_nested.col"
+
+    archiver.write_sequence(NestedData, data, path)
+    result = archiver.read_sequence(NestedData, path)
+
+    assert len(result) == len(data)
+    assert_equal(list(result), data)
+
+
+def test_mmap_column_archive(tmp_path: pathlib.Path) -> None:
+    """Test MMapColumnArchive functionality."""
+    # First write data using ColumnFileArchiver
+    archiver = ColumnFileArchiver()
+    data = [SimpleData(x=1, y=2.0, name="test"), SimpleData(x=3, y=4.0, name="test2")]
+    path = tmp_path / "test.col"
+    archiver.write_sequence(SimpleData, data, path)
+
+    # Now read using MMapColumnArchive
+    archive = MMapColumnArchive(path, SimpleData)
+    assert len(archive) == len(data)
+    assert list(archive) == data
+    assert archive[1] == data[1]
+    assert archive[0:2] == data[0:2]
+
+
+def test_row_file_archiver(tmp_path: pathlib.Path) -> None:
+    """Test RowFileArchiver write and read."""
+    archiver = RowFileArchiver()
+    data = [SimpleData(x=1, y=2.0, name="test"), SimpleData(x=3, y=4.0, name="test2")]
+    path = tmp_path / "test.row"
+
+    archiver.write_items(data, path)
+    archive = archiver.read_items(path, SimpleData)
+
+    assert len(archive) == len(data)
+    assert list(archive) == data
+
+
+def test_mmap_row_archive(tmp_path: pathlib.Path) -> None:
+    """Test MMapRowArchive functionality."""
+    # First write data using RowFileArchiver
+    archiver = RowFileArchiver()
+    data = [SimpleData(x=1, y=2.0, name="test"), SimpleData(x=3, y=4.0, name="test2")]
+    path = tmp_path / "test.row"
+    archiver.write_items(data, path)
+
+    # Now read using MMapRowArchive
+    archive = MMapRowArchive(path, SimpleData)
+    assert len(archive) == len(data)
+    assert list(archive) == data
+    assert archive[1] == data[1]
+    assert archive[0:2] == data[0:2]
+
+
+def test_combined_archive() -> None:
+    """Test CombinedArchive functionality."""
+    archive1 = ListBasedArchive(SimpleData)
+    archive2 = ListBasedArchive(SimpleData)
+
+    data1 = [SimpleData(x=1, y=2.0, name="test1")]
+    data2 = [SimpleData(x=2, y=3.0, name="test2")]
+
+    archive1.append(data1[0])
+    archive2.append(data2[0])
+
+    combined = CombinedArchive([archive1, archive2])
+
+    assert len(combined) == 2
+    assert list(combined) == data1 + data2
+    assert combined[1] == data2[0]
+    assert combined[0:2] == data1 + data2
+
+
+def test_combined_archive_empty() -> None:
+    """Test CombinedArchive with empty archives."""
+    archive1 = ListBasedArchive(SimpleData)
+    archive2 = ListBasedArchive(SimpleData)
+
+    combined = CombinedArchive([archive1, archive2])
+
+    assert len(combined) == 0
+    assert list(combined) == []
+
+
+def test_combined_archive_index_error() -> None:
+    """Test CombinedArchive index error handling."""
+    archive = ListBasedArchive(SimpleData)
+    archive.append(SimpleData(x=1, y=2.0, name="test"))
+
+    combined = CombinedArchive([archive])
+
+    with pytest.raises(IndexError):
+        _ = combined[1]

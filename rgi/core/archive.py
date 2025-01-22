@@ -3,7 +3,6 @@
 import abc
 import dataclasses
 import json
-import os
 import pickle
 import typing
 import types
@@ -15,7 +14,6 @@ from types import GenericAlias
 import numpy as np
 
 from rgi.core.types import (
-    FileOrPath,
     PrimitiveType,
     DataclassProtocol,
     is_primitive_type,
@@ -28,7 +26,6 @@ _U = typing.TypeVar("_U")
 
 ArchiveColumn = np.ndarray[Any, np.dtype[Any]]
 ArchiveColumnDict = dict[str, ArchiveColumn]
-# ArchiveMemmap = np.memmap[Any, Any]
 
 
 @dataclasses.dataclass
@@ -84,7 +81,70 @@ class ListBasedArchive(AppendableArchive[T]):
         return f"ListBasedArchive(item_type={self._item_type}, len={len(self)}, items[:1]={self._items[:1]})"  # pylint: disable=line-too-long
 
 
-# TODO: Move MMapRowArchive to here ... shoul dbe below ListBasedArchive.
+class MMapRowArchive(Archive[T]):
+    """Archive for reading items from a mmaped numpy file."""
+
+    def __init__(self, path: pathlib.Path | str, item_type: type[T] | GenericAlias):
+        self._item_type = item_type
+
+        # 1) Load the offsets array
+        self._offsets = np.load(f"{path}.index")  # shape = (count+1,)
+        self._sequence_length = len(self._offsets) - 1
+
+        # 2) Memory-map the data file
+        self._data = np.memmap(path, mode="r")
+
+    def __len__(self) -> int:
+        return self._sequence_length
+
+    def _get_item(self, idx: int) -> T:
+        start = self._offsets[idx]
+        end = self._offsets[idx + 1]
+        return pickle.loads(self._data[start:end].tobytes())
+
+    def _get_slice(self, idx: slice) -> Sequence[T]:
+        return [self._get_item(i) for i in range(idx.start, idx.stop)]
+
+    def __iter__(self) -> Iterator[T]:
+        for i in range(len(self)):
+            yield self._get_item(i)
+
+    def __getitem__(self, idx: int | slice) -> T | Sequence[T]:
+        if isinstance(idx, slice):
+            return self._get_slice(idx)
+        return self._get_item(idx)
+
+
+class RowFileArchiver:
+    """Class for reading/writing sequences/rows to disk in row based format."""
+
+    def write_items(self, items: typing.Iterable[T], path: pathlib.Path | str) -> None:
+        """Save sequence of items to file in row format.
+
+        Write 'objects' to data_filename as raw pickled bytes (one after another).
+        Then write offsets into a .npy array (index_filename), where:
+        offsets[i] = byte offset in data_filename for the i-th object
+        offsets[-1] = final size of the data file
+        """
+
+        # 1) Write data
+        offsets = [0]
+        with open(path, "wb") as fdata:
+            for item in items:
+                payload = pickle.dumps(item, protocol=5)
+                fdata.write(payload)
+                offsets.append(fdata.tell())
+
+        # 2) Convert offsets to a NumPy array and save
+        #    We'll use uint64 for large file support
+        offsets_array = np.array(offsets, dtype=np.uint64)
+        np.save(f"{path}.index", offsets_array)
+
+    def read_items(
+        self, path: pathlib.Path | str, item_type: type[T] | GenericAlias
+    ) -> MMapRowArchive[T]:
+        """Read sequence of items from file in row format."""
+        return MMapRowArchive(path, item_type)
 
 
 class SequenceToColumnConverter:
@@ -490,74 +550,6 @@ class MMapColumnArchive(Archive[T]):
     def __iter__(self) -> typing.Iterator[T]:
         for i in range(len(self)):
             yield self[i]  # type: ignore
-
-
-class MMapRowArchive(Archive[T]):
-    """Archive for reading items from a mmaped numpy file."""
-
-    def __init__(self, path: pathlib.Path | str, item_type: type[T] | GenericAlias):
-        self._item_type = item_type
-
-        # 1) Load the offsets array
-        self._offsets = np.load(f"{path}.index")  # shape = (count+1,)
-        self._sequence_length = len(self._offsets) - 1
-
-        # 2) Memory-map the data file
-        self._data = np.memmap(path, mode="r")
-
-        self._lookup_fn, self._sequence_length = RowFileArchiver().get_lookup_fn(path)
-
-    def __len__(self) -> int:
-        return self._sequence_length
-
-    def _get_item(self, idx: int) -> T:
-        start = self._offsets[idx]
-        end = self._offsets[idx + 1]
-        return pickle.loads(self._data[start:end].tobytes())
-
-    def _get_slice(self, idx: slice) -> Sequence[T]:
-        return [self._get_item(i) for i in range(idx.start, idx.stop)]
-
-    def __iter__(self) -> Iterator[T]:
-        for i in range(len(self)):
-            yield self._get_item(i)
-
-    def __getitem__(self, idx: int | slice) -> T | Sequence[T]:
-        if isinstance(idx, slice):
-            return self._get_slice(idx)
-        return self._get_item(idx)
-
-
-class RowFileArchiver:
-    """Class for reading/writing sequences/rows to disk in row based format."""
-
-    def write_items(self, items: typing.Iterable[T], path: pathlib.Path | str) -> None:
-        """Save sequence of items to file in row format.
-
-        Write 'objects' to data_filename as raw pickled bytes (one after another).
-        Then write offsets into a .npy array (index_filename), where:
-        offsets[i] = byte offset in data_filename for the i-th object
-        offsets[-1] = final size of the data file
-        """
-
-        # 1) Write data
-        offsets = [0]
-        with open(path, "wb") as fdata:
-            for item in items:
-                payload = pickle.dumps(item, protocol=5)
-                fdata.write(payload)
-                offsets.append(fdata.tell())
-
-        # 2) Convert offsets to a NumPy array and save
-        #    We'll use uint64 for large file support
-        offsets_array = np.array(offsets, dtype=np.uint64)
-        np.save(f"{path}.index", offsets_array)
-
-    def read_items(
-        self, path: pathlib.Path | str, item_type: type[T] | GenericAlias
-    ) -> MMapRowArchive[T]:
-        """Read sequence of items from file in row format."""
-        return MMapRowArchive(path, item_type)
 
 
 class CombinedArchive(Archive[T]):
