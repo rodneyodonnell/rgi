@@ -281,41 +281,16 @@ class SequenceToColumnConverter:
     def to_generic_dataclass_columns(
         self,
         field_path: str,
-        base_type: type,
-        type_args: tuple[type, ...],
+        base_type: type[DataclassProtocol],
+        base_type_args: tuple[type, ...],
         items: Sequence[Any],
     ) -> Iterator[NamedColumn]:
         """For generic dataclass types, recursively handle fields with type parameter substitution."""
 
-        def resolve_type_vars(field_type: Any) -> Any:
-            """Recursively resolve TypeVars in a type to their concrete types."""
-            # Direct TypeVar
-            if isinstance(field_type, typing.TypeVar):
-                type_var_name = field_type.__name__
-                for i, param in enumerate(base_type.__parameters__):
-                    if param.__name__ == type_var_name:
-                        return type_args[i]
-                raise ValueError(
-                    f"Could not find type argument for TypeVar {type_var_name}"
-                )
-
-            # Generic type with potential TypeVar args
-            if origin := typing.get_origin(field_type):
-                resolved_args = tuple(
-                    resolve_type_vars(arg) for arg in typing.get_args(field_type)
-                )
-                return origin[resolved_args]
-
-            return field_type
-
-        # Process each field
         for field in dataclasses.fields(base_type):
-            field_type = resolve_type_vars(field.type)
-
-            if not rgi_types.is_type_or_generic(field_type):
-                raise ValueError(
-                    f"Field {field.name} of type {field_type} is not a valid field type in {field_path}"
-                )
+            field_type = rgi_types.resolve_type_vars(
+                field.type, base_type, base_type_args
+            )
 
             field_key = f"{field_path}.{field.name}"
             field_items = [getattr(item, field.name) for item in items]
@@ -490,42 +465,18 @@ class ColumnToSequenceConverter:
     def from_generic_dataclass_columns(
         self,
         field_path: str,
-        base_type: type,
+        base_type: type[DataclassProtocol],
         base_type_args: tuple[type, ...],
         columns: ArchiveColumnDict,
         slice_: slice,
     ) -> Sequence[DataclassProtocol]:
         """Deserialize generic dataclass types from columns."""
 
-        def resolve_type_vars(field_type: Any) -> Any:
-            """Recursively resolve TypeVars in a type to their concrete types."""
-            # Direct TypeVar
-            if isinstance(field_type, typing.TypeVar):
-                type_var_name = field_type.__name__
-                for i, param in enumerate(base_type.__parameters__):
-                    if param.__name__ == type_var_name:
-                        return base_type_args[i]
-                raise ValueError(
-                    f"Could not find type argument for TypeVar {type_var_name}"
-                )
-
-            # Generic type with potential TypeVar args
-            if origin := typing.get_origin(field_type):
-                resolved_args = tuple(
-                    resolve_type_vars(arg) for arg in typing.get_args(field_type)
-                )
-                return origin[resolved_args]
-
-            return field_type
-
         deserialized_fields: list[Any] = []
         for field in dataclasses.fields(base_type):
-            field_type = resolve_type_vars(field.type)
-            # field_type = field.type
-            if not rgi_types.is_type_or_generic(field_type):
-                raise ValueError(
-                    f"Field {field.name} of type {field_type} is not a valid field type in {field_path}"
-                )
+            field_type = rgi_types.resolve_type_vars(
+                field.type, base_type, base_type_args
+            )
 
             field_key = f"{field_path}.{field.name}"
             field_items = self.from_columns(field_key, field_type, columns, slice_)
