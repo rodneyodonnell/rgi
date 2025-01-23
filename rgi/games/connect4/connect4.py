@@ -7,9 +7,10 @@ import numpy as np
 from numpy.typing import NDArray
 
 from rgi.core import base
+from rgi.core.utils import dataclass_with_np_eq
 
 
-@dataclass
+@dataclass_with_np_eq()
 class Connect4State:
     board: NDArray[np.int8]  # (height, width)
     current_player: int
@@ -52,7 +53,9 @@ class Connect4Game(base.Game[GameState, Action]):
 
     @override
     def legal_actions(self, game_state: GameState) -> Sequence[Action]:
-        return tuple(col + 1 for col in range(self.width) if game_state.board[0, col] == 0)
+        return tuple(
+            col + 1 for col in range(self.width) if game_state.board[0, col] == 0
+        )
 
     @override
     def all_actions(self) -> Sequence[Action]:
@@ -62,7 +65,9 @@ class Connect4Game(base.Game[GameState, Action]):
     def next_state(self, game_state: GameState, action: Action) -> GameState:
         """Find the lowest empty row in the selected column and return the updated game state."""
         if action not in (legal_actions := self.legal_actions(game_state)):
-            raise ValueError(f"Invalid move: Invalid column '{action}' not in {legal_actions}")
+            raise ValueError(
+                f"Invalid move: Invalid column '{action}' not in {legal_actions}"
+            )
 
         column = action - 1  # Convert 1-based action to 0-based column index
         row = np.nonzero(game_state.board[:, column] == 0)[0][-1]
@@ -70,12 +75,16 @@ class Connect4Game(base.Game[GameState, Action]):
         new_board = game_state.board.copy()
         new_board[row, column] = game_state.current_player
 
-        winner = game_state.winner or self._calculate_winner(new_board, column, row, game_state.current_player)
+        winner = game_state.winner or self._calculate_winner(
+            new_board, column, row, game_state.current_player
+        )
         next_player: PlayerId = 2 if game_state.current_player == 1 else 1
 
         return GameState(board=new_board, current_player=next_player, winner=winner)
 
-    def _calculate_winner(self, board: NDArray[np.int8], col: int, row: int, player: PlayerId) -> PlayerId:
+    def _calculate_winner(
+        self, board: NDArray[np.int8], col: int, row: int, player: PlayerId
+    ) -> PlayerId:
         """Check if the last move made at (row, col) by 'player' wins the game."""
         directions = [
             (0, 1),  # Horizontal
@@ -88,7 +97,11 @@ class Connect4Game(base.Game[GameState, Action]):
             count = 1
             for factor in [-1, 1]:
                 r, c = row + dr * factor, col + dc * factor
-                while 0 <= r < self.height and 0 <= c < self.width and board[r, c] == player:
+                while (
+                    0 <= r < self.height
+                    and 0 <= c < self.width
+                    and board[r, c] == player
+                ):
                     count += 1
                     r, c = r + dr * factor, c + dc * factor
                     if count >= self.connect_length:
@@ -114,7 +127,10 @@ class Connect4Game(base.Game[GameState, Action]):
     def pretty_str(self, game_state: GameState) -> str:
         symbols = [" ", "●", "○"]
         return (
-            "\n".join("|" + "|".join(symbols[int(cell)] for cell in row) + "|" for row in game_state.board)
+            "\n".join(
+                "|" + "|".join(symbols[int(cell)] for cell in row) + "|"
+                for row in game_state.board
+            )
             + "\n+"
             + "-+" * self.width
         )
@@ -135,7 +151,9 @@ class Connect4Game(base.Game[GameState, Action]):
 
 class Connect4Serializer(base.GameSerializer[Connect4Game, GameState, Action]):
     @override
-    def serialize_state(self, game: Connect4Game, game_state: GameState) -> dict[str, Any]:
+    def serialize_state(
+        self, game: Connect4Game, game_state: GameState
+    ) -> dict[str, Any]:
         """Serialize the game state to a dictionary for frontend consumption."""
         board = game_state.board.tolist()
         return {

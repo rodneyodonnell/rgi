@@ -100,7 +100,7 @@ class MMapRowArchive(Archive[T]):
     def _get_item(self, idx: int) -> T:
         start = self._offsets[idx]
         end = self._offsets[idx + 1]
-        return pickle.loads(self._data[start:end].tobytes())
+        return typing.cast(T, pickle.loads(self._data[start:end].tobytes()))
 
     def _get_slice(self, idx: slice) -> Sequence[T]:
         return [self._get_item(i) for i in range(*idx.indices(len(self)))]
@@ -109,6 +109,13 @@ class MMapRowArchive(Archive[T]):
         for i in range(len(self)):
             yield self._get_item(i)
 
+    @typing.overload
+    def __getitem__(self, idx: int) -> T: ...
+
+    @typing.overload
+    def __getitem__(self, idx: slice) -> Sequence[T]: ...
+
+    @typing.override
     def __getitem__(self, idx: int | slice) -> T | Sequence[T]:
         if isinstance(idx, slice):
             return self._get_slice(idx)

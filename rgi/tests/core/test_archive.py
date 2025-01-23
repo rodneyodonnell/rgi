@@ -1,59 +1,16 @@
 """Tests for archive implementations."""
 
 import pathlib
-import tempfile
 from dataclasses import dataclass, fields
 from typing import Type, TypeVar, Any, Callable
 import typing
 import numpy as np
 import pytest
 
-from numpy.testing import assert_equal
-
-from rgi.core.archive import (
-    ListBasedArchive,
-    ColumnFileArchiver,
-    MMapColumnArchive,
-    RowFileArchiver,
-    MMapRowArchive,
-    CombinedArchive,
-)
+from rgi.core.archive import ListBasedArchive, ColumnFileArchiver, MMapColumnArchive, RowFileArchiver, CombinedArchive
+from rgi.core.utils import dataclass_with_np_eq
 
 T = TypeVar("T")
-
-
-@typing.dataclass_transform()
-def dataclass_with_np_eq(*args: Any, **kwargs: Any) -> Callable[[Type[T]], Type[T]]:
-    """
-    Decorator that defines a class as a dataclass with numpy-aware equality.
-    """
-    if args and isinstance(args[0], type):
-        raise TypeError(
-            "dataclass_with_np_eq must be called with parentheses. "
-            "Use @dataclass_with_np_eq() instead of @dataclass_with_np_eq"
-        )
-
-    def wrapper(cls: Type[T]) -> Type[T]:
-        kwargs_copy = {**kwargs, "eq": False}
-        cls = dataclass(**kwargs_copy)(cls)
-
-        def __eq__(self: T, other: object) -> bool:
-            if not isinstance(other, type(self)):
-                return False
-            for field in fields(cls):  # type: ignore
-                self_val = getattr(self, field.name)
-                other_val = getattr(other, field.name)
-                if isinstance(self_val, np.ndarray):
-                    if not np.array_equal(self_val, other_val):
-                        return False
-                elif self_val != other_val:
-                    return False
-            return True
-
-        setattr(cls, "__eq__", __eq__)
-        return cls
-
-    return wrapper
 
 
 @dataclass
