@@ -1,13 +1,20 @@
 """Tests for archive implementations."""
 
 import pathlib
-from dataclasses import dataclass, fields
-from typing import Type, TypeVar, Any, Callable
+from dataclasses import dataclass
+from typing import Type, TypeVar, Any
 import typing
 import numpy as np
 import pytest
 
-from rgi.core.archive import ListBasedArchive, ColumnFileArchiver, MMapColumnArchive, RowFileArchiver, CombinedArchive
+from rgi.core.archive import (
+    ListBasedArchive,
+    ColumnFileArchiver,
+    MMapColumnArchive,
+    RowFileArchiver,
+    CombinedArchive,
+    MMapRowArchive,
+)
 from rgi.core.utils import dataclass_with_np_eq
 
 T = TypeVar("T")
@@ -116,7 +123,7 @@ def test_row_based_archive(tmp_path: pathlib.Path, item_type: Type[T], items: li
     archiver = RowFileArchiver()
     path = tmp_path / "test.rgr"
     archiver.write_items(items, path)
-    row_archive = archiver.read_items(path, item_type)
+    row_archive: MMapRowArchive[T] = archiver.read_items(path, item_type)
 
     assert len(row_archive) == len(items)
     assert_sequence_equal(item_type, list(row_archive), items)
@@ -176,7 +183,7 @@ def test_mmap_column(tmp_path: pathlib.Path, item_type: Type[T], items: list[T])
     archiver = ColumnFileArchiver()
     path = pathlib.Path(tmp_path) / "test.col"
     archiver.write_sequence(item_type, items, path)
-    column_archive = MMapColumnArchive(path, item_type)
+    column_archive: MMapColumnArchive[T] = MMapColumnArchive(path, item_type)
 
     assert len(column_archive) == len(items)
     assert_sequence_equal(item_type, list(column_archive), items)
@@ -222,13 +229,13 @@ def test_combined_archive(tmp_path: pathlib.Path, item_type: Type[T], items: lis
     row_archiver = RowFileArchiver()
     row_path = tmp_path / "test.rgr"
     row_archiver.write_items(row_items, row_path)
-    row_archive = row_archiver.read_items(row_path, item_type)
+    row_archive: MMapRowArchive[T] = row_archiver.read_items(row_path, item_type)
 
     column_items = items[1::]
     column_archiver = ColumnFileArchiver()
     column_path = tmp_path / "test.col"
     column_archiver.write_sequence(item_type, column_items, column_path)
-    column_archive = MMapColumnArchive(column_path, item_type)
+    column_archive: MMapColumnArchive[T] = MMapColumnArchive(column_path, item_type)
 
     combined_items = list_items + row_items + column_items
     combined_archive = CombinedArchive([list_archive, row_archive, column_archive])

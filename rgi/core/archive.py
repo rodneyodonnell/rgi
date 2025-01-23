@@ -8,20 +8,14 @@ import typing
 import types
 import pathlib
 from typing import Any, Sequence, cast, Iterator
-from types import GenericAlias
 
 
 import numpy as np
 
-from rgi.core.types import (
-    PrimitiveType,
-    DataclassProtocol,
-    is_primitive_type,
-    is_dataclass_type,
-)
+from rgi.core import types as rgi_types
+from rgi.core.types import TypeOrGeneric, PrimitiveType, DataclassProtocol
 
 T = typing.TypeVar("T")
-_U = typing.TypeVar("_U")
 
 
 ArchiveColumn = np.ndarray[Any, np.dtype[Any]]
@@ -84,7 +78,7 @@ class ListBasedArchive(AppendableArchive[T]):
 class MMapRowArchive(Archive[T]):
     """Archive for reading items from a mmaped numpy file."""
 
-    def __init__(self, path: pathlib.Path | str, item_type: type[T] | GenericAlias):
+    def __init__(self, path: pathlib.Path | str, item_type: TypeOrGeneric[T]):
         self._item_type = item_type
 
         # 1) Load the offsets array
@@ -155,7 +149,7 @@ class RowFileArchiver:
         with open(f"{path}.index", "wb") as f:
             np.save(f, offsets_array)
 
-    def read_items(self, path: pathlib.Path | str, item_type: type[T] | GenericAlias) -> MMapRowArchive[T]:
+    def read_items(self, path: pathlib.Path | str, item_type: TypeOrGeneric[T]) -> MMapRowArchive[T]:
         """Read sequence of items from file in row format."""
         return MMapRowArchive(path, item_type)
 
@@ -166,15 +160,15 @@ class SequenceToColumnConverter:
     def to_columns(
         self,
         field_path: str,
-        item_type: type[T] | GenericAlias,
+        item_type: TypeOrGeneric[T],
         items: Sequence[T],
     ) -> Iterator[NamedColumn]:
         """Convert sequence of items to columns of data."""
 
-        if is_primitive_type(item_type):
+        if rgi_types.is_primitive_type(item_type):
             return self.to_primitive_columns(field_path, item_type, cast(Sequence[PrimitiveType], items))
 
-        if is_dataclass_type(item_type):
+        if rgi_types.is_dataclass_type(item_type):
             return self.to_dataclass_columns(field_path, item_type, cast(Sequence[DataclassProtocol], items))
 
         if item_type is np.ndarray:
@@ -212,7 +206,7 @@ class SequenceToColumnConverter:
         """For dataclass types, which will recursively handle fields of various types."""
         for field in dataclasses.fields(item_type):
             field_type = field.type
-            if not isinstance(field_type, (type, GenericAlias)):
+            if not rgi_types.is_type_or_generic(field_type):
                 raise ValueError(f"Field {field.name} of type {field_type} is not a valid field type in {field_path}")
 
             field_key = f"{field_path}.{field.name}"
@@ -227,7 +221,7 @@ class SequenceToColumnConverter:
         size_cumsum = np.cumsum([0] + [np.prod(shape) for shape in shapes])  # type: ignore
 
         yield NamedColumn(f"{field_path}.*", flat_values)
-        yield from self.to_columns(f"{field_path}.#", int, size_cumsum)
+        yield from self.to_columns(f"{field_path}.#", int, size_cumsum)  # type: ignore
         yield from self.to_columns(f"{field_path}.shape", tuple[int, ...], shapes)
 
     def to_generic_list_columns(
@@ -262,7 +256,7 @@ class ColumnToSequenceConverter:
     def from_columns(
         self,
         field_path: str,
-        item_type: type[T] | GenericAlias,
+        item_type: TypeOrGeneric[T],
         columns: ArchiveColumnDict,
         slice_: slice,
     ) -> Sequence[T]:
@@ -270,12 +264,12 @@ class ColumnToSequenceConverter:
         if slice_ is None:
             raise ValueError("Slice must be provided")
 
-        if is_primitive_type(item_type):
+        if rgi_types.is_primitive_type(item_type):
             return cast(
                 Sequence[T],
                 self.from_primitive_columns(field_path, item_type, columns, slice_),
             )
-        if is_dataclass_type(item_type):
+        if rgi_types.is_dataclass_type(item_type):
             return cast(
                 Sequence[T],
                 self.from_dataclass_columns(field_path, item_type, columns, slice_),
@@ -326,7 +320,7 @@ class ColumnToSequenceConverter:
         deserialized_fields: list[Any] = []
         for field in dataclasses.fields(item_type):
             field_type = field.type
-            if not isinstance(field_type, (type, GenericAlias)):
+            if not rgi_types.is_type_or_generic(field_type):
                 raise ValueError(f"Field {field.name} of type {field_type} is not a valid field type in {field_path}")
 
             field_key = f"{field_path}.{field.name}"
@@ -349,7 +343,7 @@ class ColumnToSequenceConverter:
 
         length_cumsum = columns[f"{field_path}.#"][slice_.start : slice_.stop + 1]
 
-        unrolled_items = self.from_columns(
+        unrolled_items: Sequence[T] = self.from_columns(
             f"{field_path}.*",
             item_type,
             columns,
@@ -376,7 +370,7 @@ class ColumnToSequenceConverter:
         deserialized_fields: list[Any] = []
         for i, t in enumerate(base_type_args):
             tuple_field_path = f"{field_path}.{i}"
-            tuple_field_items = self.from_columns(tuple_field_path, t, columns, slice_)
+            tuple_field_items: Sequence[Any] = self.from_columns(tuple_field_path, t, columns, slice_)
             deserialized_fields.append(tuple_field_items)
 
         items = [tuple(fields) for fields in zip(*deserialized_fields)]
@@ -388,7 +382,7 @@ class ColumnToSequenceConverter:
         """Deserialize list of ndarrays from columns."""
         flat_values = columns[f"{field_path}.*"]
         size_cumsum = columns[f"{field_path}.#"]
-        shapes = self.from_columns(f"{field_path}.shape", tuple[int, ...], columns, slice_)
+        shapes: Sequence[Any] = self.from_columns(f"{field_path}.shape", tuple[int, ...], columns, slice_)
 
         ret: list[np.ndarray[Any, Any]] = []
         for i, shape in enumerate(shapes):
@@ -445,7 +439,7 @@ class ColumnFileArchiver:
                     "shape": column.data.shape,  # e.g. (10,)
                     "offset": data_offset,  # byte offset
                 }
-                metadata_dict["column"].append(column_metadata)
+                metadata_dict["column"].append(column_metadata)  # type: ignore
 
         # Write medatata_dict to a separate index file
         with open(f"{path}.index", "x", encoding="utf-8") as f:
@@ -473,7 +467,7 @@ class ColumnFileArchiver:
             assert header[:3] == self.MAGIC and header[3:] == self.VERSION
 
         # MMap columns.
-        archive_column_dict = {}
+        archive_column_dict: ArchiveColumnDict = {}
         for column_metadata in metadata_dict["column"]:
             # Note: mm objects have no close() method, so we just rely on GC to close the file.
             mm = np.memmap(
@@ -492,7 +486,7 @@ class ColumnFileArchiver:
 class MMapColumnArchive(Archive[T]):
     """Read-only archive storing items in a mmaped numpy file."""
 
-    def __init__(self, path: pathlib.Path | str, item_type: type[T] | GenericAlias):
+    def __init__(self, path: pathlib.Path | str, item_type: TypeOrGeneric[T]):
         """Initialize archive from file.
 
         Args:
@@ -537,7 +531,7 @@ class MMapColumnArchive(Archive[T]):
     @typing.override
     def __iter__(self) -> typing.Iterator[T]:
         for i in range(len(self)):
-            yield self[i]  # type: ignore
+            yield self[i]
 
 
 class CombinedArchive(Archive[T]):
@@ -573,7 +567,7 @@ class CombinedArchive(Archive[T]):
         return self._archives[archive_idx], local_idx
 
     def __len__(self) -> int:
-        return self._cumsum[-1]
+        return int(self._cumsum[-1])
 
     def _get_item(self, idx: int) -> T:
         archive, local_idx = self._locate(idx)
