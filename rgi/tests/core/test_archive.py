@@ -35,6 +35,16 @@ class NestedData:
     matrix: np.ndarray[Any, np.dtype[np.float64]]
 
 
+T1 = typing.TypeVar("T1")
+T2 = typing.TypeVar("T2")
+
+
+@dataclass_with_np_eq()
+class GenericData(typing.Generic[T1, T2]):
+    x: T1
+    y: T2
+
+
 _SAMPLE_SIMPLE_DATA = [
     SimpleData(x=1, y=2.0, name="test"),
     SimpleData(x=3, y=4.0, name="test2"),
@@ -73,6 +83,19 @@ _SAMPLE_NDARRAY_DATA = [
     np.array([[1, 2], [3, 4]]),
     np.array([[5, 6, 7], [8, 9, 10], [11, 12, 13], [14, 15, 16]]),
     np.array([[9, 10, 11], [12, 13, 14], [15, 16, 17], [18, 19, 20]]),
+]
+
+
+_SAMPLE_GENERIC_INT_FLOAT_DATA: list[GenericData[int, float]] = [
+    GenericData(x=1, y=2.0),
+    GenericData(x=3, y=4.0),
+    GenericData(x=5, y=6.0),
+]
+
+_SAMPLE_GENERIC_INT_LIST_DATA: list[GenericData[int, list[int]]] = [
+    GenericData(x=1, y=[1, 2, 3]),
+    GenericData(x=3, y=[4, 5, 6, 7, 8, 9, 10]),
+    GenericData(x=5, y=[11, 12, 13, 14, 15, 16, 17, 18, 19, 20]),
 ]
 
 
@@ -117,6 +140,8 @@ def test_list_based_archive() -> None:
         pytest.param(np.ndarray, _SAMPLE_NDARRAY_DATA, id="ndarray"),
         pytest.param(SimpleData, _SAMPLE_SIMPLE_DATA, id="simple"),
         pytest.param(NestedData, _SAMPLE_NESTED_DATA, id="nested"),
+        pytest.param(GenericData[int, float], _SAMPLE_GENERIC_INT_FLOAT_DATA, id="generic_int_float"),
+        pytest.param(GenericData[int, list[int]], _SAMPLE_GENERIC_INT_LIST_DATA, id="generic_int_list"),
     ],
 )
 def test_row_based_archive(tmp_path: pathlib.Path, item_type: Type[T], items: list[T]) -> None:
@@ -150,6 +175,8 @@ def test_row_based_archive(tmp_path: pathlib.Path, item_type: Type[T], items: li
         pytest.param(np.ndarray, _SAMPLE_NDARRAY_DATA, id="ndarray"),
         pytest.param(SimpleData, _SAMPLE_SIMPLE_DATA, id="simple"),
         pytest.param(NestedData, _SAMPLE_NESTED_DATA, id="nested"),
+        pytest.param(GenericData[int, float], _SAMPLE_GENERIC_INT_FLOAT_DATA, id="generic_int_float"),
+        pytest.param(GenericData[int, list[int]], _SAMPLE_GENERIC_INT_LIST_DATA, id="generic_int_list"),
     ],
 )
 def test_column_based_archive_sequence(tmp_path: pathlib.Path, item_type: Type[T], items: list[T]) -> None:
@@ -177,6 +204,8 @@ def test_column_based_archive_sequence(tmp_path: pathlib.Path, item_type: Type[T
         pytest.param(np.ndarray, _SAMPLE_NDARRAY_DATA, id="ndarray"),
         pytest.param(SimpleData, _SAMPLE_SIMPLE_DATA, id="simple"),
         pytest.param(NestedData, _SAMPLE_NESTED_DATA, id="nested"),
+        pytest.param(GenericData[int, float], _SAMPLE_GENERIC_INT_FLOAT_DATA, id="generic_int_float"),
+        pytest.param(GenericData[int, list[int]], _SAMPLE_GENERIC_INT_LIST_DATA, id="generic_int_list"),
     ],
 )
 def test_mmap_column(tmp_path: pathlib.Path, item_type: Type[T], items: list[T]) -> None:
@@ -191,7 +220,7 @@ def test_mmap_column(tmp_path: pathlib.Path, item_type: Type[T], items: list[T])
     assert_sequence_equal(item_type, column_archive[0:2], items[0:2])
     assert_item_equal(item_type, column_archive[-1], items[-1])
     ## Not supported for lists, etc.
-    if item_type not in [list[int], list[list[int]], np.ndarray, NestedData]:
+    if item_type not in [list[int], list[list[int]], np.ndarray, NestedData, GenericData[int, list[int]]]:
         assert column_archive[-1:3:-2] == items[-1:3:-2]
 
 
@@ -215,6 +244,8 @@ def test_invalid_column_type(tmp_path: pathlib.Path) -> None:
         pytest.param(np.ndarray, _SAMPLE_NDARRAY_DATA, id="ndarray"),
         pytest.param(SimpleData, _SAMPLE_SIMPLE_DATA, id="simple"),
         pytest.param(NestedData, _SAMPLE_NESTED_DATA, id="nested"),
+        pytest.param(GenericData[int, float], _SAMPLE_GENERIC_INT_FLOAT_DATA, id="generic_int_float"),
+        pytest.param(GenericData[int, list[int]], _SAMPLE_GENERIC_INT_LIST_DATA, id="generic_int_list"),
     ],
 )
 def test_combined_archive(tmp_path: pathlib.Path, item_type: Type[T], items: list[T]) -> None:
