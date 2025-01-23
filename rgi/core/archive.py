@@ -1,6 +1,7 @@
 """Archive implementations for storing and loading sequences of data."""
 
 import abc
+import collections
 import dataclasses
 import json
 import pickle
@@ -117,7 +118,9 @@ class MMapRowArchive(Archive[T]):
         if idx < 0:
             idx += len(self)
         if not 0 <= idx < len(self):
-            raise IndexError(f"Index {idx} out of range for archive with {len(self)} items")
+            raise IndexError(
+                f"Index {idx} out of range for archive with {len(self)} items"
+            )
         return self._get_slice(slice(idx, idx + 1))[0]
 
 
@@ -149,7 +152,9 @@ class RowFileArchiver:
         with open(f"{path}.index", "wb") as f:
             np.save(f, offsets_array)
 
-    def read_items(self, path: pathlib.Path | str, item_type: TypeOrGeneric[T]) -> MMapRowArchive[T]:
+    def read_items(
+        self, path: pathlib.Path | str, item_type: TypeOrGeneric[T]
+    ) -> MMapRowArchive[T]:
         """Read sequence of items from file in row format."""
         return MMapRowArchive(path, item_type)
 
@@ -166,25 +171,43 @@ class SequenceToColumnConverter:
         """Convert sequence of items to columns of data."""
 
         if rgi_types.is_primitive_type(item_type):
-            return self.to_primitive_columns(field_path, item_type, cast(Sequence[PrimitiveType], items))
+            return self.to_primitive_columns(
+                field_path, item_type, cast(Sequence[PrimitiveType], items)
+            )
 
         if rgi_types.is_dataclass_type(item_type):
-            return self.to_dataclass_columns(field_path, item_type, cast(Sequence[DataclassProtocol], items))
+            return self.to_dataclass_columns(
+                field_path, item_type, cast(Sequence[DataclassProtocol], items)
+            )
 
         if item_type is np.ndarray:
-            return self.to_ndarray_columns(field_path, cast(Sequence[np.ndarray[Any, Any]], items))
+            return self.to_ndarray_columns(
+                field_path, cast(Sequence[np.ndarray[Any, Any]], items)
+            )
 
         if (base_type := typing.get_origin(item_type)) is not None:
             base_type_args = typing.get_args(item_type)
 
-            if base_type is list:
-                return self.to_generic_list_columns(field_path, base_type_args[0], cast(Sequence[Sequence[Any]], items))
+            if base_type in (list, collections.abc.Sequence):
+                return self.to_generic_list_columns(
+                    field_path, base_type_args[0], cast(Sequence[Sequence[Any]], items)
+                )
             if base_type is tuple:
-                return self.to_generic_tuple_columns(field_path, base_type_args, cast(Sequence[Sequence[Any]], items))
+                return self.to_generic_tuple_columns(
+                    field_path, base_type_args, cast(Sequence[Sequence[Any]], items)
+                )
             if base_type is np.ndarray:
-                return self.to_ndarray_columns(field_path, cast(Sequence[np.ndarray[Any, Any]], items))
+                return self.to_ndarray_columns(
+                    field_path, cast(Sequence[np.ndarray[Any, Any]], items)
+                )
+            if rgi_types.is_dataclass_type(base_type):
+                return self.to_generic_dataclass_columns(
+                    field_path, base_type, base_type_args, cast(Sequence[Any], items)
+                )
 
-        raise NotImplementedError(f"Cannot add fields for field `{field_path}` with unhandled type {item_type}")
+        raise NotImplementedError(
+            f"Cannot add fields for field `{field_path}` with unhandled type {item_type}"
+        )
 
     def to_primitive_columns(
         self,
@@ -207,14 +230,18 @@ class SequenceToColumnConverter:
         for field in dataclasses.fields(item_type):
             field_type = field.type
             if not rgi_types.is_type_or_generic(field_type):
-                raise ValueError(f"Field {field.name} of type {field_type} is not a valid field type in {field_path}")
+                raise ValueError(
+                    f"Field {field.name} of type {field_type} is not a valid field type in {field_path}"
+                )
 
             field_key = f"{field_path}.{field.name}"
             field_items = [getattr(item, field.name) for item in items]
 
             yield from self.to_columns(field_key, field_type, field_items)
 
-    def to_ndarray_columns(self, field_path: str, items: Sequence[np.ndarray[Any, Any]]) -> Iterator[NamedColumn]:
+    def to_ndarray_columns(
+        self, field_path: str, items: Sequence[np.ndarray[Any, Any]]
+    ) -> Iterator[NamedColumn]:
         """Convert list of ndarrays to columns of data."""
         flat_values = np.concatenate([arr.flatten() for arr in items])
         shapes = [arr.shape for arr in items]
@@ -241,13 +268,59 @@ class SequenceToColumnConverter:
     ) -> Iterator[NamedColumn]:
         """Convert list of tuples to columns of data."""
         if base_type_args[-1] is Ellipsis:  # type: ignore
-            yield from self.to_generic_list_columns(field_path, base_type_args[0], items)
+            yield from self.to_generic_list_columns(
+                field_path, base_type_args[0], items
+            )
             return
 
         for i, t in enumerate(base_type_args):
             tuple_field_path = f"{field_path}.{i}"
             tuple_field_items = [item[i] for item in items]
             yield from self.to_columns(tuple_field_path, t, tuple_field_items)
+
+    def to_generic_dataclass_columns(
+        self,
+        field_path: str,
+        base_type: type,
+        type_args: tuple[type, ...],
+        items: Sequence[Any],
+    ) -> Iterator[NamedColumn]:
+        """For generic dataclass types, recursively handle fields with type parameter substitution."""
+
+        def resolve_type_vars(field_type: Any) -> Any:
+            """Recursively resolve TypeVars in a type to their concrete types."""
+            # Direct TypeVar
+            if isinstance(field_type, typing.TypeVar):
+                type_var_name = field_type.__name__
+                for i, param in enumerate(base_type.__parameters__):
+                    if param.__name__ == type_var_name:
+                        return type_args[i]
+                raise ValueError(
+                    f"Could not find type argument for TypeVar {type_var_name}"
+                )
+
+            # Generic type with potential TypeVar args
+            if origin := typing.get_origin(field_type):
+                resolved_args = tuple(
+                    resolve_type_vars(arg) for arg in typing.get_args(field_type)
+                )
+                return origin[resolved_args]
+
+            return field_type
+
+        # Process each field
+        for field in dataclasses.fields(base_type):
+            field_type = resolve_type_vars(field.type)
+
+            if not rgi_types.is_type_or_generic(field_type):
+                raise ValueError(
+                    f"Field {field.name} of type {field_type} is not a valid field type in {field_path}"
+                )
+
+            field_key = f"{field_path}.{field.name}"
+            field_items = [getattr(item, field.name) for item in items]
+
+            yield from self.to_columns(field_key, field_type, field_items)
 
 
 class ColumnToSequenceConverter:
@@ -275,26 +348,41 @@ class ColumnToSequenceConverter:
                 self.from_dataclass_columns(field_path, item_type, columns, slice_),
             )
         if item_type is np.ndarray:
-            return cast(Sequence[T], self.from_ndarray_columns(field_path, columns, slice_))
+            return cast(
+                Sequence[T], self.from_ndarray_columns(field_path, columns, slice_)
+            )
         if (base_type := typing.get_origin(item_type)) is not None:
             base_type_args = typing.get_args(item_type)
-            if base_type is list:
+            if base_type in (list, collections.abc.Sequence):
                 return cast(
                     Sequence[T],
-                    self.from_generic_list_columns(field_path, base_type_args[0], columns, slice_),
+                    self.from_generic_list_columns(
+                        field_path, base_type_args[0], columns, slice_
+                    ),
                 )
             if base_type is tuple:
                 return cast(
                     Sequence[T],
-                    self.from_generic_tuple_columns(field_path, base_type_args, columns, slice_),
+                    self.from_generic_tuple_columns(
+                        field_path, base_type_args, columns, slice_
+                    ),
                 )
             if base_type is np.ndarray:
                 return cast(
                     Sequence[T],
                     self.from_ndarray_columns(field_path, columns, slice_),
                 )
+            if rgi_types.is_dataclass_type(base_type):
+                return cast(
+                    Sequence[T],
+                    self.from_generic_dataclass_columns(
+                        field_path, base_type, base_type_args, columns, slice_
+                    ),
+                )
 
-        raise NotImplementedError(f"Cannot deserialize columns for field `{field_path}` with type {item_type}")
+        raise NotImplementedError(
+            f"Cannot deserialize columns for field `{field_path}` with type {item_type}"
+        )
 
     def from_primitive_columns(
         self,
@@ -321,7 +409,9 @@ class ColumnToSequenceConverter:
         for field in dataclasses.fields(item_type):
             field_type = field.type
             if not rgi_types.is_type_or_generic(field_type):
-                raise ValueError(f"Field {field.name} of type {field_type} is not a valid field type in {field_path}")
+                raise ValueError(
+                    f"Field {field.name} of type {field_type} is not a valid field type in {field_path}"
+                )
 
             field_key = f"{field_path}.{field.name}"
             field_items = self.from_columns(field_key, field_type, columns, slice_)
@@ -365,12 +455,16 @@ class ColumnToSequenceConverter:
     ) -> Sequence[Any]:
         """Deserialize list of tuples from columns."""
         if base_type_args[-1] is Ellipsis:  # type: ignore
-            return self.from_generic_list_columns(field_path, base_type_args[0], columns, slice_)
+            return self.from_generic_list_columns(
+                field_path, base_type_args[0], columns, slice_
+            )
 
         deserialized_fields: list[Any] = []
         for i, t in enumerate(base_type_args):
             tuple_field_path = f"{field_path}.{i}"
-            tuple_field_items: Sequence[Any] = self.from_columns(tuple_field_path, t, columns, slice_)
+            tuple_field_items: Sequence[Any] = self.from_columns(
+                tuple_field_path, t, columns, slice_
+            )
             deserialized_fields.append(tuple_field_items)
 
         items = [tuple(fields) for fields in zip(*deserialized_fields)]
@@ -382,7 +476,9 @@ class ColumnToSequenceConverter:
         """Deserialize list of ndarrays from columns."""
         flat_values = columns[f"{field_path}.*"]
         size_cumsum = columns[f"{field_path}.#"]
-        shapes: Sequence[Any] = self.from_columns(f"{field_path}.shape", tuple[int, ...], columns, slice_)
+        shapes: Sequence[Any] = self.from_columns(
+            f"{field_path}.shape", tuple[int, ...], columns, slice_
+        )
 
         ret: list[np.ndarray[Any, Any]] = []
         for i, shape in enumerate(shapes):
@@ -390,6 +486,53 @@ class ColumnToSequenceConverter:
             end = size_cumsum[slice_.start + i + 1]
             ret.append(np.reshape(flat_values[start:end], shape))
         return ret
+
+    def from_generic_dataclass_columns(
+        self,
+        field_path: str,
+        base_type: type,
+        base_type_args: tuple[type, ...],
+        columns: ArchiveColumnDict,
+        slice_: slice,
+    ) -> Sequence[DataclassProtocol]:
+        """Deserialize generic dataclass types from columns."""
+
+        def resolve_type_vars(field_type: Any) -> Any:
+            """Recursively resolve TypeVars in a type to their concrete types."""
+            # Direct TypeVar
+            if isinstance(field_type, typing.TypeVar):
+                type_var_name = field_type.__name__
+                for i, param in enumerate(base_type.__parameters__):
+                    if param.__name__ == type_var_name:
+                        return base_type_args[i]
+                raise ValueError(
+                    f"Could not find type argument for TypeVar {type_var_name}"
+                )
+
+            # Generic type with potential TypeVar args
+            if origin := typing.get_origin(field_type):
+                resolved_args = tuple(
+                    resolve_type_vars(arg) for arg in typing.get_args(field_type)
+                )
+                return origin[resolved_args]
+
+            return field_type
+
+        deserialized_fields: list[Any] = []
+        for field in dataclasses.fields(base_type):
+            field_type = resolve_type_vars(field.type)
+            # field_type = field.type
+            if not rgi_types.is_type_or_generic(field_type):
+                raise ValueError(
+                    f"Field {field.name} of type {field_type} is not a valid field type in {field_path}"
+                )
+
+            field_key = f"{field_path}.{field.name}"
+            field_items = self.from_columns(field_key, field_type, columns, slice_)
+            deserialized_fields.append(field_items)
+
+        items = [base_type(*fields) for fields in zip(*deserialized_fields)]
+        return cast(Sequence[DataclassProtocol], items)
 
 
 class ColumnFileArchiver:
@@ -409,7 +552,9 @@ class ColumnFileArchiver:
         path: pathlib.Path | str,
     ) -> None:
         """Save sequence of items to file in column format."""
-        named_columns = self._sequence_to_columns_converter.to_columns("", item_type, items)
+        named_columns = self._sequence_to_columns_converter.to_columns(
+            "", item_type, items
+        )
         return self.write_columns(path, named_columns, sequence_length=len(items))
 
     def write_columns(
@@ -445,7 +590,9 @@ class ColumnFileArchiver:
         with open(f"{path}.index", "x", encoding="utf-8") as f:
             json.dump(metadata_dict, f, indent=2)
 
-    def read_sequence(self, item_type: type[T] | types.GenericAlias, path: pathlib.Path | str) -> Sequence[T]:
+    def read_sequence(
+        self, item_type: type[T] | types.GenericAlias, path: pathlib.Path | str
+    ) -> Sequence[T]:
         """Read sequence of items from file."""
         column_dict, sequence_length = self.read_columns(path)
         return self._columns_to_sequence_converter.from_columns(
@@ -507,7 +654,9 @@ class MMapColumnArchive(Archive[T]):
         return self._sequence_length
 
     def _get_slice(self, idx: slice) -> Sequence[T]:
-        return self._column_to_sequence_converter.from_columns("", self._item_type, self._column_dict, idx)
+        return self._column_to_sequence_converter.from_columns(
+            "", self._item_type, self._column_dict, idx
+        )
 
     @typing.overload
     def __getitem__(self, idx: int) -> T: ...
@@ -525,7 +674,9 @@ class MMapColumnArchive(Archive[T]):
         if idx < 0:
             idx += len(self)
         if not 0 <= idx < len(self):
-            raise IndexError(f"Index {idx} out of range for archive with {len(self)} items")
+            raise IndexError(
+                f"Index {idx} out of range for archive with {len(self)} items"
+            )
         return self._get_slice(slice(idx, idx + 1))[0]
 
     @typing.override
@@ -560,7 +711,9 @@ class CombinedArchive(Archive[T]):
             IndexError: If index is out of range
         """
         if not 0 <= idx < len(self):
-            raise IndexError(f"Index {idx} out of range for archive with {len(self)} trajectories")
+            raise IndexError(
+                f"Index {idx} out of range for archive with {len(self)} trajectories"
+            )
 
         archive_idx = np.searchsorted(self._cumsum[1:], idx, side="right")
         local_idx = idx - self._cumsum[archive_idx]
@@ -591,7 +744,9 @@ class CombinedArchive(Archive[T]):
         if idx < 0:
             idx += len(self)
         if not 0 <= idx < len(self):
-            raise IndexError(f"Index {idx} out of range for archive with {len(self)} items")
+            raise IndexError(
+                f"Index {idx} out of range for archive with {len(self)} items"
+            )
 
         return self._get_item(idx)
 
