@@ -532,23 +532,6 @@ class MMapColumnArchive(Archive[T]):
         for i in range(len(self)):
             yield self[i]  # type: ignore
 
-    # def _get_slice(self, idx: slice) -> Sequence[T]:
-    #     return [self._get_item(i) for i in range(*idx.indices(len(self)))]
-
-    # def __iter__(self) -> Iterator[T]:
-    #     for i in range(len(self)):
-    #         yield self._get_item(i)
-
-    # def __getitem__(self, idx: int | slice) -> T | Sequence[T]:
-    #     if isinstance(idx, slice):
-    #         return self._get_slice(idx)
-    #     # Handle negative indices
-    #     if idx < 0:
-    #         idx += len(self)
-    #     if not 0 <= idx < len(self):
-    #         raise IndexError(f"Index {idx} out of range for archive with {len(self)} items")
-    #     return self._get_slice(slice(idx, idx + 1))[0]
-
 
 class CombinedArchive(Archive[T]):
     """Archive combining multiple archives into a single view."""
@@ -592,9 +575,23 @@ class CombinedArchive(Archive[T]):
     def _get_slice(self, _slice: slice) -> Sequence[T]:
         return [self._get_item(i) for i in range(*_slice.indices(len(self)))]
 
+    @typing.overload
+    def __getitem__(self, idx: int) -> T: ...
+
+    @typing.overload
+    def __getitem__(self, idx: slice) -> Sequence[T]: ...
+
     def __getitem__(self, idx: int | slice) -> T | Sequence[T]:
         if isinstance(idx, slice):
             return self._get_slice(idx)
+
+        # get single item
+        # Handle negative indices
+        if idx < 0:
+            idx += len(self)
+        if not 0 <= idx < len(self):
+            raise IndexError(f"Index {idx} out of range for archive with {len(self)} items")
+
         return self._get_item(idx)
 
     def __iter__(self) -> Iterator[T]:
