@@ -17,7 +17,7 @@ absl-py==2.1.0
     #   tensorflow
 annotated-types==0.7.0
     # via pydantic
-anyio==4.6.2.post1
+anyio==4.8.0
     # via
     #   httpx
     #   jupyter-server
@@ -29,15 +29,15 @@ argon2-cffi-bindings==21.2.0
     # via argon2-cffi
 arrow==1.3.0
     # via isoduration
-astroid==3.3.5
+astroid==3.3.8
     # via pylint
-asttokens==2.4.1
+asttokens==3.0.0
     # via stack-data
 astunparse==1.6.3
     # via tensorflow
 async-lru==2.0.4
     # via jupyterlab
-attrs==24.2.0
+attrs==24.3.0
     # via
     #   jsonschema
     #   outcome
@@ -47,11 +47,11 @@ babel==2.16.0
     # via jupyterlab-server
 beautifulsoup4==4.12.3
     # via nbconvert
-bleach==6.2.0
+bleach[css]==6.2.0
     # via nbconvert
 build==1.2.2.post1
     # via pip-tools
-certifi==2024.8.30
+certifi==2024.12.14
     # via
     #   httpcore
     #   httpx
@@ -59,11 +59,11 @@ certifi==2024.8.30
     #   selenium
 cffi==1.17.1
     # via argon2-cffi-bindings
-charset-normalizer==3.4.0
+charset-normalizer==3.4.1
     # via requests
-chex==0.1.87
+chex==0.1.88
     # via optax
-click==8.1.7
+click==8.1.8
     # via
     #   pip-tools
     #   uvicorn
@@ -71,7 +71,7 @@ comm==0.2.2
     # via
     #   ipykernel
     #   ipywidgets
-debugpy==1.8.7
+debugpy==1.8.11
     # via ipykernel
 decorator==5.1.1
     # via ipython
@@ -79,7 +79,7 @@ defusedxml==0.7.1
     # via nbconvert
 dill==0.3.9
     # via pylint
-etils[epath,epy]==1.10.0
+etils[epath,epy]==1.11.0
     # via
     #   optax
     #   orbax-checkpoint
@@ -89,19 +89,19 @@ executing==2.1.0
     # via stack-data
 fastapi==0.114.1
     # via -r requirements.in
-fastjsonschema==2.20.0
+fastjsonschema==2.21.1
     # via nbformat
 filelock==3.16.1
     # via
     #   torch
     #   triton
-flatbuffers==24.3.25
+flatbuffers==24.12.23
     # via tensorflow
-flax==0.10.1
+flax==0.10.2
     # via -r requirements.in
 fqdn==1.5.1
     # via jsonschema
-fsspec==2024.10.0
+fsspec==2024.12.0
     # via
     #   etils
     #   torch
@@ -111,7 +111,7 @@ google-pasta==0.2.0
     # via tensorflow
 greenlet==3.1.1
     # via playwright
-grpcio==1.67.1
+grpcio==1.69.0
     # via
     #   tensorboard
     #   tensorflow
@@ -124,11 +124,11 @@ h5py==3.12.1
     # via
     #   keras
     #   tensorflow
-httpcore==1.0.6
+httpcore==1.0.7
     # via httpx
 httptools==0.6.4
     # via uvicorn
-httpx==0.27.2
+httpx==0.28.1
     # via jupyterlab
 humanize==4.11.0
     # via orbax-checkpoint
@@ -139,7 +139,7 @@ idna==3.10
     #   jsonschema
     #   requests
     #   trio
-importlib-resources==6.4.5
+importlib-resources==6.5.2
     # via etils
 iniconfig==2.0.0
     # via pytest
@@ -148,7 +148,7 @@ ipykernel==6.29.5
     #   jupyter
     #   jupyter-console
     #   jupyterlab
-ipython==8.29.0
+ipython==8.31.0
     # via
     #   ipykernel
     #   ipywidgets
@@ -175,7 +175,7 @@ jaxlib==0.4.34
     #   chex
     #   jax
     #   optax
-jedi==0.19.1
+jedi==0.19.2
     # via ipython
 jinja2==3.1.4
     # via
@@ -185,7 +185,7 @@ jinja2==3.1.4
     #   jupyterlab-server
     #   nbconvert
     #   torch
-json5==0.9.25
+json5==0.10.0
     # via jupyterlab-server
 jsonpointer==3.0.0
     # via jsonschema
@@ -216,11 +216,11 @@ jupyter-core==5.7.2
     #   nbclient
     #   nbconvert
     #   nbformat
-jupyter-events==0.10.0
+jupyter-events==0.11.0
     # via jupyter-server
 jupyter-lsp==2.2.5
     # via jupyterlab
-jupyter-server==2.14.2
+jupyter-server==2.15.0
     # via
     #   jupyter-lsp
     #   jupyterlab
@@ -229,7 +229,7 @@ jupyter-server==2.14.2
     #   notebook-shim
 jupyter-server-terminals==0.5.3
     # via jupyter-server
-jupyterlab==4.2.5
+jupyterlab==4.3.4
     # via
     #   jupyter
     #   notebook
@@ -241,11 +241,11 @@ jupyterlab-server==2.27.3
     #   notebook
 jupyterlab-widgets==3.0.13
     # via ipywidgets
-keras==3.6.0
+keras==3.8.0
     # via tensorflow
 libclang==18.1.1
     # via tensorflow
-line-profiler==4.1.3
+line-profiler==4.2.0
     # via -r requirements.in
 markdown==3.7
     # via tensorboard
@@ -266,7 +266,7 @@ mdurl==0.1.2
     # via markdown-it-py
 memory-profiler==0.61.0
     # via -r requirements.in
-mistune==3.0.2
+mistune==3.1.0
     # via nbconvert
 ml-dtypes==0.4.1
     # via
@@ -281,15 +281,15 @@ msgpack==1.1.0
     # via
     #   flax
     #   orbax-checkpoint
-mypy==1.13.0
+mypy==1.14.1
     # via -r requirements.in
 mypy-extensions==1.0.0
     # via mypy
 namex==0.0.8
     # via keras
-nbclient==0.10.0
+nbclient==0.10.2
     # via nbconvert
-nbconvert==7.16.4
+nbconvert==7.16.5
     # via
     #   jupyter
     #   jupyter-server
@@ -304,7 +304,7 @@ nest-asyncio==1.6.0
     #   orbax-checkpoint
 networkx==3.4.2
     # via torch
-notebook==7.2.2
+notebook==7.3.2
     # via jupyter
 notebook-shim==0.2.4
     # via
@@ -339,7 +339,7 @@ nvidia-cuda-cupti-cu12==12.4.127
     # via
     #   jax-cuda12-plugin
     #   torch
-nvidia-cuda-nvcc-cu12==12.6.77
+nvidia-cuda-nvcc-cu12==12.6.85
     # via jax-cuda12-plugin
 nvidia-cuda-nvrtc-cu12==12.4.127
     # via torch
@@ -382,17 +382,17 @@ opt-einsum==3.4.0
     # via
     #   jax
     #   tensorflow
-optax==0.2.3
+optax==0.2.4
     # via flax
-optree==0.13.0
+optree==0.13.1
     # via keras
-orbax-checkpoint==0.8.0
+orbax-checkpoint==0.11.0
     # via flax
 outcome==1.3.0.post0
     # via trio
 overrides==7.7.0
     # via jupyter-server
-packaging==24.1
+packaging==24.2
     # via
     #   build
     #   ipykernel
@@ -423,18 +423,18 @@ playwright==1.48.0
     #   pytest-playwright
 pluggy==1.5.0
     # via pytest
-prometheus-client==0.21.0
+prometheus-client==0.21.1
     # via jupyter-server
 prompt-toolkit==3.0.48
     # via
     #   ipython
     #   jupyter-console
-protobuf==5.28.3
+protobuf==5.29.3
     # via
     #   orbax-checkpoint
     #   tensorboard
     #   tensorflow
-psutil==6.1.0
+psutil==6.1.1
     # via
     #   ipykernel
     #   memory-profiler
@@ -444,21 +444,23 @@ ptyprocess==0.7.0
     #   terminado
 pure-eval==0.2.3
     # via stack-data
+py-cpuinfo==9.0.0
+    # via pytest-benchmark
 pycparser==2.22
     # via cffi
-pydantic==2.9.2
+pydantic==2.10.5
     # via fastapi
-pydantic-core==2.23.4
+pydantic-core==2.27.2
     # via pydantic
 pyee==12.0.0
     # via playwright
-pygments==2.18.0
+pygments==2.19.1
     # via
     #   ipython
     #   jupyter-console
     #   nbconvert
     #   rich
-pylint==3.3.1
+pylint==3.3.3
     # via -r requirements.in
 pyproject-hooks==1.2.0
     # via
@@ -466,19 +468,22 @@ pyproject-hooks==1.2.0
     #   pip-tools
 pysocks==1.7.1
     # via urllib3
-pytest==8.3.3
+pytest==8.3.4
     # via
     #   -r requirements.in
     #   pytest-base-url
+    #   pytest-benchmark
     #   pytest-mock
     #   pytest-playwright
     #   pytest-timeout
     #   pytest-xdist
 pytest-base-url==2.1.0
     # via pytest-playwright
+pytest-benchmark==5.1.0
+    # via -r requirements.in
 pytest-mock==3.14.0
     # via -r requirements.in
-pytest-playwright==0.5.2
+pytest-playwright==0.6.2
     # via -r requirements.in
 pytest-timeout==2.3.1
     # via -r requirements.in
@@ -492,7 +497,7 @@ python-dotenv==1.0.1
     # via
     #   uvicorn
     #   webdriver-manager
-python-json-logger==2.0.7
+python-json-logger==3.2.1
     # via jupyter-events
 python-slugify==8.0.4
     # via pytest-playwright
@@ -531,21 +536,22 @@ rich==13.9.4
     # via
     #   flax
     #   keras
-rpds-py==0.20.1
+rpds-py==0.22.3
     # via
     #   jsonschema
     #   referencing
-scipy==1.14.1
+scipy==1.15.1
     # via
     #   jax
     #   jaxlib
-selenium==4.26.1
+selenium==4.27.1
     # via -r requirements.in
 send2trash==1.8.3
     # via jupyter-server
-six==1.16.0
+simplejson==3.19.3
+    # via orbax-checkpoint
+six==1.17.0
     # via
-    #   asttokens
     #   astunparse
     #   google-pasta
     #   python-dateutil
@@ -555,7 +561,6 @@ six==1.16.0
 sniffio==1.3.1
     # via
     #   anyio
-    #   httpx
     #   trio
 sortedcontainers==2.4.0
     # via trio
@@ -573,7 +578,7 @@ tensorboard-data-server==0.7.2
     # via tensorboard
 tensorflow==2.18.0
     # via -r requirements.in
-tensorstore==0.1.67
+tensorstore==0.1.71
     # via
     #   flax
     #   orbax-checkpoint
@@ -586,14 +591,14 @@ terminado==0.18.1
 text-unidecode==1.3
     # via python-slugify
 tinycss2==1.4.0
-    # via nbconvert
+    # via bleach
 tomlkit==0.13.2
     # via pylint
 toolz==1.0.0
     # via chex
 torch==2.5.0+cu124
     # via -r requirements.in
-tornado==6.4.1
+tornado==6.4.2
     # via
     #   ipykernel
     #   jupyter-client
@@ -601,7 +606,7 @@ tornado==6.4.1
     #   jupyterlab
     #   notebook
     #   terminado
-tqdm==4.66.6
+tqdm==4.67.1
     # via -r requirements.in
 traitlets==5.14.3
     # via
@@ -619,7 +624,7 @@ traitlets==5.14.3
     #   nbclient
     #   nbconvert
     #   nbformat
-trio==0.27.0
+trio==0.28.0
     # via
     #   selenium
     #   trio-websocket
@@ -627,10 +632,11 @@ trio-websocket==0.11.1
     # via selenium
 triton==3.1.0
     # via torch
-types-python-dateutil==2.9.0.20241003
+types-python-dateutil==2.9.0.20241206
     # via arrow
 typing-extensions==4.12.2
     # via
+    #   anyio
     #   chex
     #   etils
     #   fastapi
@@ -646,7 +652,7 @@ typing-extensions==4.12.2
     #   torch
 uri-template==1.3.0
     # via jsonschema
-urllib3[socks]==2.2.3
+urllib3[socks]==2.3.0
     # via
     #   requests
     #   selenium
@@ -654,11 +660,11 @@ uvicorn[standard]==0.30.6
     # via -r requirements.in
 uvloop==0.21.0
     # via uvicorn
-watchfiles==0.24.0
+watchfiles==1.0.4
     # via uvicorn
 wcwidth==0.2.13
     # via prompt-toolkit
-webcolors==24.8.0
+webcolors==24.11.1
     # via jsonschema
 webdriver-manager==4.0.2
     # via -r requirements.in
@@ -670,21 +676,21 @@ websocket-client==1.8.0
     # via
     #   jupyter-server
     #   selenium
-websockets==13.1
+websockets==14.1
     # via uvicorn
-werkzeug==3.1.1
+werkzeug==3.1.3
     # via tensorboard
-wheel==0.44.0
+wheel==0.45.1
     # via
     #   astunparse
     #   pip-tools
 widgetsnbextension==4.0.13
     # via ipywidgets
-wrapt==1.16.0
+wrapt==1.17.2
     # via tensorflow
 wsproto==1.2.0
     # via trio-websocket
-zipp==3.20.2
+zipp==3.21.0
     # via etils
 
 # The following packages are considered to be unsafe in a requirements file:

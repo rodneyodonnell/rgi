@@ -45,7 +45,7 @@ class GenericData(typing.Generic[T1, T2]):
     y: T2
 
 
-_SAMPLE_SIMPLE_DATA = [
+SAMPLE_SIMPLE_DATA = [
     SimpleData(x=1, y=2.0, name="test"),
     SimpleData(x=3, y=4.0, name="test2"),
     SimpleData(x=5, y=6.0, name="test3"),
@@ -58,7 +58,7 @@ _SAMPLE_SIMPLE_DATA = [
     SimpleData(x=19, y=20.0, name="test10"),
 ]
 
-_SAMPLE_NESTED_DATA = [
+SAMPLE_NESTED_DATA = [
     NestedData(
         simple=SimpleData(x=1, y=2.0, name="test"),
         values=[1, 2, 3],
@@ -79,20 +79,20 @@ _SAMPLE_NESTED_DATA = [
     ),
 ]
 
-_SAMPLE_NDARRAY_DATA = [
+SAMPLE_NDARRAY_DATA = [
     np.array([[1, 2], [3, 4]]),
     np.array([[5, 6, 7], [8, 9, 10], [11, 12, 13], [14, 15, 16]]),
     np.array([[9, 10, 11], [12, 13, 14], [15, 16, 17], [18, 19, 20]]),
 ]
 
 
-_SAMPLE_GENERIC_INT_FLOAT_DATA: list[GenericData[int, float]] = [
+SAMPLE_GENERIC_INT_FLOAT_DATA: list[GenericData[int, float]] = [
     GenericData(x=1, y=2.0),
     GenericData(x=3, y=4.0),
     GenericData(x=5, y=6.0),
 ]
 
-_SAMPLE_GENERIC_INT_LIST_DATA: list[GenericData[int, list[int]]] = [
+SAMPLE_GENERIC_INT_LIST_DATA: list[GenericData[int, list[int]]] = [
     GenericData(x=1, y=[1, 2, 3]),
     GenericData(x=3, y=[4, 5, 6, 7, 8, 9, 10]),
     GenericData(x=5, y=[11, 12, 13, 14, 15, 16, 17, 18, 19, 20]),
@@ -137,11 +137,11 @@ def test_list_based_archive() -> None:
         pytest.param(list[list[int]], [[[10, 20], [30, 40, 50]], [[60, 70, 80, 90, 100]]], id="list[list[int]]"),
         pytest.param(tuple[int, float, str], [(1, 2.0, "a"), (3, 4.0, "b")], id="tuple[int, float, str]"),
         pytest.param(str, ["foo", "bar", "baz", "", "", "longer_string", "x"], id="str"),
-        pytest.param(np.ndarray, _SAMPLE_NDARRAY_DATA, id="ndarray"),
-        pytest.param(SimpleData, _SAMPLE_SIMPLE_DATA, id="simple"),
-        pytest.param(NestedData, _SAMPLE_NESTED_DATA, id="nested"),
-        pytest.param(GenericData[int, float], _SAMPLE_GENERIC_INT_FLOAT_DATA, id="generic_int_float"),
-        pytest.param(GenericData[int, list[int]], _SAMPLE_GENERIC_INT_LIST_DATA, id="generic_int_list"),
+        pytest.param(np.ndarray, SAMPLE_NDARRAY_DATA, id="ndarray"),
+        pytest.param(SimpleData, SAMPLE_SIMPLE_DATA, id="simple"),
+        pytest.param(NestedData, SAMPLE_NESTED_DATA, id="nested"),
+        pytest.param(GenericData[int, float], SAMPLE_GENERIC_INT_FLOAT_DATA, id="generic_int_float"),
+        pytest.param(GenericData[int, list[int]], SAMPLE_GENERIC_INT_LIST_DATA, id="generic_int_list"),
     ],
 )
 def test_row_based_archive(tmp_path: pathlib.Path, item_type: Type[T], items: list[T]) -> None:
@@ -172,17 +172,17 @@ def test_row_based_archive(tmp_path: pathlib.Path, item_type: Type[T], items: li
         pytest.param(list[list[int]], [[[10, 20], [30, 40, 50]], [[60, 70, 80, 90, 100]]], id="list[list[int]]"),
         pytest.param(tuple[int, float, str], [(1, 2.0, "a"), (3, 4.0, "b")], id="tuple[int, float, str]"),
         pytest.param(str, ["foo", "bar", "baz", "", "", "longer_string", "x"], id="str"),
-        pytest.param(np.ndarray, _SAMPLE_NDARRAY_DATA, id="ndarray"),
-        pytest.param(SimpleData, _SAMPLE_SIMPLE_DATA, id="simple"),
-        pytest.param(NestedData, _SAMPLE_NESTED_DATA, id="nested"),
-        pytest.param(GenericData[int, float], _SAMPLE_GENERIC_INT_FLOAT_DATA, id="generic_int_float"),
-        pytest.param(GenericData[int, list[int]], _SAMPLE_GENERIC_INT_LIST_DATA, id="generic_int_list"),
+        pytest.param(np.ndarray, SAMPLE_NDARRAY_DATA, id="ndarray"),
+        pytest.param(SimpleData, SAMPLE_SIMPLE_DATA, id="simple"),
+        pytest.param(NestedData, SAMPLE_NESTED_DATA, id="nested"),
+        pytest.param(GenericData[int, float], SAMPLE_GENERIC_INT_FLOAT_DATA, id="generic_int_float"),
+        pytest.param(GenericData[int, list[int]], SAMPLE_GENERIC_INT_LIST_DATA, id="generic_int_list"),
     ],
 )
 def test_column_based_archive_sequence(tmp_path: pathlib.Path, item_type: Type[T], items: list[T]) -> None:
     archiver = ColumnFileArchiver()
     path = pathlib.Path(tmp_path) / "test.col"
-    archiver.write_sequence(item_type, items, path)
+    archiver.write_items(item_type, items, path)
     reloaded = archiver.read_sequence(item_type, path)
 
     assert len(reloaded) == len(items)
@@ -201,17 +201,17 @@ def test_column_based_archive_sequence(tmp_path: pathlib.Path, item_type: Type[T
         pytest.param(list[list[int]], [[[10, 20], [30, 40, 50]], [[60, 70, 80, 90, 100]]], id="list[list[int]]"),
         pytest.param(tuple[int, float, str], [(1, 2.0, "a"), (3, 4.0, "b")], id="tuple[int, float, str]"),
         pytest.param(str, ["foo", "bar", "baz", "", "", "longer_string", "x"], id="str"),
-        pytest.param(np.ndarray, _SAMPLE_NDARRAY_DATA, id="ndarray"),
-        pytest.param(SimpleData, _SAMPLE_SIMPLE_DATA, id="simple"),
-        pytest.param(NestedData, _SAMPLE_NESTED_DATA, id="nested"),
-        pytest.param(GenericData[int, float], _SAMPLE_GENERIC_INT_FLOAT_DATA, id="generic_int_float"),
-        pytest.param(GenericData[int, list[int]], _SAMPLE_GENERIC_INT_LIST_DATA, id="generic_int_list"),
+        pytest.param(np.ndarray, SAMPLE_NDARRAY_DATA, id="ndarray"),
+        pytest.param(SimpleData, SAMPLE_SIMPLE_DATA, id="simple"),
+        pytest.param(NestedData, SAMPLE_NESTED_DATA, id="nested"),
+        pytest.param(GenericData[int, float], SAMPLE_GENERIC_INT_FLOAT_DATA, id="generic_int_float"),
+        pytest.param(GenericData[int, list[int]], SAMPLE_GENERIC_INT_LIST_DATA, id="generic_int_list"),
     ],
 )
 def test_mmap_column(tmp_path: pathlib.Path, item_type: Type[T], items: list[T]) -> None:
     archiver = ColumnFileArchiver()
     path = pathlib.Path(tmp_path) / "test.col"
-    archiver.write_sequence(item_type, items, path)
+    archiver.write_items(item_type, items, path)
     column_archive: MMapColumnArchive[T] = MMapColumnArchive(path, item_type)
 
     assert len(column_archive) == len(items)
@@ -230,7 +230,7 @@ def test_invalid_column_type(tmp_path: pathlib.Path) -> None:
 
     archiver = ColumnFileArchiver()
     with pytest.raises(NotImplementedError):
-        archiver.write_sequence(NonDataclass, [], tmp_path / "test.col")
+        archiver.write_items(NonDataclass, [], tmp_path / "test.col")
 
 
 @pytest.mark.parametrize(
@@ -241,11 +241,11 @@ def test_invalid_column_type(tmp_path: pathlib.Path) -> None:
         pytest.param(list[list[int]], [[[10, 20], [30, 40, 50]], [[60, 70, 80, 90, 100]]], id="list[list[int]]"),
         pytest.param(tuple[int, float, str], [(1, 2.0, "a"), (3, 4.0, "b")], id="tuple[int, float, str]"),
         pytest.param(str, ["foo", "bar", "baz", "", "", "longer_string", "x"], id="str"),
-        pytest.param(np.ndarray, _SAMPLE_NDARRAY_DATA, id="ndarray"),
-        pytest.param(SimpleData, _SAMPLE_SIMPLE_DATA, id="simple"),
-        pytest.param(NestedData, _SAMPLE_NESTED_DATA, id="nested"),
-        pytest.param(GenericData[int, float], _SAMPLE_GENERIC_INT_FLOAT_DATA, id="generic_int_float"),
-        pytest.param(GenericData[int, list[int]], _SAMPLE_GENERIC_INT_LIST_DATA, id="generic_int_list"),
+        pytest.param(np.ndarray, SAMPLE_NDARRAY_DATA, id="ndarray"),
+        pytest.param(SimpleData, SAMPLE_SIMPLE_DATA, id="simple"),
+        pytest.param(NestedData, SAMPLE_NESTED_DATA, id="nested"),
+        pytest.param(GenericData[int, float], SAMPLE_GENERIC_INT_FLOAT_DATA, id="generic_int_float"),
+        pytest.param(GenericData[int, list[int]], SAMPLE_GENERIC_INT_LIST_DATA, id="generic_int_list"),
     ],
 )
 def test_combined_archive(tmp_path: pathlib.Path, item_type: Type[T], items: list[T]) -> None:
@@ -265,7 +265,7 @@ def test_combined_archive(tmp_path: pathlib.Path, item_type: Type[T], items: lis
     column_items = items[1::]
     column_archiver = ColumnFileArchiver()
     column_path = tmp_path / "test.col"
-    column_archiver.write_sequence(item_type, column_items, column_path)
+    column_archiver.write_items(item_type, column_items, column_path)
     column_archive: MMapColumnArchive[T] = MMapColumnArchive(column_path, item_type)
 
     combined_items = list_items + row_items + column_items
