@@ -1,9 +1,6 @@
 import dataclasses
-from pathlib import Path
-from typing import Generic, Sequence, Type, Any, get_origin, get_args, Union
+from typing import Generic, Sequence, Any, get_origin, get_args, Union
 
-import numpy as np
-from numpy.typing import NDArray
 
 from rgi.core import base
 from rgi.core.base import TGameState, TAction
@@ -59,95 +56,6 @@ class GameTrajectory(Generic[TGameState, TAction]):
                 f"The number of final rewards ({len(self.final_reward)}) must be the same as the number of players "
                 f"({self.num_players})"
             )
-
-    def save(self, filepath: Path | str, allow_pickle: bool = False) -> None:
-        """Save trajectory using numpy's efficient binary format."""
-        filepath = Path(filepath)
-
-        def to_valid_array(name: str, seq: Sequence[Any], assert_dtype: type[np.generic] | None = None) -> NDArray[Any]:
-            arr = np.asarray(seq)
-            if assert_dtype is not None and arr.dtype != assert_dtype:
-                raise ValueError(f"Error saving '{name}': Expected dtype {assert_dtype}, got {arr.dtype}")
-            if arr.dtype == np.dtype("O") and not allow_pickle:
-                raise ValueError(f"Error saving '{name}': Sequence contains object dtype requiring pickle: {seq}")
-            return arr
-
-        # Convert sequences to numpy arrays if they aren't already
-        action_player_ids = to_valid_array("action_player_ids", self.action_player_ids, np.int64)
-        incremental_rewards = to_valid_array("incremental_rewards", self.incremental_rewards, np.float64)
-        final_reward = to_valid_array("final_reward", self.final_reward, np.float64)
-
-        # For states and actions, we need to handle the dataclass fields
-        state_arrays = {}
-        if dataclasses.is_dataclass(self.game_states[0]):
-            for field_name in self.game_states[0].__dataclass_fields__:
-                values = [getattr(state, field_name) for state in self.game_states]
-                state_arrays[field_name] = to_valid_array(field_name, values)
-        else:
-            state_arrays[""] = to_valid_array("game_states", self.game_states)
-
-        action_arrays = {}
-        if dataclasses.is_dataclass(self.actions[0]):
-            for field_name in self.actions[0].__dataclass_fields__:
-                values = [getattr(action, field_name) for action in self.actions]
-                action_arrays[field_name] = to_valid_array(field_name, values)
-        else:
-            action_arrays[""] = to_valid_array("actions", self.actions)
-
-        # Save all arrays in a single .npz file
-        np.savez_compressed(
-            filepath,
-            action_player_ids=action_player_ids,
-            incremental_rewards=incremental_rewards,
-            final_reward=final_reward,
-            num_players=to_valid_array("num_players", [self.num_players]),
-            **{f"state_{k}": v for k, v in state_arrays.items()},
-            **{f"action_{k}": v for k, v in action_arrays.items()},
-        )
-
-    @classmethod
-    def load(
-        cls,
-        filepath: Path | str,
-        game_state_type: Type[TGameState],
-        action_type: Type[TAction],
-        allow_pickle: bool = False,
-    ) -> "GameTrajectory[TGameState, TAction]":
-        """Load trajectory from numpy binary format."""
-        filepath = Path(filepath)
-        data = np.load(filepath, allow_pickle=allow_pickle)
-
-        # Reconstruct states
-        if dataclasses.is_dataclass(game_state_type):
-            game_state_fields = {
-                field_name: data[f"state_{field_name}"] for field_name in game_state_type.__dataclass_fields__
-            }
-            game_states = [
-                game_state_type(**{k: v[i] for k, v in game_state_fields.items()})
-                for i in range(len(next(iter(game_state_fields.values()))))
-            ]
-        else:
-            game_states = data["state_"]
-
-        if dataclasses.is_dataclass(action_type):
-            action_fields = {
-                field_name: data[f"action_{field_name}"] for field_name in action_type.__dataclass_fields__
-            }
-            actions = [
-                action_type(**{k: v[i] for k, v in action_fields.items()})
-                for i in range(len(next(iter(action_fields.values()))))
-            ]
-        else:
-            actions = data["action_"]
-
-        return cls(
-            game_states=game_states,  # type: ignore
-            actions=actions,  # type: ignore
-            action_player_ids=data["action_player_ids"],
-            incremental_rewards=data["incremental_rewards"],
-            num_players=data["num_players"].item(),
-            final_reward=data["final_reward"],
-        )
 
 
 class TrajectoryBuilder(Generic[TGameState, TAction]):
