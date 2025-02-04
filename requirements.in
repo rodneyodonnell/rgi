@@ -39,6 +39,7 @@ pytest
 pytest-mock
 pytest-timeout
 pytest-xdist
+pytest-benchmark
 
 # Frontent testing
 pytest-playwright
