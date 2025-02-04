@@ -27,10 +27,14 @@ find . \( -path "*/node_modules" -o \
        -print | grep -v -E "$EXCLUDE_PATTERN" | tar -cvf rgi_source.tar -T -
 
 
-xclip -selection clipboard < rgi_source.tar
 
 # Make a copy with .txt extension so claude UI will allow it.
-cp rgi_source.tar rgi_source.tar.txt
+#cp rgi_source.tar rgi_source.tar.txt
+#xclip -selection clipboard < rgi_source.tar.txt
+
+# Base64 encode the tar file
+base64 rgi_source.tar > rgi_source.tar.base64.txt
+xclip -selection clipboard < rgi_source.tar.base64.txt
 
 echo
 echo Created source tarball 'rgi_source.tar' and copied to clipboard.
