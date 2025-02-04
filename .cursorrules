@@ -20,6 +20,7 @@ You have vast experience with nupmy, JAX, tensorflow and pytorch for ML, as well
 - Add type annotations and tests for all functions.
 - Follow PEP 8 style guidelines for Python code with 120 character line length.
 - Assume we're using Python 3.12+
+  - use 'dict/list/tuple' not 'Dict/List/Tuple' for types, etc. 
 
 # JAX style
 

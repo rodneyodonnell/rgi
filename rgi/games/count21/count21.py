@@ -54,6 +54,7 @@ class Count21Game(base.Game[TGameState, TAction]):
 
     @override
     def reward(self, game_state: TGameState, player_id: TPlayerId) -> float:
+        "Reward the player who did NOT reach the target."
         if not self.is_terminal(game_state):
             return 0.0
         return 1.0 if self.current_player_id(game_state) == player_id else -1.0

@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Generic, TypeVar, Sequence, Any
+import numpy as np
 
 TGame = TypeVar("TGame", bound="Game[Any, Any]")  # pylint: disable=invalid-name
 TGameState = TypeVar("TGameState")  # pylint: disable=invalid-name
@@ -47,6 +48,13 @@ class Game(ABC, Generic[TGameState, TAction]):
 
         This is typically 0 for non-terminal states, and -1, 0, or 1 for terminal states,
         depending on whether the player lost, drew, or won respectively."""
+
+    def reward_array(self, game_state: TGameState) -> np.ndarray:
+        """Return the reward for the given player in the given state as a NumPy array.
+
+        This is typically 0 for non-terminal states, and -1, 0, or 1 for terminal states,
+        depending on whether the player lost, drew, or won respectively."""
+        return np.array([self.reward(game_state, player_id) for player_id in self.player_ids(game_state)])
 
     @abstractmethod
     def pretty_str(self, game_state: TGameState) -> str:
