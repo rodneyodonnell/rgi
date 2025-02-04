@@ -1,6 +1,6 @@
 #!/bin/bash
 
-run_tests_options="--all --backend --frontend --headed"
+run_tests_options="--all --backend --frontend --headed --benchmark"
 
 _run_tests_script_completions() {
   local cur="${COMP_WORDS[COMP_CWORD]}"
@@ -19,7 +19,10 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
       pytest -n auto --doctest-modules
       ;;
     --backend)
-      pytest -n auto rgi --doctest-modules
+      pytest -n auto rgi --doctest-modules --benchmark-skip
+      ;;
+    --benchmark)
+      pytest rgi/benchmarks --benchmark-only
       ;;
     --frontend)
       pytest -n auto web_app --doctest-modules
