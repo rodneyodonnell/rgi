@@ -1,147 +1,109 @@
+"""Benchmark tests for archive implementations."""
+
 import time
-import psutil
+import random
+import statistics
+import dataclasses
+from pathlib import Path
+from typing import TypeVar, Any, Sequence, Callable
+
+import numpy as np
 import pytest
 from pytest_benchmark.fixture import BenchmarkFixture
 
-from pathlib import Path
-import numpy as np
-from typing import Type, Any
-import random
-
-from rgi.games.connect4 import connect4
-from rgi.games.count21 import count21
-
-from rgi.tests import test_utils
-
-from rgi.core.trajectory_archive import (
-    BaseArchive,
-    SingleFileArchive,
-    # SplitFileArchive,
-    MemoryMappedArchive,
-    ArchiveStats,
-    AppendOnlyArchive,
-    ReadOnlyArchive,
+from rgi.core.archive import (
+    Archive,
+    RowFileArchiver,
+    ColumnFileArchiver,
+    MMapRowArchive,
+    MMapColumnArchive,
 )
-from rgi.core.trajectory import GameTrajectory, TrajectoryBuilder
-from rgi.core.base import Game, TGameState, TAction
+from rgi.tests.core.test_archive import NestedData, SAMPLE_NESTED_DATA
+
+T = TypeVar("T")
 
 
-def get_memory_usage() -> float:
-    """Get current memory usage in MB"""
-    process = psutil.Process()
-    return process.memory_info().rss / (1024 * 1024)  # type: ignore
+def generate_benchmark_data(num_items: int) -> list[NestedData]:
+    """Generate random benchmark data."""
+    return [SAMPLE_NESTED_DATA[i % len(SAMPLE_NESTED_DATA)] for i in range(num_items)]
 
 
-def random_trajectory(
-    game: Game[TGameState, TAction], trajectory_length: int = 20
-) -> GameTrajectory[TGameState, TAction]:
-    """Generate a random trajectory for testing"""
-    state = game.initial_state()
-
-    builder = TrajectoryBuilder(game, state)
-    for _ in range(trajectory_length):
-        # Cycle though games until we hit the required length.
-        if game.is_terminal(state):
-            state = game.initial_state()
-
-        action_player_id = game.current_player_id(state)
-        legal_actions = game.legal_actions(state)
-        action = random.choice(legal_actions)
-        state = game.next_state(state, action)
-
-        builder.record_step(
-            action_player_id=action_player_id,
-            action=action,
-            updated_state=state,
-            incremental_reward=0.0,
-        )
-
-    return builder.build()
+def write_data(items: list[NestedData], archive_type: str, path: Path) -> None:
+    """Write data to a file."""
+    if archive_type == "row":
+        row_archiver = RowFileArchiver()
+        row_archiver.write_items(items, path)
+    else:
+        col_archiver = ColumnFileArchiver()
+        col_archiver.write_items(NestedData, items, path)
 
 
-def benchmark_archive(
-    trajectories: list[GameTrajectory[TGameState, TAction]],
-    game_state_type: Type[TGameState],
-    action_type: Type[TAction],
-    tmp_path: Path,
-) -> ArchiveStats:
-    """Benchmark archive implementations"""
-    archive_path = tmp_path / "test_archive"
-
-    # Measure write performance
-    initial_memory = get_memory_usage()
-    peak_memory = initial_memory
-
-    write_start = time.perf_counter()
-    with AppendOnlyArchive(archive_path, game_state_type, action_type) as archive:
-        for trajectory in trajectories:
-            archive.add_trajectory(trajectory)
-            peak_memory = max(peak_memory, get_memory_usage())
-    write_time = (time.perf_counter() - write_start) * 1000
-
-    # Measure read performance
-    read_start = time.perf_counter()
-    reader = ReadOnlyArchive(archive_path, game_state_type, action_type)
-
-    # Test both sequential and random access
-    sequential_trajectories = list(reader)
-    random_indices = [random.randrange(len(reader)) for _ in range(min(10, len(reader)))]
-    random_trajectories = [reader[i] for i in random_indices]
-
-    reader.close()
-    read_time = (time.perf_counter() - read_start) * 1000
-
-    # Get file size
-    file_size = sum(p.stat().st_size for p in [archive_path.with_suffix(".rgi"), archive_path.with_suffix(".idx")])
-
-    return ArchiveStats(
-        write_time_ms=write_time,
-        read_time_ms=read_time,
-        file_size_bytes=file_size,
-        peak_memory_mb=peak_memory - initial_memory,
-    )
-
-
-@pytest.mark.benchmark(
-    group="archive",
-    min_rounds=5,
-)
-@pytest.mark.parametrize(
-    "game,game_state_type,action_type",
-    [
-        (connect4.Connect4Game(), connect4.GameState, connect4.Action),
-        (count21.Count21Game(), count21.TGameState, count21.TAction),
-    ],
-)
-@pytest.mark.parametrize("num_trajectories", [10])
-@pytest.mark.parametrize("trajectory_length", [10, 50])
-def test_archive_performance(
+@pytest.mark.benchmark(group="archive_comparison")
+@pytest.mark.parametrize("archive_type", ["row", "column"])
+@pytest.mark.parametrize("num_items", [100, 1000])
+def test_mmap_write_performance(
     benchmark: BenchmarkFixture,
-    game: Game[TGameState, TAction],
-    game_state_type: Type[TGameState],
-    action_type: Type[TAction],
-    num_trajectories: int,
-    trajectory_length: int,
     tmp_path: Path,
+    archive_type: str,
+    num_items: int,
 ) -> None:
-    def run_benchmark() -> ArchiveStats:
-        test_utils.delete_directory_contents(tmp_path)
-        return benchmark_archive(
-            trajectories,
-            game_state_type,
-            action_type,
-            tmp_path,
-        )
+    """Benchmark the write performance of MMapRowArchive and MMapColumnArchive."""
 
-    # Create sample trajectories
-    trajectories = []
-    for _ in range(num_trajectories):
-        trajectories.append(random_trajectory(game, trajectory_length=trajectory_length))
+    # Generate test data
+    print(f"\nGenerating {num_items} test items...")
+    items = generate_benchmark_data(num_items)
 
-    stats = benchmark.pedantic(run_benchmark, iterations=1, rounds=5)
+    def write_fn() -> None:
+        path = tmp_path / f"benchmark_{num_items}"
+        write_data(items, archive_type, path)
 
-    print(f"\nArchive Performance:")
-    print(f"Write time: {stats.write_time_ms:.2f}ms")
-    print(f"Read time: {stats.read_time_ms:.2f}ms")
-    print(f"File size: {stats.file_size_bytes / 1024:.2f}KB")
-    print(f"Peak memory: {stats.peak_memory_mb:.2f}MB")
+    benchmark.pedantic(write_fn, iterations=10, rounds=5)
+
+
+@pytest.mark.parametrize("archive_type", ["row", "column"])
+@pytest.mark.parametrize("read_seek_type", ["sequential", "random", "field"])
+@pytest.mark.parametrize("num_items", [100, 1000])
+def test_mmap_read_performance(
+    benchmark: BenchmarkFixture,
+    tmp_path: Path,
+    archive_type: str,
+    read_seek_type: str,
+    num_items: int,
+) -> None:
+    """Benchmark the write performance of MMapRowArchive and MMapColumnArchive."""
+
+    # Generate test data
+    print(f"\nGenerating {num_items} test items...")
+    items = generate_benchmark_data(num_items)
+    path = tmp_path / f"benchmark_{num_items}"
+    write_data(items, archive_type, path)
+
+    archive: Archive[NestedData]
+    if archive_type == "row":
+        archive = RowFileArchiver().read_items(path, NestedData)
+    else:
+        archive = MMapColumnArchive(path, NestedData)
+
+    def benchmark_sequential_access() -> list[NestedData]:
+        """Sequential access benchmark."""
+        return [archive[i] for i in range(min(1000, len(archive)))]
+
+    def benchmark_random_access() -> list[NestedData]:
+        """Random access benchmark."""
+        indices = list(range(len(archive)))
+        random.shuffle(indices)
+        return [archive[i] for i in indices[:1000]]  # Read 1000 random items
+
+    def benchmark_field_access() -> list[float]:
+        """Access specific fields benchmark."""
+        return [archive[i].simple.y for i in range(min(1000, len(archive)))]
+
+    bench_fn: Callable[[], list[Any]]
+    if read_seek_type == "sequential":
+        bench_fn = benchmark_sequential_access
+    elif read_seek_type == "random":
+        bench_fn = benchmark_random_access
+    elif read_seek_type == "field":
+        bench_fn = benchmark_field_access
+
+    benchmark.pedantic(bench_fn, iterations=10, rounds=5)
