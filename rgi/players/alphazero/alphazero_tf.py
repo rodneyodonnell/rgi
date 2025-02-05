@@ -130,13 +130,21 @@ def train_model(trajectories: Sequence[Any], num_epochs: int = 10, batch_size: i
 
 
 def main() -> None:
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Train Model.")
+    parser.add_argument("--input", type=str, default="trajectories.npz", help="File to save the trajectories.")
+    parser.add_argument("--output", type=str, default="tf_pv_network.weights.h5", help="File to save the model.")
+    parser.add_argument("--num_epochs", type=int, default=10, help="Number of epochs to train.")
+    args = parser.parse_args()
+
     # Replace with actual loading of your trajectories.
     archiver = RowFileArchiver()
-    trajectories: Sequence[GameTrajectory[Any, Any]] = archiver.read_items("trajectory.npz", GameTrajectory)
+    trajectories: Sequence[GameTrajectory[Any, Any]] = archiver.read_items(args.input, GameTrajectory)
 
-    model = train_model(trajectories, num_epochs=10)
-    model.save_weights("tf_pv_network.weights.h5")
-    print("Model training complete. Weights saved to tf_pv_network.weights.h5")
+    model = train_model(trajectories, num_epochs=args.num_epochs)
+    model.save_weights(args.output)
+    print(f"Model training complete. Weights saved to {args.output}")
 
 
 if __name__ == "__main__":
