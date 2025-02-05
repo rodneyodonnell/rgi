@@ -52,7 +52,8 @@ def main() -> None:
     parser.add_argument("--num_players", type=int, default=2, help="Number of players.")
     parser.add_argument("--target", type=int, default=21, help="Game target value.")
     parser.add_argument("--max_guess", type=int, default=3, help="Maximum guess per turn.")
-    parser.add_argument("--num_games", type=int, default=1, help="Number of games to play.")
+    parser.add_argument("--num_games", type=int, default=1000, help="Number of games to play.")
+    parser.add_argument("--num_simulations", type=int, default=50, help="Number of MCTS simulations.")
     parser.add_argument("--verbose", action="store_true", help="Print game steps.")
     parser.add_argument("--progress", action="store_true", help="Show progress bar.")
     parser.add_argument("--output", type=str, default="trajectories.npz", help="File to save the trajectories.")
@@ -63,7 +64,9 @@ def main() -> None:
     # Instantiate dummy network (to be replaced by a trainable network later).
     dummy_network: DummyPolicyValueNetwork = DummyPolicyValueNetwork()
     # Create players. In self-play all players use the same algorithm.
-    players = [AlphaZeroPlayer(game, dummy_network) for _ in range(args.num_players)]
+    players = [
+        AlphaZeroPlayer(game, dummy_network, num_simulations=args.num_simulations) for _ in range(args.num_players)
+    ]
 
     trajectories: list[GameTrajectory[Any, Any]] = []
     games_range = range(args.num_games)
