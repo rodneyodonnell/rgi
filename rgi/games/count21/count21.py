@@ -13,7 +13,7 @@ class Count21State:
 
 
 TGameState = Count21State
-TAction = int
+TAction = Count21Action = int
 TPlayerId = int
 
 
