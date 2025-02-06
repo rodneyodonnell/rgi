@@ -100,7 +100,7 @@ def train_model(trajectories: Sequence[Any], num_epochs: int = 10, batch_size: i
         tf.TensorSpec(shape=(num_players,), dtype=tf.float32),
     )
     tf_dataset: tf.data.Dataset = tf.data.Dataset.from_generator(gen, output_signature=output_signature)
-    tf_dataset = tf_dataset.shuffle(buffer_size=100).batch(batch_size)
+    tf_dataset = tf_dataset.shuffle(buffer_size=1000).batch(batch_size)
 
     model: PVNetwork_Count21_TF = PVNetwork_Count21_TF(
         state_dim=state_dim, num_actions=num_actions, num_players=num_players
