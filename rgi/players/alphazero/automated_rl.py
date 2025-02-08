@@ -13,8 +13,11 @@ Usage:
 """
 
 import argparse
+import cProfile
+import pstats
 from typing import Any, List
 import numpy as np
+from numpy.typing import NDArray
 import tensorflow as tf
 from tqdm import tqdm
 
@@ -32,42 +35,53 @@ def initialize_model(game: Count21Game) -> TFPVNetworkWrapper:
     """
     init_state: Count21State = game.initial_state()
     # For Count21, we assume a flat state vector: e.g. [score, current_player].
-    state_np: np.ndarray = np.array([init_state.score, init_state.current_player], dtype=np.float32)
+    state_np: NDArray[np.float32] = np.array([init_state.score, init_state.current_player], dtype=np.float32)
     state_dim: int = state_np.shape[0]
     num_actions: int = len(game.legal_actions(init_state))
     num_players: int = game.num_players(init_state)
 
-    tf_model: TFPVNetwork = PVNetwork_Count21_TF(state_dim=state_dim, num_actions=num_actions, num_players=num_players)
+    tf_model: PVNetwork_Count21_TF = PVNetwork_Count21_TF(
+        state_dim=state_dim, num_actions=num_actions, num_players=num_players
+    )
     # Build model via a dummy forward pass
     tf_model(tf.convert_to_tensor(state_np.reshape(1, -1)))
     return TFPVNetworkWrapper(tf_model)
 
 
 def generate_selfplay_trajectories(
-    game: Count21Game, pv_network: PolicyValueNetwork, num_simulations: int, num_games: int, verbose: bool = False
-) -> List[GameTrajectory[Any, Any]]:
+    game: Count21Game,
+    pv_network: PolicyValueNetwork[Count21Game, Count21State, int],
+    num_simulations: int,
+    num_games: int,
+    verbose: bool = False,
+) -> list[GameTrajectory[Count21State, int]]:
     """
     Generate self-play trajectories using the provided policy–value network.
     """
-    trajectories: List[GameTrajectory[Any, Any]] = []
+    trajectories: list[GameTrajectory[Count21State, int]] = []
     num_players: int = game.num_players(game.initial_state())
     # Create an AlphaZeroPlayer for each position.
-    players: list[AlphaZeroPlayer] = [
+    players: list[AlphaZeroPlayer[Count21Game, Count21State, int]] = [
         AlphaZeroPlayer(game, pv_network, num_simulations=num_simulations) for _ in range(num_players)
     ]
     for _ in tqdm(range(num_games), desc="Self-play games"):
-        runner: GameRunner = GameRunner(game, players, verbose=verbose)
-        traj: GameTrajectory[Any, Any] = runner.run()
+        runner: GameRunner[Count21State, int, None] = GameRunner(game, players, verbose=verbose)
+        traj: GameTrajectory[Count21State, int] = runner.run()
         trajectories.append(traj)
     return trajectories
 
 
-def evaluate_model(game: Count21Game, pv_network: PolicyValueNetwork, num_simulations: int, num_games: int) -> None:
+def evaluate_model(
+    game: Count21Game,
+    pv_network: PolicyValueNetwork[Count21Game, Count21State, int],
+    num_simulations: int,
+    num_games: int,
+) -> None:
     """
     Simple evaluation: run self-play games with the current PV network and
     compute win percentages.
     """
-    trajectories: List[GameTrajectory[Any, Any]] = generate_selfplay_trajectories(
+    trajectories: list[GameTrajectory[Count21State, int]] = generate_selfplay_trajectories(
         game, pv_network, num_simulations, num_games, verbose=False
     )
     num_players: int = game.num_players(game.initial_state())
@@ -90,18 +104,24 @@ def main() -> None:
     parser.add_argument("--num_simulations", type=int, default=50, help="MCTS simulations per move.")
     parser.add_argument("--num_epochs", type=int, default=10, help="Training epochs per iteration.")
     parser.add_argument("--verbose", action="store_true", help="Print verbose game logs.")
+    parser.add_argument("--target", type=int, default=8, help="Target value for Count21Game.")
+    parser.add_argument("--max_guess", type=int, default=3, help="Maximum guess value for Count21Game.")
+    parser.add_argument("--profile", action="store_true", help="Enable cProfile profiling.")
     args = parser.parse_args()
 
-    # Initialize game and initial policy–value network.
-    # game: Count21Game = Count21Game(num_players=2, target=21, max_guess=3)
-    game: Count21Game = Count21Game(num_players=2, target=8, max_guess=3)
+    if args.profile:
+        profiler = cProfile.Profile()
+        profiler.enable()
+
+    # Initialize game with user-specified target and max_guess
+    game: Count21Game = Count21Game(num_players=2, target=args.target, max_guess=args.max_guess)
     pv_network_wrapper: TFPVNetworkWrapper = initialize_model(game)
 
     for iteration in range(1, args.num_iterations + 1):
         print(f"\n\n\n=== RL Iteration {iteration} ===")
 
         # 1. Self-play: generate trajectories.
-        trajectories: List[GameTrajectory[Any, Any]] = generate_selfplay_trajectories(
+        trajectories: list[GameTrajectory[Count21State, int]] = generate_selfplay_trajectories(
             game, pv_network_wrapper, args.num_simulations, args.num_selfplay_games, verbose=args.verbose
         )
         print(f"Generated {len(trajectories)} trajectories.")
@@ -130,7 +150,8 @@ def main() -> None:
             game, game.initial_state(), game.legal_actions(game.initial_state())
         )
         print(f"Policy logits[iter {iteration}]: {policy_logits}")
-        print(f"Policy softmax_pc[iter {iteration}]: {100.0*np.exp(policy_logits)/np.sum(np.exp(policy_logits))}")
+        softmax_probs = np.exp(policy_logits) / np.sum(np.exp(policy_logits)) * 100.0
+        print(f"Policy softmax_pc[iter {iteration}]: [{', '.join(f'{p:.6f}' for p in softmax_probs)}]")
         print(f"Value[iter {iteration}]: {value}")
 
         # 3. Update the current model in our wrapper.
@@ -138,6 +159,12 @@ def main() -> None:
 
         # 4. Evaluate updated model.
         evaluate_model(game, pv_network_wrapper, args.num_simulations, num_games=20)
+
+    if args.profile:
+        profiler.disable()
+        # Sort by cumulative time
+        stats = pstats.Stats(profiler).sort_stats("cumulative")
+        stats.print_stats(50)  # Print top 50 functions by time
 
 
 if __name__ == "__main__":
