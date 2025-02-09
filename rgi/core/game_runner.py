@@ -1,4 +1,4 @@
-from typing import Generic, Sequence
+from typing import Generic, Sequence, Any, Union
 
 from rgi.core import base
 from rgi.core.base import TGameState, TAction, TPlayerState
@@ -36,7 +36,16 @@ class GameRunner(Generic[TGameState, TAction, TPlayerState]):
         # Determine Action
         current_player = self.players[self.current_player_id - 1]
         legal_actions = self.game.legal_actions(old_game_state)
-        action = current_player.select_action(old_game_state, legal_actions)
+        action_result: Union[TAction, tuple[TAction, dict[TAction, int]]] = current_player.select_action(
+            old_game_state, legal_actions
+        )
+
+        # Handle both simple actions and actions with MCTS policy counts
+        if isinstance(action_result, tuple):
+            action, mcts_policy_counts = action_result
+        else:
+            action = action_result
+            mcts_policy_counts = None
 
         # Calculate & update states.
         updated_game_state = self.game.next_state(old_game_state, action)
@@ -50,7 +59,13 @@ class GameRunner(Generic[TGameState, TAction, TPlayerState]):
         for _player in self.players:
             _player.update_player_state(old_game_state, action, updated_game_state)
 
-        self.trajectory_builder.record_step(old_player_id, action, updated_game_state, incremental_reward)
+        self.trajectory_builder.record_step(
+            old_player_id,
+            action,
+            updated_game_state,
+            incremental_reward,
+            mcts_policy_counts,
+        )
 
         if self.verbose:
             print(

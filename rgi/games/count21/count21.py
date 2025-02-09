@@ -1,6 +1,5 @@
 from dataclasses import dataclass
-
-from typing import Any, Sequence
+from typing import Any, Sequence, TypeAlias
 from typing_extensions import override
 
 from rgi.core import base
@@ -12,9 +11,9 @@ class Count21State:
     current_player: int
 
 
-TGameState = Count21State
-TAction = Count21Action = int
-TPlayerId = int
+TGameState: TypeAlias = Count21State
+TAction: TypeAlias = int
+TPlayerId: TypeAlias = int
 
 
 class Count21Game(base.Game[TGameState, TAction]):

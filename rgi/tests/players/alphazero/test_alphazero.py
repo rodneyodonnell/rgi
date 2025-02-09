@@ -1,6 +1,8 @@
 import pytest
-from rgi.players.alphazero.alphazero import MCTS, DummyPolicyValueNetwork
-from rgi.games.count21.count21 import Count21Game
+from rgi.players.alphazero.alphazero import MCTS, DummyPolicyValueNetwork, AlphaZeroPlayer
+from rgi.games.count21.count21 import Count21Game, Count21State
+from typing import cast, Any, Type
+import numpy as np
 
 # pylint: disable=redefined-outer-name  # pytest fixtures trigger this false positive
 
@@ -61,3 +63,45 @@ def test_mcts_search_count21_two_player_optimal_play(dummy_network: DummyPolicyV
     assert action_visits[1] < 500
     assert action_visits[2] > 1000
     assert action_visits[3] < 500
+
+
+def test_dummy_policy_value_network() -> None:
+    game = Count21Game()
+    state = Count21State(score=0, current_player=1)
+    actions = game.legal_actions(state)
+    network = DummyPolicyValueNetwork[Count21Game, Count21State, int]()
+
+    policy_logits, value = network.predict(game, state, actions)
+
+    assert isinstance(policy_logits, np.ndarray)
+    assert isinstance(value, np.ndarray)
+    assert policy_logits.shape == (len(actions),)
+    assert value.shape == (game.num_players(state),)
+
+
+def test_alphazero_player() -> None:
+    game = Count21Game()
+    network = DummyPolicyValueNetwork[Count21Game, Count21State, int]()
+    player = AlphaZeroPlayer[Count21Game, Count21State, int](game, network, num_simulations=10)
+
+    state = Count21State(score=0, current_player=1)
+    actions = game.legal_actions(state)
+    action = player.select_action(state, actions)
+
+    assert isinstance(action, int)
+    assert action in actions
+
+
+def test_alphazero_player_with_different_simulations() -> None:
+    game = Count21Game()
+    network = DummyPolicyValueNetwork[Count21Game, Count21State, int]()
+
+    player_10 = AlphaZeroPlayer[Count21Game, Count21State, int](game, network, num_simulations=10)
+    player_100 = AlphaZeroPlayer[Count21Game, Count21State, int](game, network, num_simulations=100)
+
+    state = Count21State(score=0, current_player=1)
+    action_10 = player_10.select_action(state, game.legal_actions(state))
+    action_100 = player_100.select_action(state, game.legal_actions(state))
+
+    assert action_10 in game.legal_actions(state)
+    assert action_100 in game.legal_actions(state)

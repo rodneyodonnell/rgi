@@ -1,18 +1,22 @@
-from typing import Generic, Optional, Literal, Sequence
+from typing import Generic, Optional, Literal, Sequence, TypeVar, Any, Callable
 from abc import ABC, abstractmethod
 from typing_extensions import override
 import numpy as np
+from numpy.typing import NDArray
 
 from rgi.core.base import Player, TGame, TGameState, TAction
 
 TPlayerState = Literal[None]
+TFloat = TypeVar("TFloat", bound=np.floating[Any])
 
 
 # Policy–Value Network interface.
 # For multi‐player support, the network returns a value vector [v1, v2, ...] (one per player).
 class PolicyValueNetwork(ABC, Generic[TGame, TGameState, TAction]):
     @abstractmethod
-    def predict(self, game: TGame, state: TGameState, actions: Sequence[TAction]) -> tuple[np.ndarray, np.ndarray]:
+    def predict(
+        self, game: TGame, state: TGameState, actions: Sequence[TAction]
+    ) -> tuple[NDArray[np.float32], NDArray[np.float32]]:
         """
         Given a game, state and list of legal actions, return a tuple (policy_logits, value)
           - policy_logits: 1D NumPy array of logits corresponding to each action.
@@ -23,7 +27,9 @@ class PolicyValueNetwork(ABC, Generic[TGame, TGameState, TAction]):
 # A simple dummy implementation useful for testing MCTS.
 class DummyPolicyValueNetwork(PolicyValueNetwork[TGame, TGameState, TAction]):
     @override
-    def predict(self, game: TGame, state: TGameState, actions: Sequence[TAction]) -> tuple[np.ndarray, np.ndarray]:
+    def predict(
+        self, game: TGame, state: TGameState, actions: Sequence[TAction]
+    ) -> tuple[NDArray[np.float32], NDArray[np.float32]]:
         num_actions = len(actions)
         policy_logits = np.log(np.ones(num_actions, dtype=np.float32) / num_actions)
         n_players = game.num_players(state)
@@ -45,7 +51,7 @@ class AlphaZeroPlayer(Player[TGameState, TPlayerState, TAction], Generic[TGame, 
         mcts = MCTS(self.game, self.network, c_puct=1.0, num_simulations=self.num_simulations)
         action_visits = mcts.search(game_state)
         # Choose the action with the highest visit count.
-        best_action = max(action_visits, key=action_visits.get)
+        best_action = max(action_visits.items(), key=lambda x: x[1])[0]
         return best_action
 
 
@@ -59,13 +65,13 @@ class MCTSNode(Generic[TGame, TGameState, TAction]):
     ) -> None:
         self.state: TGameState = state
         self.parent: Optional["MCTSNode[TGame, TGameState, TAction]"] = parent
-        self.legal_actions: Sequence[TAction] | None = None
-        self.children: Sequence["MCTSNode[TGame, TGameState, TAction]"] | None = None
+        self.legal_actions: Optional[Sequence[TAction]] = None
+        self.children: Optional[Sequence["MCTSNode[TGame, TGameState, TAction]"]] = None
         self.visit_count: int = 0
-        self.total_value = np.zeros(n_players, dtype=np.float32)
+        self.total_value: NDArray[np.float32] = np.zeros(n_players, dtype=np.float32)
         self.prior: float = 0.0
 
-    def q_value(self) -> np.ndarray:
+    def q_value(self) -> NDArray[np.float32]:
         # Return average value vector. If unvisited, return zeros.
         if self.visit_count == 0:
             return np.zeros_like(self.total_value)
@@ -100,11 +106,11 @@ class MCTS(Generic[TGame, TGameState, TAction]):
         action_visits = {action: child.visit_count for action, child in zip(root.legal_actions, root.children)}
         return action_visits
 
-    def _simulate(self, node: MCTSNode[TGame, TGameState, TAction]) -> np.ndarray:
+    def _simulate(self, node: MCTSNode[TGame, TGameState, TAction]) -> NDArray[np.float32]:
         # Terminal state check.
         if self.game.is_terminal(node.state):
             # Expect reward to be a vector (absolute score per player).
-            rewards = self.game.reward_array(node.state)
+            rewards = np.array(self.game.reward_array(node.state), dtype=np.float32)
             return rewards
 
         legal_actions, children = node.legal_actions, node.children
@@ -124,7 +130,7 @@ class MCTS(Generic[TGame, TGameState, TAction]):
             for index, action in enumerate(legal_actions):
                 child_state = self.game.next_state(node.state, action)
                 child_node = MCTSNode(child_state, self.n_players, parent=node)
-                child_node.prior = policy[index]  # type: ignore
+                child_node.prior = float(policy[index])
                 children.append(child_node)
             return action_values
 
@@ -153,6 +159,6 @@ class MCTS(Generic[TGame, TGameState, TAction]):
 
         return action_values
 
-    def softmax(self, x: np.ndarray) -> np.ndarray:
+    def softmax(self, x: NDArray[np.float32]) -> NDArray[np.float32]:
         e_x = np.exp(x - np.max(x))
-        return e_x / e_x.sum()
+        return np.array(e_x / e_x.sum(), dtype=np.float32)

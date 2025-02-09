@@ -6,24 +6,27 @@ Usage:
 """
 
 import argparse
-from typing import Any
+from typing import Any, TypeVar
 import numpy as np
 from tqdm import tqdm  # Optional dependency; install with `pip install tqdm` if needed
 
 from rgi.core.game_runner import GameRunner
 from rgi.players.alphazero.alphazero import AlphaZeroPlayer, DummyPolicyValueNetwork
-from rgi.games.count21.count21 import Count21Game
+from rgi.games.count21.count21 import Count21Game, Count21State
 from rgi.core.trajectory import GameTrajectory  # For type annotation
 from rgi.core.archive import RowFileArchiver
 
+TState = TypeVar("TState")
+TAction = TypeVar("TAction")
 
-def print_stats(trajectories: list[GameTrajectory[Any, Any]], num_players: int) -> None:
+
+def print_stats(trajectories: list[GameTrajectory[Count21State, int]], num_players: int) -> None:
     """
     Compute and print win percentages per player and the frequency distribution of the first moves.
     Assumes that final_reward is a vector where the winning player's entry is the highest value.
     """
     win_counts: list[int] = [0] * num_players
-    first_move_counts: dict[Any, int] = {}
+    first_move_counts: dict[int, int] = {}
     total_games = len(trajectories)
 
     for traj in trajectories:
@@ -62,13 +65,14 @@ def main() -> None:
     # Create game instance.
     game = Count21Game(num_players=args.num_players, target=args.target, max_guess=args.max_guess)
     # Instantiate dummy network (to be replaced by a trainable network later).
-    dummy_network: DummyPolicyValueNetwork = DummyPolicyValueNetwork()
+    dummy_network = DummyPolicyValueNetwork[Count21Game, Count21State, int]()
     # Create players. In self-play all players use the same algorithm.
     players = [
-        AlphaZeroPlayer(game, dummy_network, num_simulations=args.num_simulations) for _ in range(args.num_players)
+        AlphaZeroPlayer[Count21Game, Count21State, int](game, dummy_network, num_simulations=args.num_simulations)
+        for _ in range(args.num_players)
     ]
 
-    trajectories: list[GameTrajectory[Any, Any]] = []
+    trajectories: list[GameTrajectory[Count21State, int]] = []
     games_range = range(args.num_games)
     if args.progress:
         games_range = tqdm(games_range, desc="Self-play games")

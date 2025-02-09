@@ -1,8 +1,11 @@
+from typing import cast, Any, Type
+from pathlib import Path
+
 import numpy as np
 import tensorflow as tf
 import pytest
 
-from rgi.games.count21.count21 import Count21Game, Count21Action, Count21State
+from rgi.games.count21.count21 import Count21Game, Count21State
 from rgi.players.alphazero.alphazero import AlphaZeroPlayer, DummyPolicyValueNetwork
 from rgi.players.alphazero.alphazero_tf import PVNetwork_Count21_TF, TFPVNetworkWrapper
 
@@ -110,3 +113,81 @@ def test_trained_model() -> None:
     player_10000_d = AlphaZeroPlayer(count21_game, dummy_model, num_simulations=10000)
     action_10000_d = player_10000_d.select_action(state, count21_game.legal_actions(state))
     assert action_10000_d in count21_game.legal_actions(state)
+
+
+def test_tf_model_basic() -> None:
+    # Create a simple model for testing.
+    state_dim = 2  # score and current_player
+    num_actions = 3  # 1, 2, 3
+    num_players = 2
+
+    model = PVNetwork_Count21_TF(state_dim=state_dim, num_actions=num_actions, num_players=num_players)
+
+    # Test forward pass.
+    batch_size = 4
+    inputs = tf.random.normal((batch_size, state_dim))
+    policy_logits, value = model(inputs, training=False)
+
+    assert policy_logits.shape == (batch_size, num_actions)
+    assert value.shape == (batch_size, num_players)
+
+
+def test_tf_model_with_alphazero() -> None:
+    # Create a simple model for testing.
+    state_dim = 2  # score and current_player
+    num_actions = 3  # 1, 2, 3
+    num_players = 2
+
+    model = PVNetwork_Count21_TF(state_dim=state_dim, num_actions=num_actions, num_players=num_players)
+    wrapper = TFPVNetworkWrapper(model)
+
+    game = Count21Game(num_players=num_players, target=21, max_guess=3)
+    player = AlphaZeroPlayer[Count21Game, Count21State, int](game, wrapper, num_simulations=10)
+
+    # Test that we can use the model to make predictions.
+    state = Count21State(score=0, current_player=1)
+    legal_actions = game.legal_actions(state)
+    action = player.select_action(state, legal_actions)
+
+    assert isinstance(action, int)
+    assert action in legal_actions
+
+
+def test_tf_model_save_load(tmp_path: Path) -> None:
+    # Create a simple model for testing.
+    state_dim = 2  # score and current_player
+    num_actions = 3  # 1, 2, 3
+    num_players = 2
+
+    model = PVNetwork_Count21_TF(state_dim=state_dim, num_actions=num_actions, num_players=num_players)
+    wrapper = TFPVNetworkWrapper(model)
+
+    game = Count21Game(num_players=num_players, target=21, max_guess=3)
+    player = AlphaZeroPlayer[Count21Game, Count21State, int](game, wrapper, num_simulations=10)
+
+    # Generate some random inputs.
+    state = Count21State(score=0, current_player=1)
+    legal_actions = game.legal_actions(state)
+
+    # Get predictions before saving.
+    network = cast(TFPVNetworkWrapper, player.network)
+    dummy_model = network.tf_model
+    input_tensor = tf.convert_to_tensor(np.array([[0, 1]], dtype=np.float32))
+    before_policy, before_value = dummy_model(input_tensor, training=False)
+
+    # Save the model.
+    weights_path = tmp_path / "test_model.weights.h5"
+    dummy_model.save_weights(str(weights_path))
+
+    # Create a new model and load the weights.
+    new_model = PVNetwork_Count21_TF(state_dim=state_dim, num_actions=num_actions, num_players=num_players)
+    # Build the model by calling it with a dummy input
+    new_model(input_tensor, training=False)
+    new_model.load_weights(str(weights_path))
+
+    # Get predictions after loading.
+    after_policy, after_value = new_model(input_tensor, training=False)
+
+    # Check that the predictions are the same.
+    np.testing.assert_array_almost_equal(before_policy.numpy(), after_policy.numpy())
+    np.testing.assert_array_almost_equal(before_value.numpy(), after_value.numpy())
