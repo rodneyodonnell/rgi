@@ -1,0 +1,57 @@
+---
+description: Work Completion and Documentation Standards
+globs: ["*"]
+---
+
+<rule>
+name: work_completion_process
+description: Standards for handling completed work items, including git commits and status updates
+filters:
+  - type: event
+    pattern: "compose_complete|chat_complete"
+  - type: content
+    pattern: "(?i)confirmed.*runs?|(?i)tested.*works?"
+
+actions:
+  - type: suggest
+    message: |
+      # Work Completion Checklist
+      
+      ## Git Commit
+      Create a commit with:
+      - Summary of what was changed
+      - Explanation of why the change was made
+      - Performance impact or benchmarks if relevant
+      - Any breaking changes or dependencies
+      - Reference to related issues/PRs
+      
+      Example commit format:
+      ```
+      feat(component): brief summary of change
+      
+      - Detailed description of changes made
+      - Reason for changes
+      - Performance impact: [metrics if applicable]
+      - Breaking changes: [if any]
+      
+      Related: #issue_number
+      ```
+      
+      ## Status Updates
+      - Locate relevant STATUS.md files in affected directories
+      - Update with:
+        - Completed work items
+        - New capabilities/features
+        - Known limitations
+        - Future work items
+      - Keep updates concise but informative
+      
+      ## Documentation
+      - Update relevant documentation
+      - Add examples for new features
+      - Note any configuration changes
+
+metadata:
+  priority: high
+  version: 1.0
+</rule> 
