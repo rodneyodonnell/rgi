@@ -1,0 +1,70 @@
+# Weekly Maintenance Tasks
+
+Standards for tracking and executing weekly maintenance tasks.
+
+<rule>
+name: weekly_tasks
+description: Standards for tracking and executing weekly maintenance tasks
+filters:
+  - type: file
+    pattern: "STATUS\\.md"
+  - type: content
+    pattern: "## Weekly Tasks"
+
+actions:
+  - type: require
+    message: |
+      The STATUS.md file must include a "Weekly Tasks" section with:
+
+      1. List of required weekly tasks
+      2. Last completion date for each task
+      3. Status (✅ completed or ❌ overdue)
+
+      Required weekly tasks:
+      - Update dependencies (python3 -m piptools compile --upgrade requirements.in)
+      - Full lint cleanup (python -m pylint rgi/)
+      - Complete test run (python -m pytest rgi/tests/ -v)
+      - Rebuild Docker image (docker build -t rgi:latest .)
+
+      Example format:
+      ```markdown
+      ## Weekly Tasks
+      | Task | Last Done | Status |
+      |------|-----------|--------|
+      | Update dependencies | 2024-02-09 | ✅ |
+      | Full lint cleanup | 2024-02-03 | ❌ |
+      | Complete test run | 2024-02-03 | ❌ |
+      ```
+
+  - type: suggest
+    message: |
+      Tips for weekly maintenance:
+
+      1. Run tasks in order: dependencies → lint → tests
+      2. Document any issues found in STATUS.md
+      3. Create issues for problems that can't be fixed immediately
+      4. Update the completion dates after each task
+
+examples:
+  - input: |
+      # Bad: Missing weekly tasks section
+      ## Current Progress
+      ...
+
+      # Good: Complete weekly tasks section
+      ## Weekly Tasks
+      | Task | Last Done | Status |
+      |------|-----------|--------|
+      | Update dependencies | 2024-02-09 | ✅ |
+      | Full lint cleanup | 2024-02-09 | ✅ |
+      | Complete test run | 2024-02-09 | ✅ |
+    output: "Properly checked weekly tasks"
+
+metadata:
+  priority: high
+  version: 1.0
+  tags:
+    - maintenance
+    - quality
+    - documentation
+</rule> 

@@ -1,0 +1,88 @@
+---
+description: Standards for maintaining project status documentation
+globs: ["STATUS.md", "**/STATUS.md"]
+---
+
+<rule>
+name: status_file_management
+description: Guidelines for creating and maintaining STATUS.md files across the project
+filters:
+  - type: file_name
+    pattern: "STATUS\\.md$"
+  - type: event
+    pattern: "session_start|file_create|file_modify"
+
+actions:
+  - type: suggest
+    message: |
+      # STATUS.md File Guidelines
+      
+      ## File Structure
+      Each STATUS.md should include:
+      
+      1. Current Progress
+         - Core implementation status
+         - Key features completed
+         - Performance benchmarks
+         - Recent changes
+      
+      2. Next Steps
+         - Planned improvements
+         - Known issues to address
+         - Feature roadmap
+         - Performance targets
+      
+      3. Technical Details
+         - Dependencies
+         - Usage examples
+         - Known limitations
+         - Questions to resolve
+      
+      4. Bot Notes
+         - AI assistant's observations
+         - Context for future sessions
+         - Implementation decisions
+         - Areas needing attention
+         - Debugging history
+      
+      ## File Locations
+      
+      1. Root STATUS.md (Required)
+         - Overall project status
+         - High-level roadmap
+         - Cross-cutting concerns
+         - Major milestones
+      
+      2. Component STATUS.md
+         - Only in actively developed components
+         - Component-specific details
+         - Local implementation status
+         - Remove when development is complete
+      
+      ## Maintenance Rules
+      
+      1. File Creation
+         - Create when starting work in a new directory
+         - Include initial status and goals
+         - Link to related components
+      
+      2. Updates
+         - Update after significant changes
+         - Record performance metrics
+         - Document design decisions
+         - Note breaking changes
+      
+      3. Cleanup
+         - Remove component STATUS.md when work is complete
+         - Transfer relevant info to root STATUS.md
+         - Keep historical context in git history
+      
+      4. Session Start
+         - Review relevant STATUS.md files
+         - Check for recent changes
+         - Note any blockers or dependencies
+
+metadata:
+  priority: high
+  version: 1.0
+</rule> 

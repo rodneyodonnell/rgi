@@ -1,0 +1,85 @@
+# Git Commit Checks
+
+Standards for running tests and linting before git commits.
+
+<rule>
+name: git_commit_checks
+description: Standards for running tests and linting before git commits
+filters:
+  - type: command
+    pattern: "git commit"
+  - type: event
+    pattern: "pre_commit"
+
+actions:
+  - type: require
+    message: |
+      Before committing changes, you must:
+
+      1. Run relevant tests for modified files:
+         ```bash
+         # For specific test files
+         python -m pytest path/to/test_file.py -v
+         
+         # For all tests in a module
+         python -m pytest path/to/module/tests/ -v
+         ```
+
+      2. Run linting checks:
+         ```bash
+         # For specific files
+         python -m pylint path/to/file.py
+         
+         # For all Python files in a directory
+         python -m pylint path/to/directory/
+         ```
+
+      3. Fix any test failures or linting issues before committing.
+
+      4. Include test and lint results in the commit message if significant changes were made.
+
+  - type: suggest
+    message: |
+      Tips for efficient testing and linting:
+
+      1. Only run tests relevant to your changes
+      2. Use pytest's -v flag for more detailed output
+      3. Use pytest's -k flag to run specific test cases
+      4. Fix linting issues as you go rather than all at once
+
+examples:
+  - input: |
+      # Bad: Direct commit without checks
+      git commit -m "Update function"
+
+      # Good: Run tests and lint first
+      python -m pytest rgi/tests/players/alphazero/test_tf_model_integration.py -v
+      python -m pylint rgi/players/alphazero/ray_rl.py
+      git commit -m "Fix TensorFlow model type hints - tests pass, lint clean"
+    output: "Properly checked commit with specific test and lint commands"
+
+  - input: |
+      # Bad: Commit with failing tests
+      python -m pytest rgi/tests/players/alphazero/test_tf_model_integration.py
+      # Test fails
+      git commit -m "Update model"
+
+      # Good: Fix tests first, then commit
+      # Fix the code...
+      python -m pytest rgi/tests/players/alphazero/test_tf_model_integration.py
+      # Tests pass
+      git commit -m "Update model - fixed test failures in TF model integration"
+    output: "Commit after fixing test failures"
+
+metadata:
+  priority: high
+  version: 1.0
+  applies_to:
+    - "*.py"
+    - "tests/**/*.py"
+  tags:
+    - testing
+    - linting
+    - git
+    - quality
+</rule> 

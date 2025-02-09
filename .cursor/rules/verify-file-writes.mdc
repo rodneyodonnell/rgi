@@ -1,0 +1,117 @@
+---
+description: Verify File Writes
+globs: "*"
+---
+# Verify File Writes
+
+Standards for ensuring file changes are actually written to disk.
+
+<rule>
+name: verify_file_writes
+description: Standards for verifying file changes are written to disk
+filters:
+  - type: tool
+    pattern: "edit_file"
+  - type: event
+    pattern: "post_tool_call"
+
+actions:
+  - type: require
+    message: |
+      After using edit_file, you must:
+
+      1. Use atomic file operations:
+         ```python
+         # Write to a temporary file first
+         temp_file = f"{target_file}.new"
+         edit_file(target_file=temp_file, ...)
+         
+         # Verify the content
+         content = read_file(
+             relative_workspace_path=temp_file,
+             should_read_entire_file=True,
+             explanation="Verifying file was written correctly",
+             start_line_one_indexed=1,
+             end_line_one_indexed_inclusive=100
+         )
+         
+         # If content is good, move it into place
+         if "expected_change" in content:
+             run_terminal_cmd(
+                 command=f"mv {temp_file} {target_file}",
+                 explanation="Moving verified file into place"
+             )
+         ```
+
+      2. If the file content is incorrect:
+         - Save the intended changes for comparison
+         - Try writing to a new temporary file
+         - Verify the temporary file's content
+         - Only move into place if correct
+         - If still wrong, try reapply on the temp file
+         - If it fails after all attempts, notify the user
+         - Document the issue in STATUS.md
+
+      3. For critical files (e.g., cursor rules, STATUS.md):
+         - Always verify the full file contents
+         - Use temporary files for all changes
+         - Compare actual content with intended changes
+         - Only replace original after verification
+         - Keep backup of original if needed
+
+  - type: suggest
+    message: |
+      Tips for reliable file writes:
+
+      1. Always use temporary files for changes
+      2. Use atomic move operations
+      3. Keep original file until new one is verified
+      4. Break large edits into smaller chunks
+      5. Use explicit line numbers when possible
+      6. Keep formatting consistent
+      7. For cursor rules, include frontmatter
+      8. Save intended changes for comparison
+
+examples:
+  - input: |
+      # Bad: Direct modification
+      edit_file(target_file="important.md", ...)
+      
+      # Good: Atomic operation with verification
+      intended_changes = """
+      specific content
+      that should be
+      in the file
+      """
+      temp_file = "important.md.new"
+      edit_file(target_file=temp_file, ...)
+      content = read_file(relative_workspace_path=temp_file, ...)
+      
+      if intended_changes in content:
+          run_terminal_cmd(command=f"mv {temp_file} important.md")
+      else:
+          print("Changes not found, retrying...")
+          edit_file(target_file=temp_file, ...)
+          content = read_file(relative_workspace_path=temp_file, ...)
+          if intended_changes in content:
+              run_terminal_cmd(command=f"mv {temp_file} important.md")
+          else:
+              reapply(target_file=temp_file)
+              content = read_file(relative_workspace_path=temp_file, ...)
+              if intended_changes in content:
+                  run_terminal_cmd(command=f"mv {temp_file} important.md")
+              else:
+                  print("Failed to verify changes after all attempts")
+    output: "Properly verified content with atomic file operations"
+
+metadata:
+  priority: high
+  version: 1.3
+  tags:
+    - reliability
+    - quality
+    - file-system
+    - cursor-rules
+    - content-verification
+    - atomic-operations
+</rule> 

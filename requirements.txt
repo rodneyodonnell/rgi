@@ -368,6 +368,7 @@ numpy==2.0.2
     #   tensorboard
     #   tensorflow
     #   tensorstore
+    #   types-tensorflow
 numpy-typing==1.1.1
     # via -r requirements.in
 nvidia-cublas-cu12==12.4.5.8
@@ -712,8 +713,14 @@ trio-websocket==0.11.1
     # via selenium
 triton==3.1.0
     # via torch
+types-protobuf==5.29.1.20250208
+    # via types-tensorflow
 types-python-dateutil==2.9.0.20241206
     # via arrow
+types-requests==2.32.0.20241016
+    # via types-tensorflow
+types-tensorflow==2.18.0.20241227
+    # via -r requirements.in
 typing-extensions==4.12.2
     # via
     #   anyio
@@ -738,6 +745,7 @@ urllib3[socks]==2.3.0
     # via
     #   requests
     #   selenium
+    #   types-requests
 uvicorn[standard]==0.30.6
     # via -r requirements.in
 uvloop==0.21.0
