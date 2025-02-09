@@ -46,6 +46,9 @@ pytest-playwright
 selenium
 webdriver-manager
 
+# Ray
+ray[default]
+
 # Tools
 pip-tools
 pylint

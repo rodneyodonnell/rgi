@@ -21,10 +21,34 @@ class PVNetwork_Count21_TF(keras.Model):
             num_players: Number of players (size of the value vector).
         """
         super().__init__()
+        self.state_dim = state_dim
+        self.num_actions = num_actions
+        self.num_players = num_players
         self.fc1 = layers.Dense(128, activation="relu")
         self.fc2 = layers.Dense(128, activation="relu")
         self.policy_head = layers.Dense(num_actions)  # logits, no activation
         self.value_head = layers.Dense(num_players, activation="tanh")  # values in (-1, 1)
+
+    def get_config(self) -> dict:
+        """Return configuration for model serialization."""
+        config = super().get_config()
+        config.update(
+            {
+                "state_dim": self.state_dim,
+                "num_actions": self.num_actions,
+                "num_players": self.num_players,
+            }
+        )
+        return config
+
+    @classmethod
+    def from_config(cls, config: dict) -> "PVNetwork_Count21_TF":
+        """Create model instance from configuration."""
+        return cls(
+            state_dim=config["state_dim"],
+            num_actions=config["num_actions"],
+            num_players=config["num_players"],
+        )
 
     def call(self, inputs: tf.Tensor, training: bool = False) -> Tuple[tf.Tensor, tf.Tensor]:
         x: tf.Tensor = self.fc1(inputs)
