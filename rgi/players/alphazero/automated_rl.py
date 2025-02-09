@@ -22,7 +22,7 @@ import tensorflow as tf
 from tqdm import tqdm
 import time
 
-from rgi.games.count21.count21 import Count21Game, Count21State, Count21Action
+from rgi.games.count21.count21 import Count21Game, Count21State
 from rgi.core.trajectory import GameTrajectory
 from rgi.core.game_runner import GameRunner
 from rgi.players.alphazero.alphazero import AlphaZeroPlayer, PolicyValueNetwork
@@ -65,7 +65,8 @@ def generate_selfplay_trajectories(
     num_players: int = game.num_players(game.initial_state())
     # Create an AlphaZeroPlayer for each position.
     players: list[AlphaZeroPlayer[Count21Game, Count21State, int]] = [
-        AlphaZeroPlayer(game, pv_network, num_simulations=num_simulations) for _ in range(num_players)
+        AlphaZeroPlayer[Count21Game, Count21State, int](game, pv_network, num_simulations=num_simulations)
+        for _ in range(num_players)
     ]
     for _ in tqdm(range(num_games), desc="Self-play games"):
         runner: GameRunner[Count21State, int, None] = GameRunner(game, players, verbose=verbose)
@@ -138,7 +139,7 @@ def main() -> None:
         # Optionally, print a simple stat (win distribution).
         num_players: int = game.num_players(game.initial_state())
         win_counts: list[int] = [0] * num_players
-        first_action_counts: dict[Any, int] = {}
+        first_action_counts: dict[int, int] = {}
         for traj in trajectories:
             win_counts[int(np.argmax(traj.final_reward))] += 1
             first_action_counts[traj.actions[0]] = first_action_counts.get(traj.actions[0], 0) + 1

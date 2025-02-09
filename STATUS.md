@@ -94,7 +94,7 @@
 | Task | Last Done | Status |
 |------|-----------|--------|
 | Update dependencies | 2024-02-09 | ✅ |
-| Full lint cleanup | 2024-02-03 | ❌ |
+| Full lint cleanup | 2024-03-27 | ✅ |
 | Complete test run | 2024-02-03 | ❌ |
 | Rebuild Docker image | 2024-02-09 | ✅ |
 

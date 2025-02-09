@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Generic, TypeVar, Sequence, Any
 import numpy as np
+from numpy.typing import NDArray
 
 TGame = TypeVar("TGame", bound="Game[Any, Any]")  # pylint: disable=invalid-name
 TGameState = TypeVar("TGameState")  # pylint: disable=invalid-name
@@ -49,12 +50,14 @@ class Game(ABC, Generic[TGameState, TAction]):
         This is typically 0 for non-terminal states, and -1, 0, or 1 for terminal states,
         depending on whether the player lost, drew, or won respectively."""
 
-    def reward_array(self, game_state: TGameState) -> np.ndarray:
+    def reward_array(self, game_state: TGameState) -> NDArray[np.float32]:
         """Return the reward for the given player in the given state as a NumPy array.
 
         This is typically 0 for non-terminal states, and -1, 0, or 1 for terminal states,
         depending on whether the player lost, drew, or won respectively."""
-        return np.array([self.reward(game_state, player_id) for player_id in self.player_ids(game_state)])
+        return np.array(
+            [self.reward(game_state, player_id) for player_id in self.player_ids(game_state)], dtype=np.float32
+        )
 
     @abstractmethod
     def pretty_str(self, game_state: TGameState) -> str:
@@ -63,8 +66,18 @@ class Game(ABC, Generic[TGameState, TAction]):
 
 class Player(ABC, Generic[TGameState, TPlayerState, TAction]):
     @abstractmethod
-    def select_action(self, game_state: TGameState, legal_actions: Sequence[TAction]) -> TAction:
-        """Select an action from the legal actions."""
+    def select_action(
+        self, game_state: TGameState, legal_actions: Sequence[TAction]
+    ) -> TAction | tuple[TAction, dict[TAction, int]]:
+        """Select an action from the legal actions.
+
+        Args:
+            game_state: Current game state
+            legal_actions: List of legal actions
+
+        Returns:
+            Either a single action, or a tuple of (action, mcts_policy_counts) where mcts_policy_counts
+            maps actions to their MCTS visit counts."""
 
     def update_player_state(self, old_game_state: TGameState, action: TAction, new_game_state: TGameState) -> None:
         """Update the player's internal state based on the game state and action.

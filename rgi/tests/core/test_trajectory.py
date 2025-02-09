@@ -1,11 +1,12 @@
 from pathlib import Path
-from typing import Any, Type
+from typing import Any, Type, Sequence
 
 import pytest
 
 from rgi.core.trajectory import GameTrajectory
 from rgi.core import base
 from rgi.core.game_runner import GameRunner
+from rgi.core.archive import RowFileArchiver
 from rgi.players.random_player.random_player import RandomPlayer
 from rgi.games.connect4 import connect4
 from rgi.games.othello import othello
@@ -33,12 +34,14 @@ def test_fixed_trajectory_save_load(
     runner = GameRunner(connect4_game, [player1, player2])
     original_trajectory = runner.run()
     save_path = tmp_path / "trajectory.npz"
-    original_trajectory.save(save_path, allow_pickle=False)
+    archiver = RowFileArchiver()
+    archiver.write_items([original_trajectory], str(save_path))
 
     # Load trajectory
-    reloaded_trajectory: GameTrajectory[connect4.GameState, connect4.Action] = GameTrajectory.load(
-        save_path, connect4.GameState, connect4.Action, allow_pickle=True
+    reloaded_trajectories: Sequence[GameTrajectory[connect4.GameState, connect4.Action]] = archiver.read_items(
+        str(save_path), GameTrajectory
     )
+    reloaded_trajectory = reloaded_trajectories[0]
 
     # Check equality
     equality_checker = test_utils.EqualityChecker()
@@ -105,10 +108,10 @@ def test_random_games(
 
     # save & reload
     save_path = tmp_path / "trajectory.npz"
-    trajectory.save(save_path, allow_pickle=allow_pickle)
-    reloaded_trajectory: GameTrajectory[Any, Any] = GameTrajectory.load(
-        save_path, state_type, action_type, allow_pickle=allow_pickle
-    )
+    archiver = RowFileArchiver()
+    archiver.write_items([trajectory], str(save_path))
+    reloaded_trajectories: Sequence[GameTrajectory[Any, Any]] = archiver.read_items(str(save_path), GameTrajectory)
+    reloaded_trajectory = reloaded_trajectories[0]
 
     equality_checker = test_utils.EqualityChecker()
     assert equality_checker.check_equality(trajectory, reloaded_trajectory)
