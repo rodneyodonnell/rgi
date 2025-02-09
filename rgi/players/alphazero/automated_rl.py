@@ -20,6 +20,7 @@ import numpy as np
 from numpy.typing import NDArray
 import tensorflow as tf
 from tqdm import tqdm
+import time
 
 from rgi.games.count21.count21 import Count21Game, Count21State, Count21Action
 from rgi.core.trajectory import GameTrajectory
@@ -58,6 +59,8 @@ def generate_selfplay_trajectories(
     """
     Generate self-play trajectories using the provided policy–value network.
     """
+    start_time = time.time()
+
     trajectories: list[GameTrajectory[Count21State, int]] = []
     num_players: int = game.num_players(game.initial_state())
     # Create an AlphaZeroPlayer for each position.
@@ -68,6 +71,12 @@ def generate_selfplay_trajectories(
         runner: GameRunner[Count21State, int, None] = GameRunner(game, players, verbose=verbose)
         traj: GameTrajectory[Count21State, int] = runner.run()
         trajectories.append(traj)
+
+    end_time = time.time()
+    elapsed = end_time - start_time
+    print(f"Generated {len(trajectories)} trajectories in {elapsed:.2f} seconds")
+    print(f"Games per second: {len(trajectories)/elapsed:.2f}")
+
     return trajectories
 
 
