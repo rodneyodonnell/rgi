@@ -3,7 +3,7 @@ from typing import Generic, Sequence, Any, get_origin, get_args, Union
 
 
 from rgi.core import base
-from rgi.core.base import TGameState, TAction
+from rgi.core.base import TGameState, TAction, TPlayerData
 
 
 def _is_optional(type_hint: Any) -> bool:
@@ -12,7 +12,7 @@ def _is_optional(type_hint: Any) -> bool:
 
 
 @dataclasses.dataclass
-class GameTrajectory(Generic[TGameState, TAction]):
+class GameTrajectory(Generic[TGameState, TAction, TPlayerData]):
     """Collection of sequences & actions representing a single game.
 
     Args:
@@ -23,6 +23,7 @@ class GameTrajectory(Generic[TGameState, TAction]):
         incremental_rewards: Sequence of reward changes for the acting player after each action
         num_players: Total number of players in the game
         final_reward: Final rewards for each player at game end
+        player_data: Algorithm-specific data recorded for each player at each step. Useful for for MCTS counts, etc.
     """
 
     game_states: Sequence[TGameState]
@@ -31,6 +32,7 @@ class GameTrajectory(Generic[TGameState, TAction]):
     incremental_rewards: Sequence[float]  # Change in reward for current player after their most recent action.
     num_players: int
     final_reward: Sequence[float]
+    player_data: Sequence[TPlayerData]
 
     # validate
     def __post_init__(self) -> None:
@@ -56,9 +58,14 @@ class GameTrajectory(Generic[TGameState, TAction]):
                 f"The number of final rewards ({len(self.final_reward)}) must be the same as the number of players "
                 f"({self.num_players})"
             )
+        if len(self.player_data) != len(self.actions):
+            raise ValueError(
+                f"The number of player data ({len(self.player_data)}) must be the same as the number of actions "
+                f"({len(self.actions)})"
+            )
 
 
-class TrajectoryBuilder(Generic[TGameState, TAction]):
+class TrajectoryBuilder(Generic[TGameState, TAction, TPlayerData]):
 
     def __init__(self, game: base.Game[TGameState, TAction], initial_state: TGameState):
         self.game = game
@@ -68,6 +75,7 @@ class TrajectoryBuilder(Generic[TGameState, TAction]):
         self.action_player_ids: list[int] = []
         self.incremental_rewards: list[float] = []
         self.final_reward: list[float] = []
+        self.player_data: list[TPlayerData] = []
 
     def record_step(
         self,
@@ -75,13 +83,15 @@ class TrajectoryBuilder(Generic[TGameState, TAction]):
         action: TAction,
         updated_state: TGameState,
         incremental_reward: float,
+        player_data: TPlayerData,
     ) -> None:
         self.states.append(updated_state)
         self.actions.append(action)
         self.action_player_ids.append(action_player_id)
         self.incremental_rewards.append(incremental_reward)
+        self.player_data.append(player_data)
 
-    def build(self) -> GameTrajectory[TGameState, TAction]:
+    def build(self) -> GameTrajectory[TGameState, TAction, TPlayerData]:
         final_reward = [self.game.reward(self.states[-1], player_id) for player_id in range(1, self.num_players + 1)]
         return GameTrajectory(
             self.states,
@@ -90,4 +100,5 @@ class TrajectoryBuilder(Generic[TGameState, TAction]):
             self.incremental_rewards,
             self.num_players,
             final_reward,
+            self.player_data,
         )

@@ -1,7 +1,7 @@
 import pytest
-from rgi.players.alphazero.alphazero import MCTS, DummyPolicyValueNetwork, AlphaZeroPlayer
+from rgi.players.alphazero.alphazero import MCTS, DummyPolicyValueNetwork, AlphaZeroPlayer, MCTSData
 from rgi.games.count21.count21 import Count21Game, Count21State
-from typing import cast, Any, Type
+from typing import cast, Any, Type, Literal
 import numpy as np
 
 # pylint: disable=redefined-outer-name  # pytest fixtures trigger this false positive
@@ -21,13 +21,13 @@ def count21_three_player_game() -> Count21Game:
 
 
 @pytest.fixture
-def dummy_network() -> DummyPolicyValueNetwork:
+def dummy_network() -> DummyPolicyValueNetwork[Count21Game, Count21State, int]:
     # Using the dummy network available from alphazero.
     return DummyPolicyValueNetwork()
 
 
 def test_mcts_search_count21_two_player(
-    count21_two_player_game: Count21Game, dummy_network: DummyPolicyValueNetwork
+    count21_two_player_game: Count21Game, dummy_network: DummyPolicyValueNetwork[Count21Game, Count21State, int]
 ) -> None:
     mcts = MCTS(count21_two_player_game, dummy_network, c_puct=1.0, num_simulations=10)
     state = count21_two_player_game.initial_state()
@@ -40,7 +40,7 @@ def test_mcts_search_count21_two_player(
 
 
 def test_mcts_search_count21_three_player(
-    count21_three_player_game: Count21Game, dummy_network: DummyPolicyValueNetwork
+    count21_three_player_game: Count21Game, dummy_network: DummyPolicyValueNetwork[Count21Game, Count21State, int]
 ) -> None:
     mcts = MCTS(count21_three_player_game, dummy_network, c_puct=1.0, num_simulations=10)
     state = count21_three_player_game.initial_state()
@@ -52,7 +52,9 @@ def test_mcts_search_count21_three_player(
         assert action_visits[action] >= 0, f"Action {action} has negative visits."
 
 
-def test_mcts_search_count21_two_player_optimal_play(dummy_network: DummyPolicyValueNetwork) -> None:
+def test_mcts_search_count21_two_player_optimal_play(
+    dummy_network: DummyPolicyValueNetwork[Count21Game, Count21State, int]
+) -> None:
     game = Count21Game(num_players=2, target=11, max_guess=3)
 
     mcts = MCTS(game, dummy_network, c_puct=1.0, num_simulations=2000)
@@ -82,26 +84,33 @@ def test_dummy_policy_value_network() -> None:
 def test_alphazero_player() -> None:
     game = Count21Game()
     network = DummyPolicyValueNetwork[Count21Game, Count21State, int]()
-    player = AlphaZeroPlayer[Count21Game, Count21State, int](game, network, num_simulations=10)
+    # player = AlphaZeroPlayer[Count21Game, Count21State, int, MCTSData[int]](game, network, num_simulations=10)
+    player = AlphaZeroPlayer(game, network, num_simulations=10)
 
     state = Count21State(score=0, current_player=1)
-    actions = game.legal_actions(state)
-    action = player.select_action(state, actions)
+    legal_actions = game.legal_actions(state)
+    action_result = player.select_action(state, legal_actions)
 
+    action = action_result.action
+    mcts_data = action_result.player_data
     assert isinstance(action, int)
-    assert action in actions
+    assert action in legal_actions
+    assert isinstance(mcts_data, MCTSData)
+    assert isinstance(mcts_data.policy_counts, dict)
+    assert isinstance(mcts_data.prior_probabilities, np.ndarray)
+    assert isinstance(mcts_data.value_estimate, np.ndarray)
 
 
 def test_alphazero_player_with_different_simulations() -> None:
     game = Count21Game()
     network = DummyPolicyValueNetwork[Count21Game, Count21State, int]()
 
-    player_10 = AlphaZeroPlayer[Count21Game, Count21State, int](game, network, num_simulations=10)
-    player_100 = AlphaZeroPlayer[Count21Game, Count21State, int](game, network, num_simulations=100)
+    player_10 = AlphaZeroPlayer(game, network, num_simulations=10)
+    player_100 = AlphaZeroPlayer(game, network, num_simulations=100)
 
     state = Count21State(score=0, current_player=1)
-    action_10 = player_10.select_action(state, game.legal_actions(state))
-    action_100 = player_100.select_action(state, game.legal_actions(state))
+    action_result_10_ = player_10.select_action(state, game.legal_actions(state))
+    action_result_100_ = player_100.select_action(state, game.legal_actions(state))
 
-    assert action_10 in game.legal_actions(state)
-    assert action_100 in game.legal_actions(state)
+    assert action_result_10_.action in game.legal_actions(state)
+    assert action_result_100_.action in game.legal_actions(state)

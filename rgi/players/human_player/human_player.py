@@ -1,19 +1,26 @@
-from typing import Generic, Literal, Sequence
+from typing import Literal, Sequence
 from typing_extensions import override
 
-from rgi.core.base import Player, TGame, TGameState, TAction
+from rgi.core.base import Player, TGame, TGameState, TAction, ActionResult
 
 _INDEX_PREFIX = "i:"
 
 TPlayerState = Literal[None]
+TPlayerData = Literal[None]
 
 
-class HumanPlayer(Player[TGameState, TPlayerState, TAction], Generic[TGame, TGameState, TAction]):
+class HumanPlayer(Player[TGameState, TPlayerState, TAction, TPlayerData]):
     def __init__(self, game: TGame):
         self.game = game
 
     @override
-    def select_action(self, game_state: TGameState, legal_actions: Sequence[TAction]) -> TAction:
+    def select_action(
+        self, game_state: TGameState, legal_actions: Sequence[TAction]
+    ) -> ActionResult[TAction, TPlayerData]:
+        action = self._select_action(game_state, legal_actions)
+        return ActionResult(action, None)
+
+    def _select_action(self, game_state: TGameState, legal_actions: Sequence[TAction]) -> TAction:
         while True:
             print("Current game state:")
             print(self.game.pretty_str(game_state))

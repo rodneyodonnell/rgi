@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Sequence, Any, Iterator, TypeVar, Dict, Union, Optional, cast
+from typing import Sequence, Any, Iterator, TypeVar, Dict, Union, Optional
 from numpy.typing import NDArray
 
 import numpy as np
@@ -8,13 +8,15 @@ from tensorflow.keras import Model, layers, optimizers, losses
 from tensorflow import Tensor
 from typing import Tuple
 from rgi.games.count21.count21 import Count21Game, Count21State
-from rgi.players.alphazero.alphazero import PolicyValueNetwork
+from rgi.players.alphazero.alphazero import PolicyValueNetwork, MCTSData
+from rgi.core.base import TGame, TGameState, TAction
 
 from rgi.core.archive import RowFileArchiver
 from rgi.core.trajectory import GameTrajectory
 
 TState = TypeVar("TState")
 TAction = TypeVar("TAction")
+TPlayerData = TypeVar("TPlayerData")
 TensorCompatible = Union[Tensor, str, float, NDArray[Any], int, Sequence[Any]]
 
 
@@ -63,27 +65,39 @@ class PVNetwork_Count21_TF(Model):  # type: ignore[type-arg]
         inputs: Tensor,
         training: Optional[bool] = None,
         mask: Optional[TensorCompatible] = None,
-    ) -> Tuple[Tensor, Tensor]:
-        x: Tensor = self.fc1(inputs)
+    ) -> tuple[Tensor, Tensor]:
+        """Forward pass through the network.
+
+        Args:
+            inputs: Batch of state vectors.
+            training: Whether we are training or not.
+            mask: Optional mask tensor.
+
+        Returns:
+            Tuple of (policy_logits, value) tensors.
+            - policy_logits: Batch of logits for each action.
+            - value: Batch of value vectors (one per player).
+        """
+        x = self.fc1(inputs)
         x = self.fc2(x)
-        policy_logits: Tensor = self.policy_head(x)
-        value: Tensor = self.value_head(x)
+        policy_logits = self.policy_head(x)
+        value = self.value_head(x)
         return policy_logits, value
 
 
-class TFPVNetworkWrapper(PolicyValueNetwork[Count21Game, Count21State, int]):
+class TFPVNetworkWrapper(PolicyValueNetwork[TGame, TGameState, TAction]):
     def __init__(self, tf_model: PVNetwork_Count21_TF) -> None:
         self.tf_model = tf_model
 
     def predict(
-        self, game: Count21Game, state: Count21State, actions: Sequence[int]
+        self, game: TGame, state: TGameState, actions: Sequence[TAction]
     ) -> Tuple[NDArray[np.float32], NDArray[np.float32]]:
         """
         Convert the given game state to a flat numpy array and perform a forward pass
         through the TF model. Returns a tuple (policy_logits, value) as numpy arrays.
         """
         # Example conversion: Assuming `state` is an object with `score` and `current_player` attributes.
-        state_array = np.array([state.score, state.current_player], dtype=np.float32)
+        state_array = np.array([state.score, state.current_player], dtype=np.float32)  # type: ignore
         # Expand dimensions to create a batch with a single element.
         input_tensor = tf.convert_to_tensor(state_array.reshape(1, -1))
         policy_logits, value = self.tf_model(input_tensor, training=False)
@@ -93,7 +107,7 @@ class TFPVNetworkWrapper(PolicyValueNetwork[Count21Game, Count21State, int]):
 # A simple dataset to convert your self-play trajectories into training examples.
 # Each data point is a tuple: (state, target_policy, target_value)
 class TrajectoryDataset_Count21:
-    def __init__(self, trajectories: Sequence[GameTrajectory[Count21State, int]]) -> None:
+    def __init__(self, trajectories: Sequence[GameTrajectory[Count21State, int, MCTSData[int]]]) -> None:
         self.data: list[tuple[NDArray[np.float32], NDArray[np.float32], NDArray[np.float32]]] = []
         for traj in trajectories:
             final_reward: NDArray[np.float32] = np.array(traj.final_reward, dtype=np.float32)
@@ -119,7 +133,7 @@ class TrajectoryDataset_Count21:
 
 
 def train_model(
-    trajectories: Sequence[GameTrajectory[Count21State, int]], num_epochs: int = 10, batch_size: int = 32
+    trajectories: Sequence[GameTrajectory[Count21State, int, MCTSData[int]]], num_epochs: int = 10, batch_size: int = 32
 ) -> PVNetwork_Count21_TF:
     dataset_obj: TrajectoryDataset_Count21 = TrajectoryDataset_Count21(trajectories)
 
@@ -143,9 +157,7 @@ def train_model(
     tf_dataset = tf.data.Dataset.from_generator(gen, output_signature=output_signature)
     tf_dataset = tf_dataset.shuffle(buffer_size=1000).batch(batch_size)
 
-    model: PVNetwork_Count21_TF = PVNetwork_Count21_TF(
-        state_dim=state_dim, num_actions=num_actions, num_players=num_players
-    )
+    model = PVNetwork_Count21_TF(state_dim=state_dim, num_actions=num_actions, num_players=num_players)
 
     optimizer = optimizers.Adam(1e-3)
     # For policy loss, we use SparseCategoricalCrossentropy (from_logits=True as we output raw logits).
@@ -181,7 +193,9 @@ def main() -> None:
 
     # Replace with actual loading of your trajectories.
     archiver = RowFileArchiver()
-    trajectories: Sequence[GameTrajectory[Count21State, int]] = archiver.read_items(args.input, GameTrajectory)
+    trajectories: Sequence[GameTrajectory[Count21State, int, MCTSData[int]]] = archiver.read_items(
+        args.input, GameTrajectory
+    )
 
     model = train_model(trajectories, num_epochs=args.num_epochs)
     model.save_weights(args.output)

@@ -26,8 +26,8 @@ def run_minimax(target: int, max_depth: int) -> int:
     game = Count21Game(target=target)
     state = game.initial_state()
     player = MinimaxPlayer(game, player_id=1, max_depth=max_depth)
-    action = player.select_action(state, game.legal_actions(state))
-    return action
+    action_result = player.select_action(state, game.legal_actions(state))
+    return action_result.action
 
 
 def test_minimax_depth() -> None:
@@ -59,9 +59,9 @@ def test_minimax_player_perfect_play(game: Game[Any, int]) -> None:
 
     while not game.is_terminal(state):
         if current_player == 1:
-            action = player1.select_action(state, game.legal_actions(state))
+            action = player1.select_action(state, game.legal_actions(state)).action
         else:
-            action = player2.select_action(state, game.legal_actions(state))
+            action = player2.select_action(state, game.legal_actions(state)).action
         action_sequence.append(action)
 
         state = game.next_state(state, action)
