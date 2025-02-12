@@ -1,18 +1,18 @@
 from __future__ import annotations
-from typing import Sequence, Any, Iterator, TypeVar, Dict, Union, Optional
-from numpy.typing import NDArray
+
+from typing import Any, Dict, Iterator, Optional, Sequence, Tuple, TypeVar, Union
 
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras import Model, layers, optimizers, losses
+from numpy.typing import NDArray
 from tensorflow import Tensor
-from typing import Tuple
-from rgi.games.count21.count21 import Count21Game, Count21State
-from rgi.players.alphazero.alphazero import PolicyValueNetwork, MCTSData
-from rgi.core.base import TGame, TGameState, TAction
+from tensorflow.keras import Model, layers, losses, optimizers
 
 from rgi.core.archive import RowFileArchiver
+from rgi.core.base import TAction, TGame, TGameState
 from rgi.core.trajectory import GameTrajectory
+from rgi.games.count21.count21 import Count21Game, Count21State
+from rgi.players.alphazero.alphazero import MCTSData, PolicyValueNetwork
 
 TState = TypeVar("TState")
 TAction = TypeVar("TAction")

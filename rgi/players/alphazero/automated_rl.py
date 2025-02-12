@@ -15,16 +15,17 @@ Usage:
 import argparse
 import cProfile
 import pstats
-from typing import Any, List
-import numpy as np
-from numpy.typing import NDArray
-import tensorflow as tf
-from tqdm import tqdm
 import time
+from typing import Any, List
 
-from rgi.games.count21.count21 import Count21Game, Count21State
-from rgi.core.trajectory import GameTrajectory
+import numpy as np
+import tensorflow as tf
+from numpy.typing import NDArray
+from tqdm import tqdm
+
 from rgi.core.game_runner import GameRunner
+from rgi.core.trajectory import GameTrajectory
+from rgi.games.count21.count21 import Count21Game, Count21State
 from rgi.players.alphazero.alphazero import AlphaZeroPlayer, PolicyValueNetwork
 from rgi.players.alphazero.alphazero_tf import PVNetwork_Count21_TF, TFPVNetworkWrapper, train_model
 

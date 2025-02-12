@@ -1,16 +1,16 @@
 from pathlib import Path
-from typing import Any, Type, Sequence
+from typing import Any, Sequence, Type
 
 import pytest
 
-from rgi.core.trajectory import GameTrajectory
 from rgi.core import base
-from rgi.core.game_runner import GameRunner
 from rgi.core.archive import RowFileArchiver
-from rgi.players.random_player.random_player import RandomPlayer
+from rgi.core.game_runner import GameRunner
+from rgi.core.trajectory import GameTrajectory
 from rgi.games.connect4 import connect4
-from rgi.games.othello import othello
 from rgi.games.count21 import count21
+from rgi.games.othello import othello
+from rgi.players.random_player.random_player import RandomPlayer
 from rgi.tests import test_utils
 
 # pylint: disable=redefined-outer-name  # pytest fixtures trigger this false positive

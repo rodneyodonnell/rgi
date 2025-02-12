@@ -1,11 +1,11 @@
 from typing import Any, cast
-
 from unittest.mock import patch
+
 import pytest
 from pytest_mock import MockerFixture
 
-from rgi.players.human_player.human_player import HumanPlayer
 from rgi.core.base import Game
+from rgi.players.human_player.human_player import HumanPlayer
 
 # pylint: disable=redefined-outer-name  # pytest fixtures trigger this false positive
 

@@ -1,6 +1,7 @@
 import pytest
+
 from rgi.games.count21 import count21
-from rgi.games.count21.count21 import Count21Game, Count21State, Count21Serializer
+from rgi.games.count21.count21 import Count21Game, Count21Serializer, Count21State
 
 # pylint: disable=redefined-outer-name  # pytest fixtures trigger this false positive
 

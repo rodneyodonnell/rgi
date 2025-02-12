@@ -1,11 +1,11 @@
 import random
-from typing import Literal
 import textwrap
+from typing import Literal
 
-import pytest
 import numpy as np
+import pytest
 
-from rgi.games.othello.othello import OthelloGame, OthelloState, OthelloSerializer, Action
+from rgi.games.othello.othello import Action, OthelloGame, OthelloSerializer, OthelloState
 
 # pylint: disable=redefined-outer-name  # pytest fixtures trigger this false positive
 

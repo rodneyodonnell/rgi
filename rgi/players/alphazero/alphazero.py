@@ -1,11 +1,12 @@
-from typing import Generic, Optional, Literal, Sequence, TypeVar, Any
 import dataclasses
 from abc import ABC, abstractmethod
-from typing_extensions import override
+from typing import Any, Generic, Literal, Optional, Sequence, TypeVar
+
 import numpy as np
 from numpy.typing import NDArray
+from typing_extensions import override
 
-from rgi.core.base import Player, TGame, TGameState, TAction, ActionResult
+from rgi.core.base import ActionResult, Player, TAction, TGame, TGameState
 
 
 @dataclasses.dataclass

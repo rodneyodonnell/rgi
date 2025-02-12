@@ -7,14 +7,15 @@ Usage:
 
 import argparse
 from typing import Any, TypeVar
+
 import numpy as np
 from tqdm import tqdm  # Optional dependency; install with `pip install tqdm` if needed
 
-from rgi.core.game_runner import GameRunner
-from rgi.players.alphazero.alphazero import AlphaZeroPlayer, DummyPolicyValueNetwork
-from rgi.games.count21.count21 import Count21Game, Count21State
-from rgi.core.trajectory import GameTrajectory  # For type annotation
 from rgi.core.archive import RowFileArchiver
+from rgi.core.game_runner import GameRunner
+from rgi.core.trajectory import GameTrajectory  # For type annotation
+from rgi.games.count21.count21 import Count21Game, Count21State
+from rgi.players.alphazero.alphazero import AlphaZeroPlayer, DummyPolicyValueNetwork
 
 TState = TypeVar("TState")
 TAction = TypeVar("TAction")

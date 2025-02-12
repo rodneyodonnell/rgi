@@ -1,9 +1,8 @@
 import dataclasses
-from typing import Generic, Sequence, Any, get_origin, get_args, Union
-
+from typing import Any, Generic, Sequence, Union, get_args, get_origin
 
 from rgi.core import base
-from rgi.core.base import TGameState, TAction, TPlayerData
+from rgi.core.base import TAction, TGameState, TPlayerData
 
 
 def _is_optional(type_hint: Any) -> bool:

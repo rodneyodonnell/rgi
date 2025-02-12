@@ -1,17 +1,16 @@
 # rgi/core/game_registry.py
 
-from dataclasses import dataclass
-from typing import Generic, Any, Callable
-
 import argparse
-from rgi.core.base import Game, GameSerializer, TGameState, TAction, Player
-from rgi.games.connect4 import connect4
-from rgi.games.othello import othello
-from rgi.games.count21 import count21
+from dataclasses import dataclass
+from typing import Any, Callable, Generic
 
+from rgi.core.base import Game, GameSerializer, Player, TAction, TGameState
+from rgi.games.connect4 import connect4
+from rgi.games.count21 import count21
+from rgi.games.othello import othello
+from rgi.players.human_player.human_player import HumanPlayer
 from rgi.players.minimax_player.minimax_player import MinimaxPlayer
 from rgi.players.random_player.random_player import RandomPlayer
-from rgi.players.human_player.human_player import HumanPlayer
 
 
 @dataclass

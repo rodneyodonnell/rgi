@@ -1,7 +1,9 @@
 import random
 from typing import Literal, Sequence
+
 from typing_extensions import override
-from rgi.core.base import Player, TGameState, TAction, ActionResult
+
+from rgi.core.base import ActionResult, Player, TAction, TGameState
 
 TPlayerState = Literal[None]
 TPlayerData = Literal[None]

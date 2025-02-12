@@ -1,18 +1,18 @@
 # web_app/main.py
 
 import logging
-from typing import Any, cast
 from datetime import datetime
 from threading import Lock
+from typing import Any, cast
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+from rgi.core.base import Game, GameSerializer, Player
 from rgi.core.game_registry import GAME_REGISTRY, PLAYER_REGISTRY, RegisteredGame
 from rgi.players.human_player.human_player import HumanPlayer
-from rgi.core.base import Game, Player, GameSerializer
 
 print("Server restarted at", datetime.now())
 

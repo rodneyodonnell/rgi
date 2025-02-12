@@ -1,8 +1,6 @@
-from typing import override, Literal, Sequence, Any
-from typing import TypeGuard, Protocol, Iterator, runtime_checkable
-
-
 import dataclasses
+from typing import Any, Iterator, Literal, Protocol, Sequence, TypeGuard, override, runtime_checkable
+
 import numpy as np
 
 from rgi.core import base

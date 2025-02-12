@@ -1,24 +1,18 @@
 """Benchmark tests for archive implementations."""
 
-import time
+import dataclasses
 import random
 import statistics
-import dataclasses
+import time
 from pathlib import Path
-from typing import TypeVar, Any, Sequence, Callable
+from typing import Any, Callable, Sequence, TypeVar
 
 import numpy as np
 import pytest
 from pytest_benchmark.fixture import BenchmarkFixture
 
-from rgi.core.archive import (
-    Archive,
-    RowFileArchiver,
-    ColumnFileArchiver,
-    MMapRowArchive,
-    MMapColumnArchive,
-)
-from rgi.tests.core.test_archive import NestedData, SAMPLE_NESTED_DATA
+from rgi.core.archive import Archive, ColumnFileArchiver, MMapColumnArchive, MMapRowArchive, RowFileArchiver
+from rgi.tests.core.test_archive import SAMPLE_NESTED_DATA, NestedData
 
 T = TypeVar("T")
 
