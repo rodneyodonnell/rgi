@@ -1,8 +1,10 @@
 from typing import Any
+
 import pytest
+
 from rgi.core.base import Game
-from rgi.players.minimax_player.minimax_player import MinimaxPlayer
 from rgi.games.count21.count21 import Count21Game, Count21State
+from rgi.players.minimax_player.minimax_player import MinimaxPlayer
 
 # pylint: disable=redefined-outer-name  # pytest fixtures trigger this false positive
 

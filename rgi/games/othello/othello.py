@@ -1,10 +1,9 @@
 from dataclasses import dataclass
-
 from typing import Any
-from typing_extensions import override
 
 import numpy as np
 from numpy.typing import NDArray
+from typing_extensions import override
 
 from rgi.core import base
 

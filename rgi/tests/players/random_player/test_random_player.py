@@ -1,9 +1,10 @@
 from typing import Any, cast
 
-from pytest_mock import MockerFixture
 import pytest
-from rgi.players.random_player.random_player import RandomPlayer
+from pytest_mock import MockerFixture
+
 from rgi.core.base import Game
+from rgi.players.random_player.random_player import RandomPlayer
 
 # pylint: disable=redefined-outer-name  # pytest fixtures trigger this false positive
 

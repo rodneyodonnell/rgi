@@ -1,8 +1,7 @@
+import dataclasses
 import pathlib
 import typing
-import dataclasses
-
-from typing import Any, TypeGuard, Protocol, TypeVar
+from typing import Any, Protocol, TypeGuard, TypeVar
 
 T = TypeVar("T")  # We want invariant T for most types
 T_co = TypeVar("T_co", covariant=True)  # protocol definiton required covariant.

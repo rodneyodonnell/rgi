@@ -1,14 +1,14 @@
-from typing import cast, Any, Type, Literal
 from pathlib import Path
+from typing import Any, Literal, Type, cast
 
 import numpy as np
-import tensorflow as tf
 import pytest
+import tensorflow as tf
 
+from rgi.core.base import TAction, TGame, TGameState
 from rgi.games.count21.count21 import Count21Game, Count21State
 from rgi.players.alphazero.alphazero import AlphaZeroPlayer, DummyPolicyValueNetwork, MCTSData, PolicyValueNetwork
 from rgi.players.alphazero.alphazero_tf import PVNetwork_Count21_TF, TFPVNetworkWrapper
-from rgi.core.base import TGame, TGameState, TAction
 
 # pylint: disable=redefined-outer-name  # pytest fixtures trigger this false positive
 

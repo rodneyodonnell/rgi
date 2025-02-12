@@ -1,8 +1,10 @@
-import pytest
-from rgi.players.alphazero.alphazero import MCTS, DummyPolicyValueNetwork, AlphaZeroPlayer, MCTSData
-from rgi.games.count21.count21 import Count21Game, Count21State
-from typing import cast, Any, Type, Literal
+from typing import Any, Literal, Type, cast
+
 import numpy as np
+import pytest
+
+from rgi.games.count21.count21 import Count21Game, Count21State
+from rgi.players.alphazero.alphazero import MCTS, AlphaZeroPlayer, DummyPolicyValueNetwork, MCTSData
 
 # pylint: disable=redefined-outer-name  # pytest fixtures trigger this false positive
 
@@ -53,7 +55,7 @@ def test_mcts_search_count21_three_player(
 
 
 def test_mcts_search_count21_two_player_optimal_play(
-    dummy_network: DummyPolicyValueNetwork[Count21Game, Count21State, int]
+    dummy_network: DummyPolicyValueNetwork[Count21Game, Count21State, int],
 ) -> None:
     game = Count21Game(num_players=2, target=11, max_guess=3)
 

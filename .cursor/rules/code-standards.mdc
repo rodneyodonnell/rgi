@@ -17,13 +17,17 @@ actions:
     message: |
       # Formatting Requirements
       
-      1. All Python files must be formatted with black:
+      1. All Python files must be formatted using the project's autoformat script:
          ```bash
-         black path/to/modified/file.py
+         ./scripts/run_autoformat.sh
          ```
-         Black configuration (from pyproject.toml):
+         This will run:
+         - isort for import sorting
+         - black for code formatting
+         
+         Configuration is in pyproject.toml:
          - line-length = 120
-         - target-version = ["py312"]
+         - black profile for isort
 
   - type: suggest
     message: |

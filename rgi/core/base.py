@@ -1,6 +1,6 @@
-from abc import ABC, abstractmethod
 import dataclasses
-from typing import Generic, TypeVar, Sequence, Any
+from abc import ABC, abstractmethod
+from typing import Any, Generic, Sequence, TypeVar
 
 import numpy as np
 from numpy.typing import NDArray

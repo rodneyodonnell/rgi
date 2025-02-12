@@ -1,19 +1,20 @@
 """Tests for archive implementations."""
 
 import pathlib
-from dataclasses import dataclass
-from typing import Type, TypeVar, Any
 import typing
+from dataclasses import dataclass
+from typing import Any, Type, TypeVar
+
 import numpy as np
 import pytest
 
 from rgi.core.archive import (
-    ListBasedArchive,
     ColumnFileArchiver,
-    MMapColumnArchive,
-    RowFileArchiver,
     CombinedArchive,
+    ListBasedArchive,
+    MMapColumnArchive,
     MMapRowArchive,
+    RowFileArchiver,
 )
 from rgi.core.utils import dataclass_with_np_eq
 

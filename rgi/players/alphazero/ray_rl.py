@@ -4,7 +4,7 @@ Ray-based distributed self-play for AlphaZero training.
 
 import argparse
 from dataclasses import dataclass
-from typing import TypeVar, cast, Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 import numpy as np
 import ray  # pylint: disable=no-member
@@ -17,7 +17,6 @@ from rgi.core.trajectory import GameTrajectory
 from rgi.games.count21.count21 import Count21Game, Count21State
 from rgi.players.alphazero.alphazero import AlphaZeroPlayer
 from rgi.players.alphazero.alphazero_tf import PVNetwork_Count21_TF, TFPVNetworkWrapper
-
 
 T = TypeVar("T")
 # Ray's ObjectRef type is used for async task references

@@ -1,8 +1,9 @@
 import textwrap
 from typing import Literal
 
-import pytest
 import numpy as np
+import pytest
+
 from rgi.games.connect4.connect4 import Connect4Game, Connect4Serializer
 
 TPlayerId = Literal[1, 2]
