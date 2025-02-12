@@ -109,26 +109,30 @@ class TFPVNetworkWrapper(PolicyValueNetwork[TGame, TGameState, TAction]):
 class TrajectoryDataset_Count21:
     def __init__(self, trajectories: Sequence[GameTrajectory[Count21State, int, MCTSData[int]]]) -> None:
         self.data: list[tuple[NDArray[np.float32], NDArray[np.float32], NDArray[np.float32]]] = []
+
         for traj in trajectories:
             final_reward: NDArray[np.float32] = np.array(traj.final_reward, dtype=np.float32)
-            # For each non-terminal state (skip last if terminal)
-            for i in range(len(traj.game_states) - 1):
-                state: NDArray[np.float32] = np.array(
-                    [traj.game_states[i].score, traj.game_states[i].current_player], dtype=np.float32
-                )
-                # Here, instead of aggregating all actions, you might store the MCTS
-                # probabilities for the state from self-play. For now, as an example,
-                # we compute a dummy target policy only using the action at this step.
-                n_actions: int = 3  # adjust as needed
-                target_policy: NDArray[np.float32] = np.zeros(n_actions, dtype=np.float32)
-                action = traj.actions[i]
-                target_policy[action - 1] = 1.0  # one-hot target (replace with actual MCTS counts)
-                self.data.append((state, target_policy, final_reward))
+
+            # For each state-action pair in the trajectory
+            for i in range(len(traj.actions)):
+                state = traj.game_states[i]
+                state_array = np.array([state.score, state.current_player], dtype=np.float32)
+
+                # Get MCTS visit counts for this state
+                mcts_data = traj.player_data[i]
+                visit_counts = np.zeros(3, dtype=np.float32)  # Count21 has 3 possible actions (1,2,3)
+                total_visits = sum(mcts_data.policy_counts.values())
+
+                # Convert visit counts to policy distribution
+                for action, count in mcts_data.policy_counts.items():
+                    visit_counts[action - 1] = count / total_visits  # action is 1-based
+
+                self.data.append((state_array, visit_counts, final_reward))
 
     def __len__(self) -> int:
         return len(self.data)
 
-    def __getitem__(self, idx: int) -> Tuple[NDArray[np.float32], NDArray[np.float32], NDArray[np.float32]]:
+    def __getitem__(self, idx: int) -> tuple[NDArray[np.float32], NDArray[np.float32], NDArray[np.float32]]:
         return self.data[idx]
 
 
@@ -137,21 +141,19 @@ def train_model(
 ) -> PVNetwork_Count21_TF:
     dataset_obj: TrajectoryDataset_Count21 = TrajectoryDataset_Count21(trajectories)
 
-    # Generator yielding (state, label, target_value).
-    # For policy loss, we use the class label (i.e. argmax of target_policy).
-    def gen() -> Iterator[tuple[NDArray[np.float32], int, NDArray[np.float32]]]:
+    # Generator yielding (state, target_policy, target_value)
+    def gen() -> Iterator[tuple[NDArray[np.float32], NDArray[np.float32], NDArray[np.float32]]]:
         for state, target_policy, target_value in dataset_obj.data:
-            label: int = int(np.argmax(target_policy))
-            yield state, label, target_value
+            yield state, target_policy, target_value
 
     state_dim: int = dataset_obj.data[0][0].shape[0]
     num_actions: int = dataset_obj.data[0][1].shape[0]
     num_players: int = dataset_obj.data[0][2].shape[0]
 
-    # Output: (state, action, target_value)
+    # Output signature for full probability distributions
     output_signature = (
         tf.TensorSpec(shape=(state_dim,), dtype=tf.float32),
-        tf.TensorSpec(shape=(), dtype=tf.int32),
+        tf.TensorSpec(shape=(num_actions,), dtype=tf.float32),
         tf.TensorSpec(shape=(num_players,), dtype=tf.float32),
     )
     tf_dataset = tf.data.Dataset.from_generator(gen, output_signature=output_signature)
@@ -160,24 +162,30 @@ def train_model(
     model = PVNetwork_Count21_TF(state_dim=state_dim, num_actions=num_actions, num_players=num_players)
 
     optimizer = optimizers.Adam(1e-3)
-    # For policy loss, we use SparseCategoricalCrossentropy (from_logits=True as we output raw logits).
-    policy_loss_fn = losses.SparseCategoricalCrossentropy(from_logits=True)
+    # Use categorical crossentropy for policy loss since we have probability distributions
+    policy_loss_fn = losses.CategoricalCrossentropy(from_logits=True)
     value_loss_fn = losses.MeanSquaredError()
 
     for epoch in range(num_epochs):
-        epoch_loss: float = 0.0
+        epoch_policy_loss: float = 0.0
+        epoch_value_loss: float = 0.0
         steps: int = 0
-        for states, labels, target_values in tf_dataset:
+        for states, target_policies, target_values in tf_dataset:
             with tf.GradientTape() as tape:
                 policy_logits, value_pred = model(states, training=True)
-                policy_loss = policy_loss_fn(labels, policy_logits)
+                policy_loss = policy_loss_fn(target_policies, policy_logits)
                 value_loss = value_loss_fn(target_values, value_pred)
                 total_loss = policy_loss + value_loss
             grads = tape.gradient(total_loss, model.trainable_variables)
             optimizer.apply_gradients(zip(grads, model.trainable_variables))
-            epoch_loss += float(total_loss.numpy())
+            epoch_policy_loss += float(policy_loss.numpy())
+            epoch_value_loss += float(value_loss.numpy())
             steps += 1
-        print(f"Epoch {epoch + 1}: Average Loss = {epoch_loss / steps:.4f}")
+        print(
+            f"Epoch {epoch + 1}: "
+            f"Policy Loss = {epoch_policy_loss / steps:.4f}, "
+            f"Value Loss = {epoch_value_loss / steps:.4f}"
+        )
 
     return model
 
