@@ -1,4 +1,4 @@
-from typing import cast, Any, Type
+from typing import cast, Any, Type, Literal
 from pathlib import Path
 
 import numpy as np
@@ -6,8 +6,9 @@ import tensorflow as tf
 import pytest
 
 from rgi.games.count21.count21 import Count21Game, Count21State
-from rgi.players.alphazero.alphazero import AlphaZeroPlayer, DummyPolicyValueNetwork
+from rgi.players.alphazero.alphazero import AlphaZeroPlayer, DummyPolicyValueNetwork, MCTSData, PolicyValueNetwork
 from rgi.players.alphazero.alphazero_tf import PVNetwork_Count21_TF, TFPVNetworkWrapper
+from rgi.core.base import TGame, TGameState, TAction
 
 # pylint: disable=redefined-outer-name  # pytest fixtures trigger this false positive
 
@@ -33,14 +34,15 @@ def loaded_tf_model(count21_game: Count21Game) -> PVNetwork_Count21_TF:
     model = PVNetwork_Count21_TF(state_dim=state_dim, num_actions=num_actions, num_players=num_players)
     # Build the model using a dummy forward pass.
     model(tf.convert_to_tensor(np.expand_dims(state_np, axis=0)))
-    model.load_weights("tf_pv_network.weights.h5")
     return model
 
 
 @pytest.fixture
-def improved_player(count21_game: Count21Game, loaded_tf_model: PVNetwork_Count21_TF) -> AlphaZeroPlayer:
+def improved_player(
+    count21_game: Count21Game, loaded_tf_model: PVNetwork_Count21_TF
+) -> AlphaZeroPlayer[Count21State, int]:
     # Wrap the TF model so it implements the expected PolicyValueNetwork interface.
-    wrapped_model = TFPVNetworkWrapper(loaded_tf_model)
+    wrapped_model: PolicyValueNetwork[Count21Game, Count21State, int] = TFPVNetworkWrapper(loaded_tf_model)
     return AlphaZeroPlayer(count21_game, wrapped_model)
 
 
@@ -57,11 +59,14 @@ def test_model_prediction_shapes(count21_game: Count21Game, loaded_tf_model: PVN
     assert value.shape[1] == num_players
 
 
-def test_player_select_action(improved_player: AlphaZeroPlayer, count21_game: Count21Game) -> None:
+def test_player_select_action(improved_player: AlphaZeroPlayer[Count21State, int], count21_game: Count21Game) -> None:
     state = count21_game.initial_state()
     legal_actions = count21_game.legal_actions(state)
-    action = improved_player.select_action(state, legal_actions)
-    assert action in legal_actions
+    action_result = improved_player.select_action(state, legal_actions)
+    assert action_result.action in legal_actions
+    assert isinstance(action_result.player_data.policy_counts, dict)
+    assert isinstance(action_result.player_data.prior_probabilities, np.ndarray)
+    assert isinstance(action_result.player_data.value_estimate, np.ndarray)
 
 
 def test_trained_model() -> None:
@@ -75,44 +80,48 @@ def test_trained_model() -> None:
     num_actions = len(count21_game.legal_actions(state))
     num_players = count21_game.num_players(state)
 
-    model = PVNetwork_Count21_TF(state_dim=state_dim, num_actions=num_actions, num_players=num_players)
+    model: PVNetwork_Count21_TF = PVNetwork_Count21_TF(
+        state_dim=state_dim, num_actions=num_actions, num_players=num_players
+    )
     model(tf.convert_to_tensor(np.expand_dims(state_np, axis=0)))
-    model.load_weights("tf_pv_network.g1000.s150.t8.weights.h5")
 
-    wrapped_model = TFPVNetworkWrapper(model)
-    dummy_model = DummyPolicyValueNetwork()
+    wrapped_model: PolicyValueNetwork[Count21Game, Count21State, int] = TFPVNetworkWrapper(model)
+    dummy_model: PolicyValueNetwork[Count21Game, Count21State, int] = DummyPolicyValueNetwork()
 
-    player_100 = AlphaZeroPlayer(count21_game, wrapped_model, num_simulations=100)
-    action_100 = player_100.select_action(state, count21_game.legal_actions(state))
-    assert action_100 in count21_game.legal_actions(state)
+    player_100 = AlphaZeroPlayer[Count21State, int](count21_game, wrapped_model, num_simulations=100)
+    action_result_100 = player_100.select_action(state, count21_game.legal_actions(state))
+    assert action_result_100.action in count21_game.legal_actions(state)
+    assert isinstance(action_result_100.player_data.policy_counts, dict)
+    assert isinstance(action_result_100.player_data.prior_probabilities, np.ndarray)
+    assert isinstance(action_result_100.player_data.value_estimate, np.ndarray)
 
-    player_100_d = AlphaZeroPlayer(count21_game, dummy_model, num_simulations=100)
-    action_100_d = player_100_d.select_action(state, count21_game.legal_actions(state))
-    assert action_100_d in count21_game.legal_actions(state)
+    player_100_d = AlphaZeroPlayer[Count21State, int](count21_game, dummy_model, num_simulations=100)
+    action_result_100_d = player_100_d.select_action(state, count21_game.legal_actions(state))
+    assert action_result_100_d.action in count21_game.legal_actions(state)
+    assert isinstance(action_result_100_d.player_data.policy_counts, dict)
+    assert isinstance(action_result_100_d.player_data.prior_probabilities, np.ndarray)
+    assert isinstance(action_result_100_d.player_data.value_estimate, np.ndarray)
 
-    player_1000 = AlphaZeroPlayer(count21_game, wrapped_model, num_simulations=1000)
-    action_1000 = player_1000.select_action(state, count21_game.legal_actions(state))
-    assert action_1000 in count21_game.legal_actions(state)
+    player_1000 = AlphaZeroPlayer[Count21State, int](count21_game, wrapped_model, num_simulations=1000)
+    action_result_1000 = player_1000.select_action(state, count21_game.legal_actions(state))
+    assert action_result_1000.action in count21_game.legal_actions(state)
+    assert isinstance(action_result_1000.player_data.policy_counts, dict)
+    assert isinstance(action_result_1000.player_data.prior_probabilities, np.ndarray)
+    assert isinstance(action_result_1000.player_data.value_estimate, np.ndarray)
 
-    player_1000_d = AlphaZeroPlayer(count21_game, dummy_model, num_simulations=1000)
-    action_1000_d = player_1000_d.select_action(state, count21_game.legal_actions(state))
-    assert action_1000_d in count21_game.legal_actions(state)
+    player_1000_d = AlphaZeroPlayer[Count21State, int](count21_game, dummy_model, num_simulations=1000)
+    action_result_1000_d = player_1000_d.select_action(state, count21_game.legal_actions(state))
+    assert action_result_1000_d.action in count21_game.legal_actions(state)
+    assert isinstance(action_result_1000_d.player_data.policy_counts, dict)
+    assert isinstance(action_result_1000_d.player_data.prior_probabilities, np.ndarray)
+    assert isinstance(action_result_1000_d.player_data.value_estimate, np.ndarray)
 
-    player_5000 = AlphaZeroPlayer(count21_game, wrapped_model, num_simulations=5000)
-    action_5000 = player_5000.select_action(state, count21_game.legal_actions(state))
-    assert action_5000 in count21_game.legal_actions(state)
-
-    player_5000_d = AlphaZeroPlayer(count21_game, dummy_model, num_simulations=5000)
-    action_5000_d = player_5000_d.select_action(state, count21_game.legal_actions(state))
-    assert action_5000_d in count21_game.legal_actions(state)
-
-    player_10000 = AlphaZeroPlayer(count21_game, wrapped_model, num_simulations=10000)
-    action_10000 = player_10000.select_action(state, count21_game.legal_actions(state))
-    assert action_10000 in count21_game.legal_actions(state)
-
-    player_10000_d = AlphaZeroPlayer(count21_game, dummy_model, num_simulations=10000)
-    action_10000_d = player_10000_d.select_action(state, count21_game.legal_actions(state))
-    assert action_10000_d in count21_game.legal_actions(state)
+    player_5000 = AlphaZeroPlayer[Count21State, int](count21_game, wrapped_model, num_simulations=5000)
+    action_result_5000 = player_5000.select_action(state, count21_game.legal_actions(state))
+    assert action_result_5000.action in count21_game.legal_actions(state)
+    assert isinstance(action_result_5000.player_data.policy_counts, dict)
+    assert isinstance(action_result_5000.player_data.prior_probabilities, np.ndarray)
+    assert isinstance(action_result_5000.player_data.value_estimate, np.ndarray)
 
 
 def test_tf_model_basic() -> None:
@@ -121,7 +130,9 @@ def test_tf_model_basic() -> None:
     num_actions = 3  # 1, 2, 3
     num_players = 2
 
-    model = PVNetwork_Count21_TF(state_dim=state_dim, num_actions=num_actions, num_players=num_players)
+    model: PVNetwork_Count21_TF = PVNetwork_Count21_TF(
+        state_dim=state_dim, num_actions=num_actions, num_players=num_players
+    )
 
     # Test forward pass.
     batch_size = 4
@@ -138,19 +149,24 @@ def test_tf_model_with_alphazero() -> None:
     num_actions = 3  # 1, 2, 3
     num_players = 2
 
-    model = PVNetwork_Count21_TF(state_dim=state_dim, num_actions=num_actions, num_players=num_players)
-    wrapper = TFPVNetworkWrapper(model)
+    model: PVNetwork_Count21_TF = PVNetwork_Count21_TF(
+        state_dim=state_dim, num_actions=num_actions, num_players=num_players
+    )
+    wrapper: PolicyValueNetwork[Count21Game, Count21State, int] = TFPVNetworkWrapper(model)
 
     game = Count21Game(num_players=num_players, target=21, max_guess=3)
-    player = AlphaZeroPlayer[Count21Game, Count21State, int](game, wrapper, num_simulations=10)
+    player = AlphaZeroPlayer[Count21State, int](game, wrapper, num_simulations=10)
 
     # Test that we can use the model to make predictions.
     state = Count21State(score=0, current_player=1)
     legal_actions = game.legal_actions(state)
-    action = player.select_action(state, legal_actions)
+    action_result = player.select_action(state, legal_actions)
 
-    assert isinstance(action, int)
-    assert action in legal_actions
+    assert isinstance(action_result.action, int)
+    assert action_result.action in legal_actions
+    assert isinstance(action_result.player_data.policy_counts, dict)
+    assert isinstance(action_result.player_data.prior_probabilities, np.ndarray)
+    assert isinstance(action_result.player_data.value_estimate, np.ndarray)
 
 
 def test_tf_model_save_load(tmp_path: Path) -> None:
@@ -159,18 +175,21 @@ def test_tf_model_save_load(tmp_path: Path) -> None:
     num_actions = 3  # 1, 2, 3
     num_players = 2
 
-    model = PVNetwork_Count21_TF(state_dim=state_dim, num_actions=num_actions, num_players=num_players)
-    wrapper = TFPVNetworkWrapper(model)
+    model: PVNetwork_Count21_TF = PVNetwork_Count21_TF(
+        state_dim=state_dim, num_actions=num_actions, num_players=num_players
+    )
+    wrapper: PolicyValueNetwork[Count21Game, Count21State, int] = TFPVNetworkWrapper(model)
 
     game = Count21Game(num_players=num_players, target=21, max_guess=3)
-    player = AlphaZeroPlayer[Count21Game, Count21State, int](game, wrapper, num_simulations=10)
+    player = AlphaZeroPlayer[Count21State, int](game, wrapper, num_simulations=10)
 
     # Generate some random inputs.
     state = Count21State(score=0, current_player=1)
     legal_actions = game.legal_actions(state)
 
     # Get predictions before saving.
-    network = cast(TFPVNetworkWrapper, player.network)
+    network = player.network
+    assert isinstance(network, TFPVNetworkWrapper)  # Type check to ensure we can access tf_model
     dummy_model = network.tf_model
     input_tensor = tf.convert_to_tensor(np.array([[0, 1]], dtype=np.float32))
     before_policy, before_value = dummy_model(input_tensor, training=False)

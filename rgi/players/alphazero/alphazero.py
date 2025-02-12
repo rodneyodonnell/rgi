@@ -1,12 +1,30 @@
-from typing import Generic, Optional, Literal, Sequence, TypeVar, Any, Callable
+from typing import Generic, Optional, Literal, Sequence, TypeVar, Any
+import dataclasses
 from abc import ABC, abstractmethod
 from typing_extensions import override
 import numpy as np
 from numpy.typing import NDArray
 
-from rgi.core.base import Player, TGame, TGameState, TAction
+from rgi.core.base import Player, TGame, TGameState, TAction, ActionResult
+
+
+@dataclasses.dataclass
+class MCTSData(Generic[TAction]):
+    """Data collected during MCTS search for a single state.
+
+    Args:
+        policy_counts: Dictionary mapping actions to their visit counts in MCTS
+        prior_probabilities: Network's prior probabilities for each action
+        value_estimate: Network's value estimate for each player
+    """
+
+    policy_counts: dict[TAction, int]
+    prior_probabilities: NDArray[np.float32]
+    value_estimate: NDArray[np.float32]
+
 
 TPlayerState = Literal[None]
+TPlayerData = MCTSData[TAction]
 TFloat = TypeVar("TFloat", bound=np.floating[Any])
 
 
@@ -38,7 +56,7 @@ class DummyPolicyValueNetwork(PolicyValueNetwork[TGame, TGameState, TAction]):
 
 
 # AlphaZeroPlayer uses MCTS based on the policy–value network.
-class AlphaZeroPlayer(Player[TGameState, TPlayerState, TAction], Generic[TGame, TGameState, TAction]):
+class AlphaZeroPlayer(Player[TGameState, TPlayerState, TAction, TPlayerData]):
     def __init__(
         self, game: TGame, network: PolicyValueNetwork[TGame, TGameState, TAction], *, num_simulations: int = 50
     ) -> None:
@@ -47,12 +65,32 @@ class AlphaZeroPlayer(Player[TGameState, TPlayerState, TAction], Generic[TGame, 
         self.num_simulations = num_simulations
 
     @override
-    def select_action(self, game_state: TGameState, legal_actions: Sequence[TAction]) -> TAction:
+    def select_action(
+        self, game_state: TGameState, legal_actions: Sequence[TAction]
+    ) -> ActionResult[TAction, TPlayerData]:
         mcts = MCTS(self.game, self.network, c_puct=1.0, num_simulations=self.num_simulations)
+
+        # Get network predictions for the current state
+        policy_logits, value_estimate = self.network.predict(self.game, game_state, legal_actions)
+        prior_probabilities = self.softmax(policy_logits)
+
+        # Run MCTS search
         action_visits = mcts.search(game_state)
-        # Choose the action with the highest visit count.
+
+        # Choose the action with the highest visit count
         best_action = max(action_visits.items(), key=lambda x: x[1])[0]
-        return best_action
+
+        # Return both the action and the MCTS data
+        mcts_data = MCTSData(
+            policy_counts=action_visits,
+            prior_probabilities=prior_probabilities,
+            value_estimate=value_estimate,
+        )
+        return ActionResult(best_action, mcts_data)
+
+    def softmax(self, x: NDArray[np.float32]) -> NDArray[np.float32]:
+        e_x = np.exp(x - np.max(x))
+        return np.array(e_x / e_x.sum(), dtype=np.float32)
 
 
 # MCTS Node now stores a vector of total values.

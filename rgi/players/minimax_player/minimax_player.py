@@ -1,12 +1,13 @@
 from typing import Optional, Literal, Sequence
 from typing_extensions import override
 
-from rgi.core.base import Game, Player, TGameState, TAction, TPlayerId
+from rgi.core.base import Game, Player, TGameState, TAction, TPlayerId, ActionResult
 
 TPlayerState = Literal[None]
+TPlayerData = Literal[None]
 
 
-class MinimaxPlayer(Player[TGameState, TPlayerState, TAction]):
+class MinimaxPlayer(Player[TGameState, TPlayerState, TAction, TPlayerData]):
     def __init__(
         self,
         game: Game[TGameState, TAction],
@@ -66,8 +67,10 @@ class MinimaxPlayer(Player[TGameState, TPlayerState, TAction]):
             return min_eval, best_action
 
     @override
-    def select_action(self, game_state: TGameState, legal_actions: Sequence[TAction]) -> TAction:
+    def select_action(
+        self, game_state: TGameState, legal_actions: Sequence[TAction]
+    ) -> ActionResult[TAction, TPlayerData]:
         _, best_action = self.minimax(game_state, self.max_depth, -float("inf"), float("inf"))
         if best_action is None:
-            return legal_actions[0]
-        return best_action
+            best_action = legal_actions[0]
+        return ActionResult(best_action, None)

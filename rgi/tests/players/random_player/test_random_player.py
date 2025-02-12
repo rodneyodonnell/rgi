@@ -26,7 +26,7 @@ def test_select_action(game: Game[Any, int], player: RandomPlayer[Any, Any]) -> 
     actions = game.legal_actions(state)
 
     # Run multiple times to ensure we're getting different actions
-    selected_actions = set(player.select_action(state, actions) for _ in range(50))
+    selected_actions = set(player.select_action(state, actions).action for _ in range(50))
 
     assert len(selected_actions) > 1, "RandomPlayer should select different actions over multiple calls"
     assert all(action in actions for action in selected_actions), "All selected actions should be legal"

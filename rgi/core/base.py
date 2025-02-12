@@ -1,5 +1,7 @@
 from abc import ABC, abstractmethod
+import dataclasses
 from typing import Generic, TypeVar, Sequence, Any
+
 import numpy as np
 from numpy.typing import NDArray
 
@@ -7,6 +9,7 @@ TGame = TypeVar("TGame", bound="Game[Any, Any]")  # pylint: disable=invalid-name
 TGameState = TypeVar("TGameState")  # pylint: disable=invalid-name
 TPlayerState = TypeVar("TPlayerState")  # pylint: disable=invalid-name
 TAction = TypeVar("TAction")  # pylint: disable=invalid-name
+TPlayerData = TypeVar("TPlayerData")  # pylint: disable=invalid-name
 TPlayerId = int  # pylint: disable=invalid-name
 
 
@@ -64,11 +67,17 @@ class Game(ABC, Generic[TGameState, TAction]):
         """Return a human-readable string representation of the game state."""
 
 
-class Player(ABC, Generic[TGameState, TPlayerState, TAction]):
+@dataclasses.dataclass
+class ActionResult(Generic[TAction, TPlayerData]):
+    action: TAction
+    player_data: TPlayerData
+
+
+class Player(ABC, Generic[TGameState, TPlayerState, TAction, TPlayerData]):
     @abstractmethod
     def select_action(
         self, game_state: TGameState, legal_actions: Sequence[TAction]
-    ) -> TAction | tuple[TAction, dict[TAction, int]]:
+    ) -> ActionResult[TAction, TPlayerData]:
         """Select an action from the legal actions.
 
         Args:
@@ -76,8 +85,7 @@ class Player(ABC, Generic[TGameState, TPlayerState, TAction]):
             legal_actions: List of legal actions
 
         Returns:
-            Either a single action, or a tuple of (action, mcts_policy_counts) where mcts_policy_counts
-            maps actions to their MCTS visit counts."""
+            Return an ActionData containing the selected action and optional player data."""
 
     def update_player_state(self, old_game_state: TGameState, action: TAction, new_game_state: TGameState) -> None:
         """Update the player's internal state based on the game state and action.
