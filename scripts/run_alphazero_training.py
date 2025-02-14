@@ -277,6 +277,8 @@ def main(config: TrainingConfig) -> None:
 
 
 if __name__ == "__main__":
+    assert "GPU" in str(tf.config.list_physical_devices("GPU")), "No GPU found"
+
     parser = argparse.ArgumentParser(description="Run continuous AlphaZero training.")
     parser.add_argument("--iterations", type=int, default=100, help="Number of training iterations")
     parser.add_argument("--games-per-iter", type=int, default=100, help="Self-play games per iteration")
