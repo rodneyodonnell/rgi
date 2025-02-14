@@ -3,7 +3,7 @@
 
 Usage:
 ./scripts/run_alphazero_training.py --iterations 1000 --games-per-iter 100 --mcts-sims 50 --save-freq 50
-nohup ./scripts/run_alphazero_training.py --iterations 100 --games-per-iter 100 --mcts-sims 50 --epochs 10 --eval-games 50 --save-freq 5 > training.log 2>&1
+nohup ./scripts/run_alphazero_training.py --iterations 100 --games-per-iter 100 --mcts-sims 50 --epochs 10 --eval-games 50 --save-freq 1
 
 Fast Run:
 ./scripts/run_alphazero_training.py --iterations 2 --games-per-iter 5 --mcts-sims 10 --epochs 5 --eval-games 10 --save-freq 1
@@ -15,7 +15,7 @@ import json
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import Any, NamedTuple
+from typing import Any, NamedTuple, TypedDict, NotRequired
 
 import numpy as np
 import tensorflow as tf
@@ -42,6 +42,21 @@ class TrainingConfig(NamedTuple):
     output_dir: str = "training_runs"  # Directory to save models and metrics
 
 
+class OpponentMetrics(TypedDict):
+    win_rate: float
+    avg_game_length: NotRequired[float]
+
+class EvaluationMetrics(TypedDict):
+    random: OpponentMetrics
+    random_mcts: OpponentMetrics
+    previous_model: NotRequired[OpponentMetrics]
+
+class IterationMetrics(TypedDict):
+    iteration: int
+    random_opponent: EvaluationMetrics
+    previous_snapshot: NotRequired[EvaluationMetrics]
+
+
 def create_initial_model() -> PVNetwork_Count21_TF:
     """Create and initialize the model."""
     game = Count21Game(num_players=2, target=21, max_guess=3)
@@ -53,8 +68,9 @@ def create_initial_model() -> PVNetwork_Count21_TF:
 
     model = PVNetwork_Count21_TF(state_dim=state_dim, num_actions=num_actions, num_players=num_players)
     # Build model via a dummy forward pass
-    model(tf.convert_to_tensor(state_array.reshape(1, -1)))
-    return model
+    dummy_input = tf.convert_to_tensor(state_array.reshape(1, -1))
+    _ = model(dummy_input)  # type: ignore[func-returns-value]
+    return model  # type: ignore[return-value]
 
 
 def evaluate_model(
@@ -62,39 +78,37 @@ def evaluate_model(
     opponent_model: PVNetwork_Count21_TF | None,
     num_games: int,
     mcts_simulations: int,
-) -> dict[str, float]:
-    """Evaluate model against opponent (random player if opponent_model is None)."""
+) -> EvaluationMetrics:
+    """Evaluate model against different opponents.
+    
+    Returns:
+        Dictionary containing win rates and game lengths against different opponents.
+    """
     game = Count21Game(num_players=2, target=21, max_guess=3)
     model_wrapper = TFPVNetworkWrapper(model)
-    wins = 0
+    
+    # Create a random network for pure MCTS comparison
+    random_network = create_initial_model()
+    random_wrapper = TFPVNetworkWrapper(random_network)
+
+    # Track metrics for different opponents
+    random_wins = 0
+    mcts_wins = 0
     total_moves = 0
 
+    # First evaluate against random player
     for game_idx in range(num_games):
         # Alternate playing first and second
         if game_idx % 2 == 0:
-            if opponent_model is None:
-                players = [
-                    AlphaZeroPlayer(game, model_wrapper, num_simulations=mcts_simulations),
-                    RandomPlayer(),
-                ]
-            else:
-                opponent_wrapper = TFPVNetworkWrapper(opponent_model)
-                players = [
-                    AlphaZeroPlayer(game, model_wrapper, num_simulations=mcts_simulations),
-                    AlphaZeroPlayer(game, opponent_wrapper, num_simulations=mcts_simulations),
-                ]
+            players = [
+                AlphaZeroPlayer(game, model_wrapper, num_simulations=mcts_simulations),
+                RandomPlayer(),
+            ]
         else:
-            if opponent_model is None:
-                players = [
-                    RandomPlayer(),
-                    AlphaZeroPlayer(game, model_wrapper, num_simulations=mcts_simulations),
-                ]
-            else:
-                opponent_wrapper = TFPVNetworkWrapper(opponent_model)
-                players = [
-                    AlphaZeroPlayer(game, opponent_wrapper, num_simulations=mcts_simulations),
-                    AlphaZeroPlayer(game, model_wrapper, num_simulations=mcts_simulations),
-                ]
+            players = [
+                RandomPlayer(),
+                AlphaZeroPlayer(game, model_wrapper, num_simulations=mcts_simulations),
+            ]
 
         runner = GameRunner(game, players, verbose=False)
         trajectory = runner.run()
@@ -102,13 +116,69 @@ def evaluate_model(
         # Check if model won (accounting for playing first/second)
         model_idx = 0 if game_idx % 2 == 0 else 1
         if trajectory.final_reward[model_idx] > 0:
-            wins += 1
+            random_wins += 1
         total_moves += len(trajectory.actions)
 
-    metrics = {
-        "win_rate": wins / num_games,
-        "avg_game_length": total_moves / num_games,
+    # Then evaluate against random MCTS
+    for game_idx in range(num_games):
+        if game_idx % 2 == 0:
+            players = [
+                AlphaZeroPlayer(game, model_wrapper, num_simulations=mcts_simulations),
+                AlphaZeroPlayer(game, random_wrapper, num_simulations=mcts_simulations),
+            ]
+        else:
+            players = [
+                AlphaZeroPlayer(game, random_wrapper, num_simulations=mcts_simulations),
+                AlphaZeroPlayer(game, model_wrapper, num_simulations=mcts_simulations),
+            ]
+
+        runner = GameRunner(game, players, verbose=False)
+        trajectory = runner.run()
+        
+        # Check if model won (accounting for playing first/second)
+        model_idx = 0 if game_idx % 2 == 0 else 1
+        if trajectory.final_reward[model_idx] > 0:
+            mcts_wins += 1
+
+    # Finally evaluate against previous model if provided
+    prev_model_wins = 0
+    if opponent_model is not None:
+        opponent_wrapper = TFPVNetworkWrapper(opponent_model)
+        for game_idx in range(num_games):
+            if game_idx % 2 == 0:
+                players = [
+                    AlphaZeroPlayer(game, model_wrapper, num_simulations=mcts_simulations),
+                    AlphaZeroPlayer(game, opponent_wrapper, num_simulations=mcts_simulations),
+                ]
+            else:
+                players = [
+                    AlphaZeroPlayer(game, opponent_wrapper, num_simulations=mcts_simulations),
+                    AlphaZeroPlayer(game, model_wrapper, num_simulations=mcts_simulations),
+                ]
+
+            runner = GameRunner(game, players, verbose=False)
+            trajectory = runner.run()
+            
+            # Check if model won (accounting for playing first/second)
+            model_idx = 0 if game_idx % 2 == 0 else 1
+            if trajectory.final_reward[model_idx] > 0:
+                prev_model_wins += 1
+
+    metrics: EvaluationMetrics = {
+        "random": {
+            "win_rate": random_wins / num_games,
+            "avg_game_length": total_moves / num_games,
+        },
+        "random_mcts": {
+            "win_rate": mcts_wins / num_games,
+        },
     }
+    
+    if opponent_model is not None:
+        metrics["previous_model"] = {
+            "win_rate": prev_model_wins / num_games,
+        }
+    
     return metrics
 
 
@@ -129,7 +199,7 @@ def main(config: TrainingConfig) -> None:
 
     # Initialize model and metrics tracking
     current_model = create_initial_model()
-    metrics_history: list[dict[str, Any]] = []
+    metrics_history: list[IterationMetrics] = []
     archiver = RowFileArchiver()
 
     # Main training loop
@@ -165,9 +235,11 @@ def main(config: TrainingConfig) -> None:
 
         # Evaluation phase
         print("Evaluation phase...")
-        metrics = {
+        eval_metrics = evaluate_model(current_model, None, config.eval_games, config.mcts_simulations)
+        
+        metrics: IterationMetrics = {
             "iteration": iteration,
-            "random_opponent": evaluate_model(current_model, None, config.eval_games, config.mcts_simulations),
+            "random_opponent": eval_metrics,
         }
 
         # Save model snapshot
@@ -194,9 +266,14 @@ def main(config: TrainingConfig) -> None:
 
         # Print current metrics
         print(f"\nCurrent metrics:")
-        print(f"Win rate vs random: {metrics['random_opponent']['win_rate']:.2%}")
-        if "previous_snapshot" in metrics:
-            print(f"Win rate vs previous snapshot: {metrics['previous_snapshot']['win_rate']:.2%}")
+        print(f"Win rate vs random: {metrics['random_opponent']['random']['win_rate']:.2%}")
+        print(f"Win rate vs random MCTS: {metrics['random_opponent']['random_mcts']['win_rate']:.2%}")
+        
+        previous_snapshot = metrics.get("previous_snapshot")
+        if previous_snapshot is not None:
+            previous_model = previous_snapshot.get("previous_model")
+            if previous_model is not None:
+                print(f"Win rate vs previous snapshot: {previous_model['win_rate']:.2%}")
 
 
 if __name__ == "__main__":
