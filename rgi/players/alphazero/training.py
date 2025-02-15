@@ -172,9 +172,11 @@ def main(config: TrainingConfig) -> None:
                 dashboard_host="0.0.0.0",  # Allow external access
                 dashboard_port=8265,  # Match the port in docker-compose
                 include_dashboard=True,  # Ensure dashboard is enabled
-                metrics_export_port=8080,  # Port for Prometheus metrics
-                _metrics_export_disk_usage=True,  # Export disk metrics
-                _metrics_export_gpu_utilization=True,  # Export GPU metrics
+                _system_config={
+                    "metrics_report_interval_ms": 2000,  # Report metrics every 2 seconds
+                    "metrics_export_port": 8080,  # Port for Prometheus metrics
+                },
+                _temp_dir=str(run_dir.absolute() / "ray_temp"),  # Use absolute path for Ray temp files
             )
 
         # Save config

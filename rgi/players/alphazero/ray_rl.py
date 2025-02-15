@@ -109,11 +109,14 @@ def run_distributed_selfplay(config: SelfPlayConfig) -> list[GameTrajectory[Coun
             _system_config={
                 "object_store_memory": int(10e9),  # 10GB
                 "object_store_full_delay_ms": 100,
+                "metrics_report_interval_ms": 2000,  # Report metrics every 2 seconds
+                "metrics_export_port": 8080,  # Port for Prometheus metrics
             },
             logging_level="WARNING",  # Reduce Ray logging
             dashboard_host="0.0.0.0",  # Allow external access
             dashboard_port=8265,  # Match the port in docker-compose
             include_dashboard=True,  # Ensure dashboard is enabled
+            _temp_dir=str(Path(config.output_path).absolute().parent / "ray_temp"),  # Use absolute path for Ray temp files
         )
 
     # Initialize workers
