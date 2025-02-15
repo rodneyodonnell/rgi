@@ -194,7 +194,7 @@ def main(config: TrainingConfig) -> None:
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     run_dir = Path(config.output_dir) / timestamp
     models_dir = run_dir / "models"
-    models_dir.mkdir(parents=True)
+    models_dir.mkdir(parents=True, exist_ok=True)
 
     # Initialize Ray if not already initialized
     if not ray.is_initialized():
@@ -230,10 +230,11 @@ def main(config: TrainingConfig) -> None:
                 output_path=str(trajectory_file),
                 verbose=True,
             )
-            run_distributed_selfplay(selfplay_config)
+            trajectories = run_distributed_selfplay(selfplay_config)
 
-            # Load generated trajectories
-            trajectories = archiver.read_items(str(trajectory_file), GameTrajectory)
+            # Save trajectories
+            archiver.write_items(trajectories, str(trajectory_file))  # type: ignore[arg-type]
+            print(f"Wrote {len(trajectories)} trajectories to {trajectory_file}")
 
             # Training phase
             print("Training phase...")

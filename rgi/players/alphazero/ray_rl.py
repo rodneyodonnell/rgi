@@ -7,6 +7,7 @@ Ray-based distributed self-play for AlphaZero training.
 import argparse
 import dataclasses
 import os
+from pathlib import Path
 from typing import Any, Sequence, cast
 
 import numpy as np
@@ -14,6 +15,9 @@ import ray
 import tensorflow as tf
 from tensorflow.keras import Model
 from tqdm import tqdm
+
+# Force CPU usage
+tf.config.set_visible_devices([], "GPU")
 
 from rgi.core.archive import RowFileArchiver
 from rgi.core.game_runner import GameRunner
@@ -30,9 +34,14 @@ class SelfPlayConfig:
     num_workers: int = 4  # Number of Ray workers
     num_games: int = 100  # Total number of self-play games
     num_simulations: int = 100  # MCTS simulations per move
-    weights_path: str = ""  # Path to model weights
-    output_path: str = ""  # Path to save trajectories
+    weights_path: str | Path = ""  # Path to model weights
+    output_path: str | Path = ""  # Path to save trajectories
     verbose: bool = False  # Whether to print progress
+
+    def __post_init__(self) -> None:
+        """Convert paths to strings."""
+        self.weights_path = str(self.weights_path)
+        self.output_path = str(self.output_path)
 
 
 # Ray's @remote decorator dynamically adds the 'remote' attribute at runtime
@@ -56,7 +65,7 @@ class SelfPlayWorker:
         dummy_input = tf.convert_to_tensor(state_array.reshape(1, -1))
         _ = self.model(dummy_input)
         self.model.load_weights(config.weights_path)
-        self.model_wrapper = TFPVNetworkWrapper(self.model)
+        self.model_wrapper: TFPVNetworkWrapper = TFPVNetworkWrapper(cast(PVNetwork_Count21_TF, self.model))
 
     def run_games(self, num_games: int) -> list[GameTrajectory[Count21State, int, MCTSData[int]]]:
         """Run self-play games and return trajectories."""
@@ -72,36 +81,48 @@ class SelfPlayWorker:
         return trajectories
 
 
-def run_distributed_selfplay(config: SelfPlayConfig) -> None:
-    """Run distributed self-play using Ray."""
+def run_distributed_selfplay(config: SelfPlayConfig) -> list[GameTrajectory[Count21State, int, MCTSData[int]]]:
+    """Run distributed self-play using Ray.
+
+    Returns:
+        List of game trajectories from all workers.
+    """
     # Initialize Ray if not already initialized
     if not ray.is_initialized():
-        ray.init()
+        ray.init(
+            _system_config={
+                "object_store_memory": int(10e9),  # 10GB
+                "object_store_full_delay_ms": 100,
+            }
+        )
 
     # Initialize workers
-    workers = [SelfPlayWorker.remote(config) for _ in range(config.num_workers)]
+    workers: list[Any] = [SelfPlayWorker.remote(config) for _ in range(config.num_workers)]
 
     # Distribute games among workers
     games_per_worker = config.num_games // config.num_workers
     remaining_games = config.num_games % config.num_workers
 
     # Launch tasks
-    tasks = []
+    tasks: list[Any] = []
     for i, worker in enumerate(workers):
         num_games = games_per_worker + (1 if i < remaining_games else 0)
         if num_games > 0:
             tasks.append(worker.run_games.remote(num_games))
 
-    # Wait for all tasks and combine results
+    # Wait for all tasks and combine results with progress bar
     all_trajectories: list[GameTrajectory[Count21State, int, MCTSData[int]]] = []
-    for trajectories in ray.get(tasks):
-        all_trajectories.extend(trajectories)
+    with tqdm(total=len(tasks), desc="Self-play games", disable=not config.verbose) as pbar:
+        while tasks:
+            done_id, tasks = ray.wait(tasks)
+            trajectories = ray.get(done_id[0])
+            all_trajectories.extend(trajectories)
+            pbar.update(1)
 
-    # Save trajectories
-    archiver = RowFileArchiver()
-    archiver.write_items(config.output_path, all_trajectories)
     if config.verbose:
-        print(f"Wrote {len(all_trajectories)} trajectories to {config.output_path}")
+        print(f"Generated {len(all_trajectories)} trajectories")
+
+    return all_trajectories
 
 
 if __name__ == "__main__":
