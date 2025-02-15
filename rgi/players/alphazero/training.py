@@ -167,7 +167,7 @@ def main(config: TrainingConfig) -> None:
     try:
         # Initialize Ray if not already initialized
         if not ray.is_initialized():
-            ray.init()
+            ray.init(logging_level="WARNING")  # Reduce Ray logging
 
         # Save config
         with open(run_dir / "config.json", "w") as f:
@@ -179,18 +179,30 @@ def main(config: TrainingConfig) -> None:
         metrics_history: list[IterationMetrics] = []
         archiver = RowFileArchiver()
 
+        print("\nStarting training run with config:")
+        print(f"  Iterations: {config.num_iterations}")
+        print(f"  Games per iteration: {config.games_per_iteration}")
+        print(f"  MCTS simulations: {config.mcts_simulations}")
+        print(f"  Training epochs: {config.training_epochs}")
+        print(f"  Eval games: {config.eval_games}")
+        print(f"  Save frequency: {config.save_frequency}")
+        print(f"  Ray workers: {config.num_workers}")
+        print(f"  Output directory: {run_dir}\n")
+
         # Main training loop
         saved_model_paths: list[Path] = []
         with tqdm(total=config.num_iterations, desc="Training Progress") as pbar:
             for iteration in range(config.num_iterations):
-                print(f"\nIteration {iteration + 1}/{config.num_iterations}")
+                print(f"\n{'='*80}")
+                print(f"Iteration {iteration + 1}/{config.num_iterations}")
+                print(f"{'='*80}")
 
                 # Save current model weights for distributed workers
                 temp_weights_path = models_dir / f"temp_weights_iter_{iteration}.weights.h5"
                 current_model.save_weights(str(temp_weights_path))
 
                 # Self-play phase using Ray
-                print("Self-play phase...")
+                print("\nSelf-play phase...")
                 trajectory_file = run_dir / f"trajectories_iter_{iteration}.npz"
                 selfplay_config = SelfPlayConfig(
                     num_workers=config.num_workers,
@@ -207,14 +219,14 @@ def main(config: TrainingConfig) -> None:
                 print(f"Wrote {len(trajectories)} trajectories to {trajectory_file}")
 
                 # Training phase
-                print("Training phase...")
+                print("\nTraining phase...")
                 current_model = train_model(trajectories, num_epochs=config.training_epochs)
 
                 # Clean up temporary weights
                 temp_weights_path.unlink()
 
                 # Evaluation phase
-                print("Evaluation phase...")
+                print("\nEvaluation phase...")
                 eval_metrics = evaluate_model(current_model, baseline_model, config.eval_games, config.mcts_simulations)
 
                 metrics: IterationMetrics = {
@@ -226,7 +238,7 @@ def main(config: TrainingConfig) -> None:
                 if (iteration + 1) % config.save_frequency == 0:
                     model_path = models_dir / f"model_iter_{iteration}.weights.h5"
                     current_model.save_weights(str(model_path))
-                    print(f"Saved model snapshot to {model_path}")
+                    print(f"\nSaved model snapshot to {model_path}")
                     saved_model_paths.append(model_path)
 
                     if len(saved_model_paths) > 1:
@@ -244,23 +256,29 @@ def main(config: TrainingConfig) -> None:
                 with open(run_dir / "metrics.json", "w") as f:
                     json.dump(metrics_history, f, indent=2)
 
-                # Print current metrics
-                print(f"\nCurrent metrics:")
-                print(f"Win rate vs random: {metrics['random_opponent']['random']['win_rate']:.2%}")
-                print(f"Win rate vs random MCTS: {metrics['random_opponent']['random_mcts']['win_rate']:.2%}")
+                # Print current metrics in a clear format
+                print("\nCurrent Metrics:")
+                print("-" * 40)
+                print(f"Win rate vs random:      {metrics['random_opponent']['random']['win_rate']:.1%}")
+                print(f"Win rate vs random MCTS: {metrics['random_opponent']['random_mcts']['win_rate']:.1%}")
+                print(f"Avg game length:         {metrics['random_opponent']['random']['avg_game_length']:.1f}")
 
                 previous_snapshot = metrics.get("previous_snapshot")
                 if previous_snapshot is not None:
                     previous_model = previous_snapshot.get("previous_model")
                     if previous_model is not None:
-                        print(f"Win rate vs previous snapshot: {previous_model['win_rate']:.2%}")
+                        print(f"Win rate vs prev model:  {previous_model['win_rate']:.1%}")
+                print("-" * 40)
 
-                # Update progress bar with win rate
+                # Update progress bar with win rates
                 pbar.set_postfix(
-                    win_rate_vs_random=f"{metrics['random_opponent']['random']['win_rate']:.2%}",
-                    win_rate_vs_mcts=f"{metrics['random_opponent']['random_mcts']['win_rate']:.2%}",
+                    random=f"{metrics['random_opponent']['random']['win_rate']:.1%}",
+                    mcts=f"{metrics['random_opponent']['random_mcts']['win_rate']:.1%}",
                 )
                 pbar.update(1)
+
+        print("\nTraining complete!")
+        print(f"Models and metrics saved in {run_dir}")
     finally:
         # Ensure Ray is shut down
         if ray.is_initialized():
