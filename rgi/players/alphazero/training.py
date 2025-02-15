@@ -81,7 +81,7 @@ def create_initial_model() -> PVNetwork_Count21_TF:
 
 def evaluate_model(
     model: PVNetwork_Count21_TF,
-    opponent_model: PVNetwork_Count21_TF | None,
+    baseline_model: PVNetwork_Count21_TF,
     num_games: int,
     mcts_simulations: int,
 ) -> EvaluationMetrics:
@@ -92,10 +92,7 @@ def evaluate_model(
     """
     game = Count21Game(num_players=2, target=21, max_guess=3)
     model_wrapper = TFPVNetworkWrapper(model)
-
-    # Create a random network for pure MCTS comparison
-    random_network = create_initial_model()
-    random_wrapper = TFPVNetworkWrapper(random_network)
+    baseline_wrapper = TFPVNetworkWrapper(baseline_model)
 
     # Track metrics for different opponents
     random_wins = 0
@@ -130,11 +127,11 @@ def evaluate_model(
         if game_idx % 2 == 0:
             players = [
                 AlphaZeroPlayer(game, model_wrapper, num_simulations=mcts_simulations),
-                AlphaZeroPlayer(game, random_wrapper, num_simulations=mcts_simulations),
+                AlphaZeroPlayer(game, baseline_wrapper, num_simulations=mcts_simulations),
             ]
         else:
             players = [
-                AlphaZeroPlayer(game, random_wrapper, num_simulations=mcts_simulations),
+                AlphaZeroPlayer(game, baseline_wrapper, num_simulations=mcts_simulations),
                 AlphaZeroPlayer(game, model_wrapper, num_simulations=mcts_simulations),
             ]
 
@@ -146,30 +143,6 @@ def evaluate_model(
         if trajectory.final_reward[model_idx] > 0:
             mcts_wins += 1
 
-    # Finally evaluate against previous model if provided
-    prev_model_wins = 0
-    if opponent_model is not None:
-        opponent_wrapper = TFPVNetworkWrapper(opponent_model)
-        for game_idx in range(num_games):
-            if game_idx % 2 == 0:
-                players = [
-                    AlphaZeroPlayer(game, model_wrapper, num_simulations=mcts_simulations),
-                    AlphaZeroPlayer(game, opponent_wrapper, num_simulations=mcts_simulations),
-                ]
-            else:
-                players = [
-                    AlphaZeroPlayer(game, opponent_wrapper, num_simulations=mcts_simulations),
-                    AlphaZeroPlayer(game, model_wrapper, num_simulations=mcts_simulations),
-                ]
-
-            runner = GameRunner(game, players, verbose=False)
-            trajectory = runner.run()
-
-            # Check if model won (accounting for playing first/second)
-            model_idx = 0 if game_idx % 2 == 0 else 1
-            if trajectory.final_reward[model_idx] > 0:
-                prev_model_wins += 1
-
     metrics: EvaluationMetrics = {
         "random": {
             "win_rate": random_wins / num_games,
@@ -179,11 +152,6 @@ def evaluate_model(
             "win_rate": mcts_wins / num_games,
         },
     }
-
-    if opponent_model is not None:
-        metrics["previous_model"] = {
-            "win_rate": prev_model_wins / num_games,
-        }
 
     return metrics
 
@@ -196,104 +164,108 @@ def main(config: TrainingConfig) -> None:
     models_dir = run_dir / "models"
     models_dir.mkdir(parents=True, exist_ok=True)
 
-    # Initialize Ray if not already initialized
-    if not ray.is_initialized():
-        ray.init()
+    try:
+        # Initialize Ray if not already initialized
+        if not ray.is_initialized():
+            ray.init()
 
-    # Save config
-    with open(run_dir / "config.json", "w") as f:
-        json.dump(config._asdict(), f, indent=2)
+        # Save config
+        with open(run_dir / "config.json", "w") as f:
+            json.dump(config._asdict(), f, indent=2)
 
-    # Initialize model and metrics tracking
-    current_model = create_initial_model()
-    metrics_history: list[IterationMetrics] = []
-    archiver = RowFileArchiver()
+        # Initialize models and metrics tracking
+        current_model = create_initial_model()
+        baseline_model = create_initial_model()  # Create a fixed random model for evaluation
+        metrics_history: list[IterationMetrics] = []
+        archiver = RowFileArchiver()
 
-    # Main training loop
-    saved_model_paths: list[Path] = []
-    with tqdm(total=config.num_iterations, desc="Training Progress") as pbar:
-        for iteration in range(config.num_iterations):
-            print(f"\nIteration {iteration + 1}/{config.num_iterations}")
+        # Main training loop
+        saved_model_paths: list[Path] = []
+        with tqdm(total=config.num_iterations, desc="Training Progress") as pbar:
+            for iteration in range(config.num_iterations):
+                print(f"\nIteration {iteration + 1}/{config.num_iterations}")
 
-            # Save current model weights for distributed workers
-            temp_weights_path = models_dir / f"temp_weights_iter_{iteration}.weights.h5"
-            current_model.save_weights(str(temp_weights_path))
+                # Save current model weights for distributed workers
+                temp_weights_path = models_dir / f"temp_weights_iter_{iteration}.weights.h5"
+                current_model.save_weights(str(temp_weights_path))
 
-            # Self-play phase using Ray
-            print("Self-play phase...")
-            trajectory_file = run_dir / f"trajectories_iter_{iteration}.npz"
-            selfplay_config = SelfPlayConfig(
-                num_workers=config.num_workers,
-                num_games=config.games_per_iteration,
-                num_simulations=config.mcts_simulations,
-                weights_path=str(temp_weights_path),
-                output_path=str(trajectory_file),
-                verbose=True,
-            )
-            trajectories = run_distributed_selfplay(selfplay_config)
+                # Self-play phase using Ray
+                print("Self-play phase...")
+                trajectory_file = run_dir / f"trajectories_iter_{iteration}.npz"
+                selfplay_config = SelfPlayConfig(
+                    num_workers=config.num_workers,
+                    num_games=config.games_per_iteration,
+                    num_simulations=config.mcts_simulations,
+                    weights_path=str(temp_weights_path),
+                    output_path=str(trajectory_file),
+                    verbose=True,
+                )
+                trajectories = run_distributed_selfplay(selfplay_config)
 
-            # Save trajectories
-            archiver.write_items(trajectories, str(trajectory_file))  # type: ignore[arg-type]
-            print(f"Wrote {len(trajectories)} trajectories to {trajectory_file}")
+                # Save trajectories
+                archiver.write_items(trajectories, str(trajectory_file))  # type: ignore[arg-type]
+                print(f"Wrote {len(trajectories)} trajectories to {trajectory_file}")
 
-            # Training phase
-            print("Training phase...")
-            current_model = train_model(trajectories, num_epochs=config.training_epochs)
+                # Training phase
+                print("Training phase...")
+                current_model = train_model(trajectories, num_epochs=config.training_epochs)
 
-            # Clean up temporary weights
-            temp_weights_path.unlink()
+                # Clean up temporary weights
+                temp_weights_path.unlink()
 
-            # Evaluation phase
-            print("Evaluation phase...")
-            eval_metrics = evaluate_model(current_model, None, config.eval_games, config.mcts_simulations)
+                # Evaluation phase
+                print("Evaluation phase...")
+                eval_metrics = evaluate_model(current_model, baseline_model, config.eval_games, config.mcts_simulations)
 
-            metrics: IterationMetrics = {
-                "iteration": iteration,
-                "random_opponent": eval_metrics,
-            }
+                metrics: IterationMetrics = {
+                    "iteration": iteration,
+                    "random_opponent": eval_metrics,
+                }
 
-            # Save model snapshot
-            if (iteration + 1) % config.save_frequency == 0:
-                model_path = models_dir / f"model_iter_{iteration}.weights.h5"
-                current_model.save_weights(str(model_path))
-                print(f"Saved model snapshot to {model_path}")
-                saved_model_paths.append(model_path)
+                # Save model snapshot
+                if (iteration + 1) % config.save_frequency == 0:
+                    model_path = models_dir / f"model_iter_{iteration}.weights.h5"
+                    current_model.save_weights(str(model_path))
+                    print(f"Saved model snapshot to {model_path}")
+                    saved_model_paths.append(model_path)
 
-                if len(saved_model_paths) > 1:
-                    previous_model_path = saved_model_paths[-2]
-                    if previous_model_path.exists():
-                        previous_model = create_initial_model()
-                        previous_model.load_weights(str(previous_model_path))
-                        metrics["previous_snapshot"] = evaluate_model(
-                            current_model, previous_model, config.eval_games, config.mcts_simulations
-                        )
+                    if len(saved_model_paths) > 1:
+                        previous_model_path = saved_model_paths[-2]
+                        if previous_model_path.exists():
+                            previous_model = create_initial_model()
+                            previous_model.load_weights(str(previous_model_path))
+                            metrics["previous_snapshot"] = evaluate_model(
+                                current_model, previous_model, config.eval_games, config.mcts_simulations
+                            )
 
-            metrics_history.append(metrics)
+                metrics_history.append(metrics)
 
-            # Save metrics
-            with open(run_dir / "metrics.json", "w") as f:
-                json.dump(metrics_history, f, indent=2)
+                # Save metrics
+                with open(run_dir / "metrics.json", "w") as f:
+                    json.dump(metrics_history, f, indent=2)
 
-            # Print current metrics
-            print(f"\nCurrent metrics:")
-            print(f"Win rate vs random: {metrics['random_opponent']['random']['win_rate']:.2%}")
-            print(f"Win rate vs random MCTS: {metrics['random_opponent']['random_mcts']['win_rate']:.2%}")
+                # Print current metrics
+                print(f"\nCurrent metrics:")
+                print(f"Win rate vs random: {metrics['random_opponent']['random']['win_rate']:.2%}")
+                print(f"Win rate vs random MCTS: {metrics['random_opponent']['random_mcts']['win_rate']:.2%}")
 
-            previous_snapshot = metrics.get("previous_snapshot")
-            if previous_snapshot is not None:
-                previous_model = previous_snapshot.get("previous_model")
-                if previous_model is not None:
-                    print(f"Win rate vs previous snapshot: {previous_model['win_rate']:.2%}")
+                previous_snapshot = metrics.get("previous_snapshot")
+                if previous_snapshot is not None:
+                    previous_model = previous_snapshot.get("previous_model")
+                    if previous_model is not None:
+                        print(f"Win rate vs previous snapshot: {previous_model['win_rate']:.2%}")
 
-            # Update progress bar with win rate
-            pbar.set_postfix(
-                win_rate_vs_random=f"{metrics['random_opponent']['random']['win_rate']:.2%}",
-                win_rate_vs_mcts=f"{metrics['random_opponent']['random_mcts']['win_rate']:.2%}",
-            )
-            pbar.update(1)
-
-    print("\nTraining complete!")
-    print(f"Final model and metrics saved in {run_dir}")
+                # Update progress bar with win rate
+                pbar.set_postfix(
+                    win_rate_vs_random=f"{metrics['random_opponent']['random']['win_rate']:.2%}",
+                    win_rate_vs_mcts=f"{metrics['random_opponent']['random_mcts']['win_rate']:.2%}",
+                )
+                pbar.update(1)
+    finally:
+        # Ensure Ray is shut down
+        if ray.is_initialized():
+            ray.shutdown()
+            print("\nRay has been shut down.")
 
 
 if __name__ == "__main__":
