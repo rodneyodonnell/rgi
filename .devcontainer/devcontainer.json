@@ -1,58 +1,23 @@
 {
-    "name": "RGI Dev Container",
-    "build": {
-        "context": "..",
-        "dockerfile": "../Dockerfile",
-        "args": {
-            "USERNAME": "ubuntu"
-        }
-    },
-    // Launch jupyter on localhost:8888 during dev.
-    // "postCreateCommand": "jupyter notebook --ip 0.0.0.0 --port 8888 --no-browser --allow-root --NotebookApp.token='' --NotebookApp.password=''",
-    "forwardPorts": [
-        8888
+    "name": "RGI Development",
+    "dockerComposeFile": [
+        "../docker-compose.yml"
     ],
-    "runArgs": [
-        "--gpus",
-        "all"
-    ],
-    "mounts": [
-        "source=${localWorkspaceFolder}/logs,target=/app/logs,type=bind",
-        "source=${localWorkspaceFolder}/rgi,target=/app/rgi,type=bind",
-        "source=${localWorkspaceFolder}/web_app,target=/app/web_app,type=bind",
-        "source=${localWorkspaceFolder}/scripts,target=/app/scripts,type=bind",
-        "source=${localWorkspaceFolder}/notebooks,target=/app/notebooks,type=bind"
-    ],
+    "service": "rgi-env",
+    "workspaceFolder": "/workspaces/rgi",
     "remoteUser": "ubuntu",
-    "updateRemoteUserUID": true,
     "customizations": {
         "vscode": {
             "extensions": [
-                "GitHub.copilot",
                 "ms-python.python",
-                "ms-vscode.git",
-                "ms-azuretools.vscode-docker",
-                "ms-toolsai.jupyter",
-                "ms-python.black-formatter",
-                "prettier.prettier-vscode",
-                "ms-python.vscode-pylance",
-                "ms-python.pylint",
-                "ms-python.mypy-type-checker",
-                "bcanzanella.openmatchingfiles",
-                "ms-python.debugpy"
+                "ms-python.vscode-pylance"
             ],
             "settings": {
-                "editor.formatOnSave": true,
-                "[python]": {
-                    "editor.codeActionsOnSave": {
-                        "source.organizeImports": "explicit"
-                    },
-                    "editor.defaultFormatter": "ms-python.black-formatter"
-                },
-                "python.analysis.typeCheckingMode": "basic",
-                "pylint.enabled": true
+                "python.defaultInterpreterPath": "/app/.venv/bin/python",
+                "python.analysis.extraPaths": [
+                    "/workspaces/rgi"
+                ]
             }
         }
-    },
-    "postCreateCommand": "pip install black pylint mypy debugpy"
+    }
 }

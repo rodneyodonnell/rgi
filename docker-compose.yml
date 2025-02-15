@@ -1,0 +1,97 @@
+# Docker Compose Command Cheat Sheet
+#
+# Start all services:
+#   docker compose up -d
+#
+# Stop all services:
+#   docker compose down
+#
+# Restart containers (without rebuilding):
+#   docker compose restart                 # All services
+#   docker compose restart rgi-env         # Just RGI environment
+#   docker compose stop rgi-env && docker compose start rgi-env  # Alternative restart
+#
+# View logs:
+#   docker compose logs                    # All services
+#   docker compose logs rgi-env            # Just RGI environment
+#   docker compose logs -f rgi-env         # Follow RGI logs
+#
+# Rebuild RGI container (after Dockerfile changes):
+#   docker compose build rgi-env           # Just build
+#   docker compose up -d --build rgi-env   # Build and restart
+#
+# Shell into RGI container:
+#   docker compose exec rgi-env bash
+#
+# Check service status:
+#   docker compose ps
+#
+# Monitor resources:
+#   docker compose top
+#
+# Clean up:
+#   docker compose down -v                 # Stop and remove volumes
+#   docker compose down --rmi all          # Stop and remove images
+#
+# Access services:
+#   Ray Dashboard:     http://localhost:8265
+#   Prometheus:        http://localhost:9090
+#   Grafana:          http://localhost:3000 (admin/admin)
+
+version: '3.8'
+
+services:
+  rgi-env:
+    build: .
+    volumes:
+      - .:/workspaces/rgi
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ~/.ssh:/home/ubuntu/.ssh:ro
+    ports:
+      - "8265:8265" # Ray dashboard
+    networks:
+      - monitoring
+    user: ubuntu
+    environment:
+      - PYTHONPATH=/workspaces/rgi
+    tty: true
+    stdin_open: true
+
+  prometheus:
+    image: prom/prometheus:v2.50.1
+    volumes:
+      - ./monitoring/prometheus:/etc/prometheus
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+    ports:
+      - "9090:9090"
+    networks:
+      - monitoring
+
+  grafana:
+    image: grafana/grafana:10.4.0
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    ports:
+      - "3000:3000"
+    networks:
+      - monitoring
+    depends_on:
+      - prometheus
+
+networks:
+  monitoring:
+
+
+volumes:
+  prometheus_data:
+  grafana_data:

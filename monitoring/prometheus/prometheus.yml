@@ -1,0 +1,9 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'ray'
+    static_configs:
+      - targets: ['rgi-env:8265']  # Ray dashboard in the RGI container
+    metrics_path: '/metrics' 
