@@ -24,6 +24,8 @@
   - Self-play data generation working
   - Training loop with evaluation implemented
   - Ray-based parallel implementation added
+  - Training metrics visualization added
+  - Current training run: 50 iterations with 100 games/iter started on 2024-02-14
 - ❌ MuZero implementation not started
 - ❌ Other ML algorithms not started
 
@@ -58,6 +60,8 @@
    - Make implementation more generic for other games
    - Profile and optimize performance
    - Investigate low GPU utilization
+   - Resume training after reboot
+   - Analyze training metrics and tune hyperparameters
 
 2. Code Organization
    - Auto-register games
