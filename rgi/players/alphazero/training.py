@@ -167,7 +167,15 @@ def main(config: TrainingConfig) -> None:
     try:
         # Initialize Ray if not already initialized
         if not ray.is_initialized():
-            ray.init(logging_level="WARNING")  # Reduce Ray logging
+            ray.init(
+                logging_level="WARNING",  # Reduce Ray logging
+                dashboard_host="0.0.0.0",  # Allow external access
+                dashboard_port=8265,  # Match the port in docker-compose
+                include_dashboard=True,  # Ensure dashboard is enabled
+                metrics_export_port=8080,  # Port for Prometheus metrics
+                _metrics_export_disk_usage=True,  # Export disk metrics
+                _metrics_export_gpu_utilization=True,  # Export GPU metrics
+            )
 
         # Save config
         with open(run_dir / "config.json", "w") as f:
