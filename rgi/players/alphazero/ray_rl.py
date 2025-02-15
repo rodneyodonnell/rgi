@@ -110,7 +110,10 @@ def run_distributed_selfplay(config: SelfPlayConfig) -> list[GameTrajectory[Coun
                 "object_store_memory": int(10e9),  # 10GB
                 "object_store_full_delay_ms": 100,
             },
-            logging_level="WARNING"  # Reduce Ray logging
+            logging_level="WARNING",  # Reduce Ray logging
+            dashboard_host="0.0.0.0",  # Allow external access
+            dashboard_port=8265,  # Match the port in docker-compose
+            include_dashboard=True,  # Ensure dashboard is enabled
         )
 
     # Initialize workers

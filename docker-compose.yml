@@ -47,8 +47,10 @@ services:
       - .:/workspaces/rgi
       - /var/run/docker.sock:/var/run/docker.sock
       - ~/.ssh:/home/ubuntu/.ssh:ro
+      - ray_metrics:/tmp/ray  # Mount Ray metrics directory
     ports:
-      - "8265:8265" # Ray dashboard
+      - "8265:8265"  # Ray dashboard
+      - "8000-8099:8000-8099"  # Ray worker ports
     networks:
       - monitoring
     user: ubuntu
@@ -62,6 +64,7 @@ services:
     volumes:
       - ./monitoring/prometheus:/etc/prometheus
       - prometheus_data:/prometheus
+      - ray_metrics:/tmp/ray:ro  # Mount Ray metrics directory read-only
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
@@ -91,7 +94,7 @@ services:
 networks:
   monitoring:
 
-
 volumes:
   prometheus_data:
   grafana_data:
+  ray_metrics:  # Add volume for Ray metrics
