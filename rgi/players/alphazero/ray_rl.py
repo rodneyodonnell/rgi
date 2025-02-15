@@ -70,14 +70,30 @@ class SelfPlayWorker:
     def run_games(self, num_games: int) -> list[GameTrajectory[Count21State, int, MCTSData[int]]]:
         """Run self-play games and return trajectories."""
         trajectories: list[GameTrajectory[Count21State, int, MCTSData[int]]] = []
-        for _ in range(num_games):
+        
+        # Only show progress if verbose and this is the first worker
+        show_progress = self.config.verbose and ray.get_runtime_context().get_worker_id() == 0
+        
+        # Use tqdm only if showing progress
+        game_range = tqdm(range(num_games), desc="Games", disable=not show_progress)
+        for _ in game_range:
             players = [
                 AlphaZeroPlayer(self.game, self.model_wrapper, num_simulations=self.config.num_simulations)
                 for _ in range(2)
             ]
-            runner = GameRunner(self.game, players, verbose=self.config.verbose)
+            runner = GameRunner(self.game, players, verbose=False)  # Always set verbose=False for workers
             trajectory = runner.run()
             trajectories.append(trajectory)
+            
+            if show_progress:
+                # Update progress bar with game stats
+                final_rewards = trajectory.final_reward
+                game_range.set_postfix(
+                    moves=len(trajectory.actions),
+                    p1_reward=f"{final_rewards[0]:.1f}",
+                    p2_reward=f"{final_rewards[1]:.1f}"
+                )
+                
         return trajectories
 
 
@@ -93,7 +109,8 @@ def run_distributed_selfplay(config: SelfPlayConfig) -> list[GameTrajectory[Coun
             _system_config={
                 "object_store_memory": int(10e9),  # 10GB
                 "object_store_full_delay_ms": 100,
-            }
+            },
+            logging_level="WARNING"  # Reduce Ray logging
         )
 
     # Initialize workers
@@ -112,7 +129,7 @@ def run_distributed_selfplay(config: SelfPlayConfig) -> list[GameTrajectory[Coun
 
     # Wait for all tasks and combine results with progress bar
     all_trajectories: list[GameTrajectory[Count21State, int, MCTSData[int]]] = []
-    with tqdm(total=len(tasks), desc="Self-play games", disable=not config.verbose) as pbar:
+    with tqdm(total=len(tasks), desc="Workers", disable=not config.verbose) as pbar:
         while tasks:
             done_id, tasks = ray.wait(tasks)
             trajectories = ray.get(done_id[0])
@@ -120,7 +137,7 @@ def run_distributed_selfplay(config: SelfPlayConfig) -> list[GameTrajectory[Coun
             pbar.update(1)
 
     if config.verbose:
-        print(f"Generated {len(all_trajectories)} trajectories")
+        print(f"\nGenerated {len(all_trajectories)} trajectories")
 
     return all_trajectories
 
