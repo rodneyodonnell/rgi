@@ -176,7 +176,7 @@ def main(config: TrainingConfig) -> None:
                     "metrics_report_interval_ms": 2000,  # Report metrics every 2 seconds
                     "metrics_export_port": 8080,  # Port for Prometheus metrics
                 },
-                _temp_dir=str(run_dir.absolute() / "ray_temp"),  # Use absolute path for Ray temp files
+                _temp_dir="/tmp/ray",  # Use shorter path for Ray temp files
             )
 
         # Save config

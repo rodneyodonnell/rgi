@@ -116,7 +116,7 @@ def run_distributed_selfplay(config: SelfPlayConfig) -> list[GameTrajectory[Coun
             dashboard_host="0.0.0.0",  # Allow external access
             dashboard_port=8265,  # Match the port in docker-compose
             include_dashboard=True,  # Ensure dashboard is enabled
-            _temp_dir=str(Path(config.output_path).absolute().parent / "ray_temp"),  # Use absolute path for Ray temp files
+            _temp_dir="/tmp/ray",  # Use shorter path for Ray temp files
         )
 
     # Initialize workers
