@@ -32,7 +32,7 @@ flax
 # Frontend
 fastapi==0.114.1
 uvicorn[standard]==0.30.6
-Jinja2==3.1.4
+Jinja2==3.1.5
 
 # Testing
 pytest
