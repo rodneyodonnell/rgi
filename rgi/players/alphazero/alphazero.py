@@ -8,22 +8,23 @@ from typing_extensions import override
 
 from rgi.core.base import ActionResult, Player, TAction, TGame, TGameState
 
-
 @dataclasses.dataclass
 class MCTSData(Generic[TAction]):
     """Data collected during MCTS search for a single state.
 
     Args:
-        policy_counts: Dictionary mapping actions to their visit counts in MCTS
-        prior_probabilities: Network's prior probabilities for each action
-        value_estimate: Network's value estimate for each player
+        policy_counts: Visit counts in MCTS, indexed by legal actions.
+        prior_probabilities: Network's prior probabilities for each action, indexed by legal actions.
+        value_estimate: Network's value estimate for each player, indexed by player_id.
         legal_actions: Sequence of legal actions for this state
     """
 
     policy_counts: dict[TAction, int]
-    prior_probabilities: NDArray[np.float32]
     value_estimate: NDArray[np.float32]
     legal_actions: Sequence[TAction]
+
+    root_prior_policies: NDArray[np.float32]
+    root_prior_values: NDArray[np.float32]
 
 
 TPlayerState = Literal[None]
@@ -40,8 +41,8 @@ class PolicyValueNetwork(ABC, Generic[TGame, TGameState, TAction]):
     ) -> tuple[NDArray[np.float32], NDArray[np.float32]]:
         """
         Given a game, state and list of legal actions, return a tuple (policy_logits, value)
-          - policy_logits: 1D NumPy array of logits corresponding to each action.
-          - value: NumPy array of predicted values, one per player. These should be in range (-1, 1).
+          - policy_logits: 1D NumPy array of logits corresponding to each action, indexed by legal action.
+          - value: NumPy array of predicted values, one per player, indexed by player_id. These should be in range (-1, 1).
         """
 
 
@@ -73,23 +74,16 @@ class AlphaZeroPlayer(Player[TGameState, TPlayerState, TAction, TPlayerData]):
     ) -> ActionResult[TAction, TPlayerData]:
         mcts = MCTS(self.game, self.network, c_puct=1.0, num_simulations=self.num_simulations)
 
-        # Get network predictions for the current state
-        policy_logits, value_estimate = self.network.predict(self.game, game_state, legal_actions)
-        prior_probabilities = self.softmax(policy_logits)
-
         # Run MCTS search
-        action_visits = mcts.search(game_state)
+        mcts_data = mcts.search(game_state)
+        
+        # Validate that passed in and calculated legal actions are the same.
+        assert mcts_data.legal_actions == legal_actions
 
         # Choose the action with the highest visit count
-        best_action = max(action_visits.items(), key=lambda x: x[1])[0]
+        best_action_index = np.argmax(mcts_data.policy_counts)
+        best_action = mcts_data.legal_actions[best_action_index]
 
-        # Return both the action and the MCTS data
-        mcts_data = MCTSData(
-            policy_counts=action_visits,
-            prior_probabilities=prior_probabilities,
-            value_estimate=value_estimate,
-            legal_actions=legal_actions,
-        )
         return ActionResult(best_action, mcts_data)
 
     def softmax(self, x: NDArray[np.float32]) -> NDArray[np.float32]:
@@ -97,7 +91,6 @@ class AlphaZeroPlayer(Player[TGameState, TPlayerState, TAction, TPlayerData]):
         return np.array(e_x / e_x.sum(), dtype=np.float32)
 
 
-# MCTS Node now stores a vector of total values.
 class MCTSNode(Generic[TGame, TGameState, TAction]):
     def __init__(
         self,
@@ -130,6 +123,7 @@ class MCTS(Generic[TGame, TGameState, TAction]):
         noise_alpha: float = 0.03,
         noise_epsilon: float = 0.25,
     ) -> None:
+        assert num_simulations > 0
         self.game = game
         self.network = network
         self.c_puct = c_puct  # Exploration constant.
@@ -137,16 +131,25 @@ class MCTS(Generic[TGame, TGameState, TAction]):
         self.n_players = game.num_players(game.initial_state())
         self.noise_alpha = noise_alpha
         self.noise_epsilon = noise_epsilon
+        self.root_prior_policies: Optional[NDArray[np.float32]] = None
+        self.root_prior_values: Optional[NDArray[np.float32]] = None
 
-    def search(self, root_state: TGameState) -> dict[TAction, int]:
+    def search(self, root_state: TGameState) -> MCTSData[TAction]:
         root: MCTSNode[TGame, TGameState, TAction] = MCTSNode(root_state, self.n_players)
         for _ in range(self.num_simulations):
             self._simulate(root)
 
         assert root.legal_actions is not None
         assert root.children is not None
-        action_visits = {action: child.visit_count for action, child in zip(root.legal_actions, root.children)}
-        return action_visits
+        action_visits = np.array([child.visit_count for child in root.children], dtype=np.int32)
+        mcts_data: MCTSData[TAction] = MCTSData(
+            policy_counts=action_visits,
+            root_prior_policies=self.root_prior_policies,
+            root_prior_values=self.root_prior_values,
+            value_estimate=root.total_value / root.visit_count,
+            legal_actions=root.legal_actions,
+        )
+        return mcts_data
 
     def _simulate(self, node: MCTSNode[TGame, TGameState, TAction]) -> NDArray[np.float32]:
         # Terminal state check.
@@ -165,6 +168,10 @@ class MCTS(Generic[TGame, TGameState, TAction]):
             policy = self.softmax(policy_logits)
 
             if node.parent is None:
+                # Record extra data when expanding root node.
+                self.root_prior_policies = self.softmax(policy_logits)
+                self.root_prior_values = action_values
+                # Add some noise to root node to make game non deterministic.
                 noise = np.random.dirichlet([self.noise_alpha] * len(legal_actions))
                 policy = (1 - self.noise_epsilon) * policy + self.noise_epsilon * noise
 
@@ -174,9 +181,10 @@ class MCTS(Generic[TGame, TGameState, TAction]):
                 child_node = MCTSNode(child_state, self.n_players, parent=node)
                 child_node.prior = float(policy[index])
                 children.append(child_node)
+            
             return action_values
 
-        # Selection: choose the child with highest UCB based on current player's value.
+        # Selection: choose the child with highest UCB (upper confidence bound) based on current player's value.
         curr_player = self.game.current_player_id(node.state)
         curr_index = curr_player - 1  # Adjust for 0-indexing.
         total_visits = sum(child.visit_count for child in children)
