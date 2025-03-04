@@ -19,7 +19,7 @@ def game(mocker: MockerFixture) -> Game[Any, int]:
 
 
 @pytest.fixture
-def player(game: Game[Any, int]) -> HumanPlayer[Game[Any, int], Any, int]:
+def player(game: Game[Any, int]) -> HumanPlayer:
     return HumanPlayer(game)
 
 
@@ -36,22 +36,22 @@ def player(game: Game[Any, int]) -> HumanPlayer[Game[Any, int], Any, int]:
 )
 def test_select_action(
     game: Game[Any, int],
-    player: HumanPlayer[Game[Any, int], Any, int],
+    player: HumanPlayer,
     user_input: str,
     expected_action: int,
 ) -> None:
     with patch("builtins.input", return_value=user_input):
-        action = player.select_action(None, game.legal_actions(None))
-        assert action == expected_action
+        action_result = player.select_action(None, game.legal_actions(None))
+        assert action_result.action == expected_action
 
 
-def test_invalid_input(game: Game[Any, int], player: HumanPlayer[Game[Any, int], Any, int]) -> None:
+def test_invalid_input(game: Game[Any, int], player: HumanPlayer) -> None:
     with patch("builtins.input", side_effect=["invalid", "1"]):
-        action = player.select_action(None, game.legal_actions(None))
-        assert action == 1
+        action_result = player.select_action(None, game.legal_actions(None))
+        assert action_result.action == 1
 
 
-def test_update_state(player: HumanPlayer[Game[Any, int], Any, int]) -> None:
+def test_update_state(player: HumanPlayer) -> None:
     # HumanPlayer's update_state should do nothing
     player.update_player_state(None, 0, 0)
     # If we reach here without error, the test passes

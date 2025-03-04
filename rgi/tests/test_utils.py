@@ -6,6 +6,7 @@ import numpy as np
 from rgi.core import base
 
 PlayerState = Literal[None]
+PlayerData = None
 
 
 @runtime_checkable
@@ -20,7 +21,7 @@ class IndexableAndIterable(Protocol):
     def __iter__(self) -> Iterator[Any]: ...
 
 
-class PresetPlayer(base.Player[base.TGameState, PlayerState, base.TAction]):
+class PresetPlayer(base.Player[base.TGameState, PlayerState, base.TAction, PlayerData]):
     """Player that selects a pre-determined sequence of actions or action ids."""
 
     def __init__(
@@ -34,13 +35,18 @@ class PresetPlayer(base.Player[base.TGameState, PlayerState, base.TAction]):
         self.idx = 0
 
     @override
-    def select_action(self, game_state: base.TGameState, legal_actions: Sequence[base.TAction]) -> base.TAction:
+    def select_action(
+        self, game_state: base.TGameState, legal_actions: Sequence[base.TAction]
+    ) -> base.ActionResult[base.TAction, PlayerData]:
+        if self.actions is not None:
+            action = self.actions[self.idx]
+        else:
+            assert self.action_ids is not None
+            action_id = self.action_ids[self.idx]
+            action = legal_actions[action_id]
+
         self.idx += 1
-        if self.actions:
-            return self.actions[self.idx - 1]
-        if self.action_ids:
-            return legal_actions[self.action_ids[self.idx - 1]]
-        raise ValueError("No actions or action ids provided.")
+        return base.ActionResult(action, None)
 
 
 class EqualityChecker:

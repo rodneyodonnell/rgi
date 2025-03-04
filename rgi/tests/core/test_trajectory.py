@@ -64,28 +64,55 @@ def test_trajectory_validation(connect4_game: connect4.Connect4Game) -> None:
             incremental_rewards=[],
             num_players=2,
             final_reward=[1.0, -1.0],
+            player_data=[],
         )
 
     # Test with mismatched lengths
     with pytest.raises(ValueError, match="must be one more than the number of actions"):
         GameTrajectory(
             game_states=[valid_state],
-            actions=[1],
-            action_player_ids=[1],
+            actions=[0],
+            action_player_ids=[0],
             incremental_rewards=[0.0],
             num_players=2,
             final_reward=[1.0, -1.0],
+            player_data=[None],
         )
 
-    # Test with mismatched number of final rewards
-    with pytest.raises(ValueError, match="must be the same as the number of players"):
+    # Test with mismatched action and player ID lengths
+    with pytest.raises(ValueError, match="must be the same as the number of action player ids"):
         GameTrajectory(
             game_states=[valid_state, valid_state],
-            actions=[1],
-            action_player_ids=[1],
+            actions=[0],
+            action_player_ids=[],
             incremental_rewards=[0.0],
             num_players=2,
-            final_reward=[1.0],
+            final_reward=[1.0, -1.0],
+            player_data=[None],
+        )
+
+    # Test with mismatched action and incremental reward lengths
+    with pytest.raises(ValueError, match="must be the same as the number of incremental rewards"):
+        GameTrajectory(
+            game_states=[valid_state, valid_state],
+            actions=[0],
+            action_player_ids=[0],
+            incremental_rewards=[],
+            num_players=2,
+            final_reward=[1.0, -1.0],
+            player_data=[None],
+        )
+
+    # Test with mismatched player data length
+    with pytest.raises(ValueError, match="must be the same as the number of actions"):
+        GameTrajectory(
+            game_states=[valid_state, valid_state],
+            actions=[0],
+            action_player_ids=[0],
+            incremental_rewards=[0.0],
+            num_players=2,
+            final_reward=[1.0, -1.0],
+            player_data=[],
         )
 
 

@@ -120,12 +120,21 @@ class TrajectoryDataset_Count21:
 
                 # Get MCTS visit counts for this state
                 mcts_data = traj.player_data[i]
-                visit_counts = np.zeros(3, dtype=np.float32)  # Count21 has 3 possible actions (1,2,3)
+                
+                # Use legal_actions from MCTSData instead of hardcoding the number of actions
+                num_actions = len(mcts_data.legal_actions)
+                visit_counts = np.zeros(num_actions, dtype=np.float32)
                 total_visits = sum(mcts_data.policy_counts.values())
 
                 # Convert visit counts to policy distribution
                 for action, count in mcts_data.policy_counts.items():
-                    visit_counts[action - 1] = count / total_visits  # action is 1-based
+                    # Find the index of this action in legal_actions
+                    try:
+                        action_idx = mcts_data.legal_actions.index(action)
+                        visit_counts[action_idx] = count / total_visits
+                    except ValueError:
+                        # This should never happen if legal_actions is correctly maintained
+                        raise ValueError(f"Action {action} not found in legal_actions {mcts_data.legal_actions}")
 
                 self.data.append((state_array, visit_counts, final_reward))
 

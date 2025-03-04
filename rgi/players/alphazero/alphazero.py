@@ -17,11 +17,13 @@ class MCTSData(Generic[TAction]):
         policy_counts: Dictionary mapping actions to their visit counts in MCTS
         prior_probabilities: Network's prior probabilities for each action
         value_estimate: Network's value estimate for each player
+        legal_actions: Sequence of legal actions for this state
     """
 
     policy_counts: dict[TAction, int]
     prior_probabilities: NDArray[np.float32]
     value_estimate: NDArray[np.float32]
+    legal_actions: Sequence[TAction]
 
 
 TPlayerState = Literal[None]
@@ -34,7 +36,7 @@ TFloat = TypeVar("TFloat", bound=np.floating[Any])
 class PolicyValueNetwork(ABC, Generic[TGame, TGameState, TAction]):
     @abstractmethod
     def predict(
-        self, game: TGame, state: TGameState, actions: Sequence[TAction]
+        self, game: TGame, state: TGameState, legal_actions: Sequence[TAction]
     ) -> tuple[NDArray[np.float32], NDArray[np.float32]]:
         """
         Given a game, state and list of legal actions, return a tuple (policy_logits, value)
@@ -47,9 +49,9 @@ class PolicyValueNetwork(ABC, Generic[TGame, TGameState, TAction]):
 class DummyPolicyValueNetwork(PolicyValueNetwork[TGame, TGameState, TAction]):
     @override
     def predict(
-        self, game: TGame, state: TGameState, actions: Sequence[TAction]
+        self, game: TGame, state: TGameState, legal_actions: Sequence[TAction]
     ) -> tuple[NDArray[np.float32], NDArray[np.float32]]:
-        num_actions = len(actions)
+        num_actions = len(legal_actions)
         policy_logits = np.log(np.ones(num_actions, dtype=np.float32) / num_actions)
         n_players = game.num_players(state)
         value = np.zeros(n_players, dtype=np.float32)
@@ -86,6 +88,7 @@ class AlphaZeroPlayer(Player[TGameState, TPlayerState, TAction, TPlayerData]):
             policy_counts=action_visits,
             prior_probabilities=prior_probabilities,
             value_estimate=value_estimate,
+            legal_actions=legal_actions,
         )
         return ActionResult(best_action, mcts_data)
 
