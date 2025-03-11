@@ -241,7 +241,7 @@ jupyterlab-server==2.27.3
     #   notebook
 jupyterlab-widgets==3.0.13
     # via ipywidgets
-keras==3.8.0
+keras==3.9.0
     # via tensorflow
 libclang==18.1.1
     # via tensorflow
