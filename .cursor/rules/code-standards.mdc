@@ -1,0 +1,73 @@
+---
+description: Code Style and Framework Standards
+globs: ["*.py", "*.ipynb"]
+---
+
+<rule>
+name: code_standards
+description: Python code style and ML framework usage guidelines
+filters:
+  - type: file_extension
+    pattern: "\\.py$|\\.ipynb$"
+  - type: event
+    pattern: "file_create|file_modify"
+
+actions:
+  - type: require
+    message: |
+      # Formatting Requirements
+      
+      1. All Python files must be formatted using the project's autoformat script:
+         ```bash
+         ./scripts/run_autoformat.sh
+         ```
+         This will run:
+         - isort for import sorting
+         - black for code formatting
+         
+         Configuration is in pyproject.toml:
+         - line-length = 120
+         - black profile for isort
+
+  - type: suggest
+    message: |
+      # Python Code Standards
+      
+      1. General Style
+         - Follow PEP 8 guidelines
+         - 120 character line length
+         - Concise, technical implementations
+         - Include accurate examples
+      
+      2. Type Annotations
+         - Required for all functions
+         - Use Python 3.12+ syntax
+         - Use built-in types (dict/list/tuple)
+         - No capital types (Dict/List/Tuple)
+      
+      3. Testing
+         - Include unit tests
+         - Test edge cases
+         - Document test coverage
+      
+      # Framework Guidelines
+      
+      1. JAX
+         - Follow [JAX Documentation](mdc:https:/jax.readthedocs.io)
+         - Use latest transformation patterns
+         - Follow JAX-specific best practices
+      
+      2. TensorFlow
+         - Follow [TensorFlow Documentation](mdc:https:/www.tensorflow.org/api_docs)
+         - Use modern TF patterns
+         - Follow TF 2.x best practices
+      
+      3. PyTorch
+         - Follow [PyTorch Documentation](mdc:https:/pytorch.org/docs/stable/index.html)
+         - Use latest PyTorch features
+         - Follow PyTorch idioms
+
+metadata:
+  priority: high
+  version: 1.0
+</rule> 
