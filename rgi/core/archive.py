@@ -4,17 +4,16 @@ import abc
 import collections
 import dataclasses
 import json
-import pickle
-import typing
-import types
 import pathlib
-from typing import Any, Sequence, cast, Iterator
-
+import pickle
+import types
+import typing
+from typing import Any, Iterator, Sequence, cast
 
 import numpy as np
 
 from rgi.core import types as rgi_types
-from rgi.core.types import TypeOrGeneric, PrimitiveType, DataclassProtocol
+from rgi.core.types import DataclassProtocol, PrimitiveType, TypeOrGeneric
 
 T = typing.TypeVar("T")
 

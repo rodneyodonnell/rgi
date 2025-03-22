@@ -1,7 +1,7 @@
 #! /usr/bin/env python3
-import torch
 import jax
 import tensorflow as tf
+import torch
 
 print("\n\nChecking GPU availability...")
 print(f"torch.cuda.is_available(): {torch.cuda.is_available()}")

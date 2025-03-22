@@ -1,6 +1,6 @@
+import dataclasses
 import typing
 from typing import Any, Callable, Type, TypeVar
-import dataclasses
 
 import numpy as np
 

@@ -1,7 +1,7 @@
 from typing import Generic, Sequence
 
 from rgi.core import base
-from rgi.core.base import TGameState, TAction, TPlayerState
+from rgi.core.base import TAction, TGameState, TPlayerState
 from rgi.core.trajectory import GameTrajectory, TrajectoryBuilder
 
 

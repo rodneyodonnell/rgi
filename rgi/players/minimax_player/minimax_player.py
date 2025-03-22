@@ -1,7 +1,8 @@
-from typing import Optional, Literal, Sequence
+from typing import Literal, Optional, Sequence
+
 from typing_extensions import override
 
-from rgi.core.base import Game, Player, TGameState, TAction, TPlayerId
+from rgi.core.base import Game, Player, TAction, TGameState, TPlayerId
 
 TPlayerState = Literal[None]
 

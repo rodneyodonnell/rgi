@@ -1,6 +1,6 @@
 from dataclasses import dataclass
-
 from typing import Any, Sequence
+
 from typing_extensions import override
 
 from rgi.core import base

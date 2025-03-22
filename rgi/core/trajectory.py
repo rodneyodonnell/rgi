@@ -1,12 +1,12 @@
 import dataclasses
 from pathlib import Path
-from typing import Generic, Sequence, Type, Any, get_origin, get_args, Union
+from typing import Any, Generic, Sequence, Type, Union, get_args, get_origin
 
 import numpy as np
 from numpy.typing import NDArray
 
 from rgi.core import base
-from rgi.core.base import TGameState, TAction
+from rgi.core.base import TAction, TGameState
 
 
 def _is_optional(type_hint: Any) -> bool:

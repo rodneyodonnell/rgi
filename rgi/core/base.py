@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Generic, TypeVar, Sequence, Any
+from typing import Any, Generic, Sequence, TypeVar
 
 TGame = TypeVar("TGame", bound="Game[Any, Any]")  # pylint: disable=invalid-name
 TGameState = TypeVar("TGameState")  # pylint: disable=invalid-name

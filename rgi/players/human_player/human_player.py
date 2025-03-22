@@ -1,7 +1,8 @@
 from typing import Generic, Literal, Sequence
+
 from typing_extensions import override
 
-from rgi.core.base import Player, TGame, TGameState, TAction
+from rgi.core.base import Player, TAction, TGame, TGameState
 
 _INDEX_PREFIX = "i:"
 
