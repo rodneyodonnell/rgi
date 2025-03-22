@@ -8,6 +8,7 @@ from typing_extensions import override
 
 from rgi.core.base import ActionResult, Player, TAction, TGame, TGameState
 
+
 @dataclasses.dataclass
 class MCTSData(Generic[TAction]):
     """Data collected during MCTS search for a single state.
@@ -76,7 +77,7 @@ class AlphaZeroPlayer(Player[TGameState, TPlayerState, TAction, TPlayerData]):
 
         # Run MCTS search
         mcts_data = mcts.search(game_state)
-        
+
         # Validate that passed in and calculated legal actions are the same.
         assert mcts_data.legal_actions == legal_actions
 
@@ -181,7 +182,7 @@ class MCTS(Generic[TGame, TGameState, TAction]):
                 child_node = MCTSNode(child_state, self.n_players, parent=node)
                 child_node.prior = float(policy[index])
                 children.append(child_node)
-            
+
             return action_values
 
         # Selection: choose the child with highest UCB (upper confidence bound) based on current player's value.

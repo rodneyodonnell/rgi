@@ -70,10 +70,10 @@ class SelfPlayWorker:
     def run_games(self, num_games: int) -> list[GameTrajectory[Count21State, int, MCTSData[int]]]:
         """Run self-play games and return trajectories."""
         trajectories: list[GameTrajectory[Count21State, int, MCTSData[int]]] = []
-        
+
         # Only show progress if verbose and this is the first worker
         show_progress = self.config.verbose and ray.get_runtime_context().get_worker_id() == 0
-        
+
         # Use tqdm only if showing progress
         game_range = tqdm(range(num_games), desc="Games", disable=not show_progress)
         for _ in game_range:
@@ -84,16 +84,16 @@ class SelfPlayWorker:
             runner = GameRunner(self.game, players, verbose=False)  # Always set verbose=False for workers
             trajectory = runner.run()
             trajectories.append(trajectory)
-            
+
             if show_progress:
                 # Update progress bar with game stats
                 final_rewards = trajectory.final_reward
                 game_range.set_postfix(
                     moves=len(trajectory.actions),
                     p1_reward=f"{final_rewards[0]:.1f}",
-                    p2_reward=f"{final_rewards[1]:.1f}"
+                    p2_reward=f"{final_rewards[1]:.1f}",
                 )
-                
+
         return trajectories
 
 

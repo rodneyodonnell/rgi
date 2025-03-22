@@ -120,7 +120,7 @@ class TrajectoryDataset_Count21:
 
                 # Get MCTS visit counts for this state
                 mcts_data = traj.player_data[i]
-                
+
                 # Use legal_actions from MCTSData instead of hardcoding the number of actions
                 num_actions = len(mcts_data.legal_actions)
                 visit_counts = np.zeros(num_actions, dtype=np.float32)

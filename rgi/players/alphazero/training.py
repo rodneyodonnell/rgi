@@ -13,7 +13,7 @@ import argparse
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import NamedTuple, TypedDict, NotRequired
+from typing import NamedTuple, NotRequired, TypedDict
 
 import numpy as np
 import ray
