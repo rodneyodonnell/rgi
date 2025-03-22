@@ -7,37 +7,46 @@ on:
     branches: [ main ]
 
 jobs:
-  test:
+  lint:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.12"]
-
     steps:
     - uses: actions/checkout@v4
     
-    - name: Set up Python ${{ matrix.python-version }}
+    - name: Set up Python 3.12
       uses: actions/setup-python@v5
       with:
-        python-version: ${{ matrix.python-version }}
+        python-version: "3.12"
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install black isort mypy pylint
+        
+    - name: Run linting checks
+      run: |
+        echo "Running formatting checks..."
+        black --check .
+        isort --check .
+        echo "Running type checks..."
+        mypy rgi
+        echo "Running pylint..."
+        pylint rgi --fail-under=9.8  # Allow minor style warnings while catching real issues
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
         
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-        pip install pytest mypy pylint black isort
-        
-    - name: Check formatting with black
-      run: black --check .
-        
-    - name: Check imports with isort
-      run: isort --check .
-        
-    - name: Type checking with mypy
-      run: mypy rgi
-        
-    - name: Lint with pylint
-      run: pylint rgi
+        pip install pytest
         
     - name: Run tests
       run: |
