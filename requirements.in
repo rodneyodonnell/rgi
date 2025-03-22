@@ -17,6 +17,7 @@
 # Versions here must match Dockerfile, and are included here to keep consistency with dependencies.
 jax[cuda]==0.4.35
 tensorflow==2.18.0
+types-tensorflow
 torch==2.5.0
 playwright==1.48.0
 
@@ -45,6 +46,9 @@ pytest-benchmark
 pytest-playwright
 selenium
 webdriver-manager
+
+# Ray
+ray[default]
 
 # Tools
 pip-tools
