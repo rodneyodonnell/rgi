@@ -11,6 +11,4 @@ isort .
 
 # Run black using project config from pyproject.toml
 echo "Running black..."
-black .
-
-echo "Formatting complete!" 
+black . 
