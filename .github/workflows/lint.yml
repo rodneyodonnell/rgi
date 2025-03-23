@@ -1,0 +1,94 @@
+name: Lint
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  issue_comment:
+    types: [created]
+
+jobs:
+  lint:
+    if: |
+      github.event_name == 'pull_request' ||
+      github.event_name == 'push' ||
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '/run_lint'))
+    runs-on: ubuntu-22.04
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Needed for getting changed files
+    
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install black isort mypy pylint
+
+    - name: Get changed files
+      id: changed-files
+      if: github.event_name == 'pull_request'
+      run: |
+        echo "files=$(git diff --name-only --diff-filter=ACMRT origin/${{ github.base_ref }} ${{ github.sha }} | grep '\.py$' | tr '\n' ' ')" >> $GITHUB_OUTPUT
+        echo "any_python=$(git diff --name-only --diff-filter=ACMRT origin/${{ github.base_ref }} ${{ github.sha }} | grep -q '\.py$' && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
+
+    - name: Check formatting with black
+      run: |
+        if [ "${{ github.event_name }}" == "pull_request" ]; then
+          if [ "${{ steps.changed-files.outputs.any_python }}" == "true" ]; then
+            echo "Checking changed files: ${{ steps.changed-files.outputs.files }}"
+            black --check ${{ steps.changed-files.outputs.files }}
+          else
+            echo "No Python files changed, skipping black check"
+          fi
+        else
+          echo "Running full check..."
+          black --check .
+        fi
+        
+    - name: Check imports with isort
+      run: |
+        if [ "${{ github.event_name }}" == "pull_request" ]; then
+          if [ "${{ steps.changed-files.outputs.any_python }}" == "true" ]; then
+            echo "Checking changed files: ${{ steps.changed-files.outputs.files }}"
+            isort --check ${{ steps.changed-files.outputs.files }}
+          else
+            echo "No Python files changed, skipping isort check"
+          fi
+        else
+          echo "Running full check..."
+          isort --check .
+        fi
+        
+    - name: Type checking with mypy
+      run: |
+        if [ "${{ github.event_name }}" == "pull_request" ]; then
+          if [ "${{ steps.changed-files.outputs.any_python }}" == "true" ]; then
+            echo "Checking changed files: ${{ steps.changed-files.outputs.files }}"
+            mypy ${{ steps.changed-files.outputs.files }}
+          else
+            echo "No Python files changed, skipping mypy check"
+          fi
+        else
+          echo "Running full check..."
+          mypy rgi
+        fi
+        
+    - name: Lint with pylint
+      run: |
+        if [ "${{ github.event_name }}" == "pull_request" ]; then
+          if [ "${{ steps.changed-files.outputs.any_python }}" == "true" ]; then
+            echo "Checking changed files: ${{ steps.changed-files.outputs.files }}"
+            pylint ${{ steps.changed-files.outputs.files }} --fail-under=9.8
+          else
+            echo "No Python files changed, skipping pylint check"
+          fi
+        else
+          echo "Running full check..."
+          pylint rgi --fail-under=9.8
+        fi 

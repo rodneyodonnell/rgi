@@ -1,5 +1,8 @@
 # RGI
 
+[![Tests](https://github.com/rodneyodonnell/rgi/actions/workflows/test.yml/badge.svg)](https://github.com/rodneyodonnell/rgi/actions/workflows/test.yml)
+[![Lint](https://github.com/rodneyodonnell/rgi/actions/workflows/lint.yml/badge.svg)](https://github.com/rodneyodonnell/rgi/actions/workflows/lint.yml)
+
 This repository if a testbed for playing with Reinforcement Learning for Games.
 
 ## Goals:
