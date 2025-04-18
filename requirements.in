@@ -18,7 +18,7 @@
 jax[cuda]==0.4.35
 tensorflow==2.18.0
 types-tensorflow
-torch==2.5.0
+torch==2.6.0+cu124
 playwright==1.48.0
 
 
